@@ -21,6 +21,7 @@ import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
 import { WorkflowChooser, type PlannerWorkflow } from "./components/WorkflowChooser";
+import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
 
 const backendClient = new BackendClient();
 
@@ -323,6 +324,7 @@ function App() {
 
   return (
     <main className="app-shell">
+      <BackendStatusIndicator backendClient={backendClient} />
       <header className="app-header">
         <div>
           <p className="eyebrow">awork planner utility</p>

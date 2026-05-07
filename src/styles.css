@@ -794,3 +794,25 @@ select:disabled {
 .delete-x-button:hover {
   background: #fdecea;
 }
+
+.backend-startup-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #fff5db;
+  border: 1px solid #f1d58f;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
+  z-index: 100;
+}
+
+.backend-startup-indicator p {
+  margin: 0;
+  color: #60440a;
+  font-weight: 600;
+  font-size: 0.9rem;
+}

@@ -12,7 +12,33 @@ interface TaskScheduleQuery {
   to: string;
 }
 
+type BackendStatusListener = (status: "ok" | "starting") => void;
+
 export class BackendClient {
+  private statusListeners: Set<BackendStatusListener> = new Set();
+  private isBackendStarting = false;
+
+  onStatusChange(listener: BackendStatusListener): () => void {
+    this.statusListeners.add(listener);
+    return () => this.statusListeners.delete(listener);
+  }
+
+  private notifyStatusChange(status: "ok" | "starting") {
+    this.statusListeners.forEach((listener) => listener(status));
+  }
+
+  async checkBackendHealth(): Promise<boolean> {
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/auth/status`, {
+        credentials: "include",
+        signal: AbortSignal.timeout(5000),
+      });
+      return response.ok || response.status === 401;
+    } catch {
+      return false;
+    }
+  }
+
   getLoginUrl(): string {
     return `${BACKEND_BASE_URL}/auth/login`;
   }
@@ -81,26 +107,63 @@ export class BackendClient {
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
-      ...init,
-      credentials: "include",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        ...init.headers,
-      },
-    });
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
+        ...init,
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...init.headers,
+        },
+      });
 
-    if (!response.ok) {
-      const message = await safeReadError(response);
-      throw new Error(message || `Backend request failed with status ${response.status}.`);
+      // If backend is starting up (503), wait and retry
+      if (response.status === 503) {
+        return this.handleBackendStarting<T>(path, init);
+      }
+
+      if (!response.ok) {
+        const message = await safeReadError(response);
+        throw new Error(message || `Backend request failed with status ${response.status}.`);
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      this.notifyStatusChange("ok");
+      return response.json() as Promise<T>;
+    } catch (error) {
+      // Connection error likely means backend is starting
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        return this.handleBackendStarting<T>(path, init);
+      }
+      throw error;
+    }
+  }
+
+  private async handleBackendStarting<T>(path: string, init: RequestInit): Promise<T> {
+    if (!this.isBackendStarting) {
+      this.isBackendStarting = true;
+      this.notifyStatusChange("starting");
     }
 
-    if (response.status === 204) {
-      return undefined as T;
-    }
+    // Wait 3 seconds for backend to start
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    return response.json() as Promise<T>;
+    // Check if backend is healthy
+    const isHealthy = await this.checkBackendHealth();
+
+    if (isHealthy) {
+      this.isBackendStarting = false;
+      this.notifyStatusChange("ok");
+      // Retry the original request
+      return this.request<T>(path, init);
+    } else {
+      // Still starting, wait more and try again
+      return this.handleBackendStarting<T>(path, init);
+    }
   }
 }
 
