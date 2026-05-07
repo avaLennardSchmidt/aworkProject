@@ -39,6 +39,8 @@ import { DeleteGroupModal } from "./components/DeleteGroupModal";
 import { ErrorAlert } from "./components/ErrorAlert";
 import { FilterPanel } from "./components/FilterPanel";
 import { LoadingState } from "./components/LoadingState";
+import { ManualBlockerEditModal } from "./components/ManualBlockerEditModal";
+import { ManualEditConfirmModal } from "./components/ManualEditConfirmModal";
 import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
@@ -84,6 +86,8 @@ function App() {
   >([]);
   const [hasLoadedSchedules, setHasLoadedSchedules] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ScheduleGroup>();
+  const [manualConfirmGroup, setManualConfirmGroup] = useState<ScheduleGroup>();
+  const [manualEditGroup, setManualEditGroup] = useState<ScheduleGroup>();
   const [deleteGroup, setDeleteGroup] = useState<ScheduleGroup>();
   const [previewChanges, setPreviewChanges] = useState<PreviewChange[]>();
   const [updateResults, setUpdateResults] = useState<UpdateResult[]>();
@@ -190,6 +194,8 @@ function App() {
     setProjectTasksForCreate([]);
     setHasLoadedSchedules(false);
     setSelectedGroup(undefined);
+    setManualConfirmGroup(undefined);
+    setManualEditGroup(undefined);
     setDeleteGroup(undefined);
     setPreviewChanges(undefined);
     setUpdateResults(undefined);
@@ -390,7 +396,15 @@ function App() {
 
   function handlePreview(changes: PreviewChange[]) {
     setPreviewChanges(changes);
+    setSelectedGroup(undefined);
+    setManualConfirmGroup(undefined);
+    setManualEditGroup(undefined);
     setUpdateResults(undefined);
+  }
+
+  function handleManualEditRequest(group: ScheduleGroup) {
+    setSelectedGroup(undefined);
+    setManualConfirmGroup(group);
   }
   async function handleDeleteGroup() {
     if (!currentUser || !deleteGroup) return;
@@ -462,6 +476,8 @@ function App() {
 
   function closeModals() {
     setSelectedGroup(undefined);
+    setManualConfirmGroup(undefined);
+    setManualEditGroup(undefined);
     setDeleteGroup(undefined);
     setPreviewChanges(undefined);
     setUpdateResults(undefined);
@@ -551,6 +567,35 @@ function App() {
         <BulkEditModal
           group={selectedGroup}
           currentUser={currentUser}
+          onClose={closeModals}
+          onPreview={handlePreview}
+          onManualEditRequest={handleManualEditRequest}
+        />
+      ) : null}
+
+      {manualConfirmGroup ? (
+        <ManualEditConfirmModal
+          group={manualConfirmGroup}
+          onBack={() => {
+            setSelectedGroup(manualConfirmGroup);
+            setManualConfirmGroup(undefined);
+          }}
+          onCancel={closeModals}
+          onConfirm={() => {
+            setManualEditGroup(manualConfirmGroup);
+            setManualConfirmGroup(undefined);
+          }}
+        />
+      ) : null}
+
+      {manualEditGroup && currentUser ? (
+        <ManualBlockerEditModal
+          group={manualEditGroup}
+          currentUser={currentUser}
+          onBack={() => {
+            setManualConfirmGroup(manualEditGroup);
+            setManualEditGroup(undefined);
+          }}
           onClose={closeModals}
           onPreview={handlePreview}
         />

@@ -18,9 +18,10 @@ interface BulkEditModalProps {
   currentUser: AworkUser;
   onClose: () => void;
   onPreview: (changes: PreviewChange[]) => void;
+  onManualEditRequest: (group: ScheduleGroup) => void;
 }
 
-export function BulkEditModal({ group, currentUser, onClose, onPreview }: BulkEditModalProps) {
+export function BulkEditModal({ group, currentUser, onClose, onPreview, onManualEditRequest }: BulkEditModalProps) {
   const originalDuration = calculateDurationMinutes(group.schedules[0].start, group.schedules[0].end);
   const [mode, setMode] = useState<BulkEditMode>("manual");
   const [newStartTime, setNewStartTime] = useState(group.startTime);
@@ -172,13 +173,18 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview }: BulkEd
         <div className="computed-window">New pattern: {computedWindow}</div>
         {error ? <div className="alert alert-error">{error}</div> : null}
 
-        <div className="modal-actions">
-          <button type="button" className="ghost-button" onClick={onClose}>
-            Cancel
+        <div className="modal-actions modal-actions-split">
+          <button type="button" className="manual-edit-button" onClick={() => onManualEditRequest(group)}>
+            Manual edit
           </button>
-          <button type="button" className="primary-button" onClick={handlePreview}>
-            Preview changes
-          </button>
+          <div className="modal-actions-right">
+            <button type="button" className="ghost-button" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="button" className="primary-button" onClick={handlePreview}>
+              Preview changes
+            </button>
+          </div>
         </div>
       </div>
     </div>
