@@ -149,12 +149,6 @@ function App() {
     });
   }, [allSchedules, currentUser, filters.hidePast, filters.projectId]);
 
-  const ignoredOwnershipCount = useMemo(() => {
-    if (!currentUser) return 0;
-    return allSchedules.filter(
-      (schedule) => !isOwnSchedule(schedule, currentUser),
-    ).length;
-  }, [allSchedules, currentUser]);
 
   const groups = useMemo(
     () => groupSchedules(filteredSchedules),
@@ -243,27 +237,7 @@ function App() {
       setHasLoadedSchedules(true);
 
       if (mapped.schedules.length === 0) {
-        setStatusMessage("No schedules found for this date range.");
-      } else if (
-        enrichedSchedules.every(
-          (schedule) => !isOwnSchedule(schedule, currentUser),
-        )
-      ) {
-        setStatusMessage(
-          "Schedules were loaded, but none could be verified as your own.",
-        );
-      } else {
-        const ownSchedulesWithProject = enrichedSchedules.filter(
-          (schedule) =>
-            isOwnSchedule(schedule, currentUser) &&
-            schedule.projectId &&
-            schedule.projectName,
-        );
-        setStatusMessage(
-          ownSchedulesWithProject.length > 0
-            ? `${enrichedSchedules.length} schedules loaded. Project filter is available.`
-            : `${enrichedSchedules.length} schedules loaded. No project data was found in your schedule response.`,
-        );
+        setStatusMessage("No planned blockers found for this date range.");
       }
     } catch (loadError) {
       setError(
@@ -471,7 +445,7 @@ function App() {
         setUpdateSuccess({
           count: successCount,
           failed: failureCount,
-          title: "Bam, Blocker angepasst.",
+          title: "BÄM, Blocker angepasst.",
           detail: "The selected blocker updates, additions, and unplans were applied. The awork task was not deleted.",
         });
       }
@@ -576,14 +550,6 @@ function App() {
           {isLoadingSchedules ? (
             <LoadingState label="Loading planned tasks from awork..." />
           ) : null}
-
-          {ignoredOwnershipCount > 0 ? (
-            <div className="alert alert-warning">
-              {ignoredOwnershipCount} schedules were ignored because ownership
-              could not be verified for the connected user.
-            </div>
-          ) : null}
-
           <ScheduleGroupsList
             groups={groups}
             hasLoaded={hasLoadedSchedules}
@@ -658,7 +624,7 @@ function App() {
 
       {createSuccess ? (
         <SuccessPopup
-          title="Bam, Aufgabe erledigt."
+          title="BÄM, Aufgabe erledigt."
           message={`${createSuccess.count} planned blocker${createSuccess.count === 1 ? "" : "s"} created successfully.`}
           detail={
             createSuccess.taskCreated
@@ -673,7 +639,7 @@ function App() {
 
       {deleteSuccess ? (
         <SuccessPopup
-          title="Bam, Gruppe ausgeplant."
+          title="BÄM, Gruppe ausgeplant."
           message={`${deleteSuccess.count} planned blocker${deleteSuccess.count === 1 ? "" : "s"} unplanned successfully.`}
           detail="All selected blockers were removed from your planner. The awork task was not deleted."
           onClose={() => setDeleteSuccess(undefined)}
@@ -682,7 +648,7 @@ function App() {
 
       {updateSuccess ? (
         <SuccessPopup
-          title={updateSuccess.title ?? "Bam, Zeitfenster angepasst."}
+          title={updateSuccess.title ?? "BÄM, Zeitfenster angepasst."}
           message={`${updateSuccess.count} planned blocker${updateSuccess.count === 1 ? "" : "s"} updated successfully.`}
           detail={updateSuccess.detail ?? "The new time window was applied to the selected blockers."}
           onClose={() => setUpdateSuccess(undefined)}
