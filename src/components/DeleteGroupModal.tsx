@@ -18,8 +18,8 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="delete-group-title">
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Delete group</p>
-            <h2 id="delete-group-title">Delete {group.schedules.length} planned blockers?</h2>
+            <p className="eyebrow">Unplan group</p>
+            <h2 id="delete-group-title">Unplan {group.schedules.length} planned blockers?</h2>
             <p>
               {group.taskName} · {group.projectName ?? "Project not resolved"} · {group.weekdayLabel} {group.startTime}-{group.endTime}
             </p>
@@ -30,7 +30,7 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
         </div>
 
         <div className="alert alert-warning">
-          This removes the selected planner blockers from awork. It does not delete the task or project. Only blockers verified as your own can be deleted.
+          This removes the selected planner blockers from your awork calendar. It does not delete the task or project. Only blockers verified as your own can be unplanned.
         </div>
 
         <div className="preview-summary">
@@ -52,7 +52,7 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
 
         {deleteResults ? (
           <div className={failureCount > 0 ? "alert alert-error" : "alert alert-success"}>
-            {successCount} deletes succeeded. {failureCount} deletes failed.
+            {successCount} blockers unplanned. {failureCount} failed.
           </div>
         ) : null}
 
@@ -74,7 +74,7 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
             Close
           </button>
           <button type="button" className="danger-button" disabled={isDeleting || Boolean(deleteResults)} onClick={onDelete}>
-            {isDeleting ? "Deleting..." : "Delete blockers"}
+            {isDeleting ? "Unplanning..." : "Unplan blockers"}
           </button>
         </div>
       </div>

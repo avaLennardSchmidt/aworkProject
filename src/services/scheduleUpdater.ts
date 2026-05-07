@@ -39,7 +39,7 @@ export async function updateScheduleChanges(
   return results;
 }
 
-function buildUpdatePayload(change: PreviewChange): unknown {
+export function buildUpdatePayload(change: PreviewChange): unknown {
   if (!isRecord(change.schedule.raw)) {
     return {
       start: change.newStartIso,

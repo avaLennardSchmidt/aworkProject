@@ -1,7 +1,9 @@
 import {
+  addDays,
   addMinutes,
   differenceInMinutes,
   format,
+  getDay,
   getISOWeek,
   isValid,
   parse,
@@ -12,6 +14,16 @@ import type { AworkTaskSchedule } from "../types/awork";
 
 export function getTimeHHmm(iso: string): string {
   return format(parseISO(iso), "HH:mm");
+}
+
+export function setWeekdayPreservingTime(iso: string, weekday: number): string {
+  const original = parseISO(iso);
+
+  if (!isValid(original) || weekday < 0 || weekday > 6) {
+    throw new Error("Invalid date or weekday value.");
+  }
+
+  return toLocalIsoWithOffset(addDays(original, weekday - getDay(original)));
 }
 
 export function setTimeOnSameDate(iso: string, hhmm: string): string {
@@ -64,11 +76,34 @@ export function buildUpdatedTimeWindow(
   };
 }
 
+export function buildUpdatedTimeWindowOnWeekday(
+  schedule: AworkTaskSchedule,
+  newStartTime: string,
+  newEndTime: string,
+  weekday: number,
+): { newStartIso: string; newEndIso: string } {
+  const shiftedStart = setWeekdayPreservingTime(schedule.start, weekday);
+  const shiftedEnd = setWeekdayPreservingTime(schedule.end, weekday);
+
+  return {
+    newStartIso: setTimeOnSameDate(shiftedStart, newStartTime),
+    newEndIso: setTimeOnSameDate(shiftedEnd, newEndTime),
+  };
+}
+
 export function buildUpdatedTimeWindowKeepStart(
   schedule: AworkTaskSchedule,
   newDurationMinutes: number,
 ): { newStartIso: string; newEndIso: string } {
-  const start = parseISO(schedule.start);
+  return buildUpdatedTimeWindowKeepStartOnWeekday(schedule, newDurationMinutes, getDay(parseISO(schedule.start)));
+}
+
+export function buildUpdatedTimeWindowKeepStartOnWeekday(
+  schedule: AworkTaskSchedule,
+  newDurationMinutes: number,
+  weekday: number,
+): { newStartIso: string; newEndIso: string } {
+  const start = parseISO(setWeekdayPreservingTime(schedule.start, weekday));
   const end = addMinutes(start, newDurationMinutes);
 
   return {
@@ -81,7 +116,15 @@ export function buildUpdatedTimeWindowKeepEnd(
   schedule: AworkTaskSchedule,
   newDurationMinutes: number,
 ): { newStartIso: string; newEndIso: string } {
-  const end = parseISO(schedule.end);
+  return buildUpdatedTimeWindowKeepEndOnWeekday(schedule, newDurationMinutes, getDay(parseISO(schedule.end)));
+}
+
+export function buildUpdatedTimeWindowKeepEndOnWeekday(
+  schedule: AworkTaskSchedule,
+  newDurationMinutes: number,
+  weekday: number,
+): { newStartIso: string; newEndIso: string } {
+  const end = parseISO(setWeekdayPreservingTime(schedule.end, weekday));
   const start = addMinutes(end, -newDurationMinutes);
 
   return {

@@ -30,7 +30,7 @@ export async function deleteScheduleGroup(
       results.push({
         scheduleId: schedule.id,
         success: false,
-        error: error instanceof Error ? error.message : "Delete failed.",
+        error: error instanceof Error ? error.message : "Unplan failed.",
       });
     }
   }

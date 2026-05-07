@@ -21,7 +21,10 @@ export function ScheduleGroupsList({
   onChangeTimeWindow,
   onDeleteGroup,
 }: ScheduleGroupsListProps) {
-  const projectSections = useMemo(() => buildProjectSections(groups), [groups]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedSearchQuery = searchQuery.trim();
+  const filteredGroups = useMemo(() => filterGroups(groups, searchQuery), [groups, searchQuery]);
+  const projectSections = useMemo(() => buildProjectSections(filteredGroups), [filteredGroups]);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
     new Set(),
   );
@@ -55,11 +58,30 @@ export function ScheduleGroupsList({
     <section className="groups-section">
       <div className="section-heading">
         <p className="eyebrow">Schedule groups</p>
-        <h2>{groups.length} editable groups</h2>
+        <h2>{filteredGroups.length} editable groups</h2>
       </div>
 
-      <div className="groups-table-wrap">
-        <table className="groups-table">
+      <div className="groups-search-row">
+        <label htmlFor="groups-search">Search groups</label>
+        <input
+          id="groups-search"
+          type="search"
+          value={searchQuery}
+          placeholder="Search task, project, weekday, time..."
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+      </div>
+
+      {filteredGroups.length === 0 ? (
+        <section className="panel empty-state groups-search-empty">
+          <h2>No groups match this search</h2>
+          <p>Try a task, project, weekday, or time window.</p>
+        </section>
+      ) : null}
+
+      {filteredGroups.length > 0 ? (
+        <div className="groups-table-wrap">
+          <table className="groups-table">
           <thead>
             <tr>
               <th scope="col">Task</th>
@@ -76,15 +98,16 @@ export function ScheduleGroupsList({
               <ProjectRows
                 key={section.projectKey}
                 section={section}
-                collapsed={collapsedProjects.has(section.projectKey)}
+                collapsed={!normalizedSearchQuery && collapsedProjects.has(section.projectKey)}
                 onToggle={() => toggleProject(section.projectKey)}
                 onChangeTimeWindow={onChangeTimeWindow}
                 onDeleteGroup={onDeleteGroup}
               />
             ))}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -157,7 +180,8 @@ function ProjectRows({
                 <button
                   type="button"
                   className="delete-x-button"
-                  title="Delete group"
+                  title="Unplan group"
+                  aria-label="Unplan group"
                   onClick={() => onDeleteGroup(group)}
                 >
                   ×
@@ -167,6 +191,25 @@ function ProjectRows({
           </tr>
         ))}
     </>
+  );
+}
+
+function filterGroups(groups: ScheduleGroup[], query: string): ScheduleGroup[] {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return groups;
+
+  return groups.filter((group) =>
+    [
+      group.taskName,
+      group.projectName,
+      group.weekdayLabel,
+      group.startTime,
+      group.endTime,
+      group.startTime + "-" + group.endTime,
+      group.weekdayLabel + " " + group.startTime + "-" + group.endTime,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery)),
   );
 }
 

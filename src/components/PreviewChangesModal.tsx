@@ -45,7 +45,7 @@ export function PreviewChangesModal({
         <div className="preview-list">
           {changes.map((change) => (
             <div key={change.schedule.id} className="preview-row">
-              <span>{change.dateLabel}</span>
+              <span>{formatPreviewDate(change.dateLabel, change.newDateLabel)}</span>
               <strong>
                 {change.oldStart}-{change.oldEnd} to {change.newStart}-{change.newEnd}
               </strong>
@@ -86,4 +86,12 @@ export function PreviewChangesModal({
       </div>
     </div>
   );
+}
+
+function formatPreviewDate(oldDateLabel: string, newDateLabel?: string): string {
+  if (!newDateLabel || newDateLabel === oldDateLabel) {
+    return oldDateLabel;
+  }
+
+  return `${oldDateLabel} to ${newDateLabel}`;
 }

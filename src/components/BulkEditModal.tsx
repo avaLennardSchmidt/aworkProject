@@ -2,14 +2,13 @@ import { useMemo, useState } from "react";
 import type { AworkUser } from "../types/awork";
 import type { BulkEditMode, PreviewChange, ScheduleGroup } from "../types/planner";
 import {
-  buildUpdatedTimeWindow,
-  buildUpdatedTimeWindowKeepEnd,
-  buildUpdatedTimeWindowKeepStart,
+  buildUpdatedTimeWindowKeepEndOnWeekday,
+  buildUpdatedTimeWindowKeepStartOnWeekday,
+  buildUpdatedTimeWindowOnWeekday,
   calculateDurationMinutes,
   formatMinutesAsHours,
   formatScheduleDateLabel,
   getTimeHHmm,
-  isSameLocalDate,
 } from "../services/scheduleTimeCalculator";
 import { isOwnSchedule } from "../services/scheduleMapper";
 
@@ -26,20 +25,22 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
   const [mode, setMode] = useState<BulkEditMode>("manual");
   const [newStartTime, setNewStartTime] = useState(group.startTime);
   const [newEndTime, setNewEndTime] = useState(group.endTime);
+  const [newWeekday, setNewWeekday] = useState(String(group.weekday));
   const [durationMinutes, setDurationMinutes] = useState(String(originalDuration));
   const [error, setError] = useState("");
 
   const computedWindow = useMemo(() => {
     const duration = Number(durationMinutes);
+    const weekdayLabel = weekdayOptions.find((day) => day.value === Number(newWeekday))?.label ?? group.weekdayLabel;
     if (mode === "manual") {
-      return `${newStartTime}-${newEndTime}`;
+      return `${weekdayLabel} ${newStartTime}-${newEndTime}`;
     }
     if (!Number.isFinite(duration) || duration <= 0) {
       return "Invalid duration";
     }
-    const sample = buildWindowForSchedule(mode, group.schedules[0], newStartTime, newEndTime, duration);
-    return `${getTimeHHmm(sample.newStartIso)}-${getTimeHHmm(sample.newEndIso)}`;
-  }, [durationMinutes, group.schedules, mode, newEndTime, newStartTime]);
+    const sample = buildWindowForSchedule(mode, group.schedules[0], newStartTime, newEndTime, Number(newWeekday), duration);
+    return `${weekdayLabel} ${getTimeHHmm(sample.newStartIso)}-${getTimeHHmm(sample.newEndIso)}`;
+  }, [durationMinutes, group.schedules, group.weekdayLabel, mode, newEndTime, newStartTime, newWeekday]);
 
   function handlePreview() {
     const validationMessage = validate();
@@ -50,10 +51,11 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
 
     const duration = Number(durationMinutes);
     const changes = group.schedules.map((schedule) => {
-      const updated = buildWindowForSchedule(mode, schedule, newStartTime, newEndTime, duration);
+      const updated = buildWindowForSchedule(mode, schedule, newStartTime, newEndTime, Number(newWeekday), duration);
       return {
         schedule,
         dateLabel: formatScheduleDateLabel(schedule.start),
+        newDateLabel: formatScheduleDateLabel(updated.newStartIso),
         oldStart: getTimeHHmm(schedule.start),
         oldEnd: getTimeHHmm(schedule.end),
         newStart: getTimeHHmm(updated.newStartIso),
@@ -87,7 +89,7 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
 
     const duration = Number(durationMinutes);
     if (mode === "manual") {
-      const sample = safeBuildWindow(() => buildUpdatedTimeWindow(group.schedules[0], newStartTime, newEndTime));
+      const sample = safeBuildWindow(() => buildUpdatedTimeWindowOnWeekday(group.schedules[0], newStartTime, newEndTime, Number(newWeekday)));
       if (!sample) {
         return "Enter a valid start and end time.";
       }
@@ -101,13 +103,16 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
       return "Duration must be greater than 0 minutes.";
     }
 
-    const changesDate = group.schedules.some((schedule) => {
-      const updated = buildWindowForSchedule(mode, schedule, newStartTime, newEndTime, duration);
-      return !isSameLocalDate(schedule.start, updated.newStartIso) || !isSameLocalDate(schedule.end, updated.newEndIso);
-    });
+    const sample = safeBuildWindow(() =>
+      buildWindowForSchedule(mode, group.schedules[0], newStartTime, newEndTime, Number(newWeekday), duration),
+    );
 
-    if (changesDate) {
-      return "Duration cannot move a blocker to a different calendar date.";
+    if (!sample) {
+      return "Enter a valid weekday and duration.";
+    }
+
+    if (calculateDurationMinutes(sample.newStartIso, sample.newEndIso) <= 0) {
+      return "New start time must be before new end time.";
     }
 
     return "";
@@ -148,6 +153,16 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
         {mode === "manual" ? (
           <div className="filter-grid">
             <div className="form-row">
+              <label htmlFor="new-weekday">New weekday</label>
+              <select id="new-weekday" value={newWeekday} onChange={(event) => setNewWeekday(event.target.value)}>
+                {weekdayOptions.map((day) => (
+                  <option key={day.value} value={day.value}>
+                    {day.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-row">
               <label htmlFor="new-start">New start time</label>
               <input id="new-start" type="time" value={newStartTime} onChange={(event) => setNewStartTime(event.target.value)} />
             </div>
@@ -157,16 +172,28 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
             </div>
           </div>
         ) : (
-          <div className="form-row compact-input">
-            <label htmlFor="duration">New duration in minutes</label>
-            <input
-              id="duration"
-              type="number"
-              min="1"
-              step="15"
-              value={durationMinutes}
-              onChange={(event) => setDurationMinutes(event.target.value)}
-            />
+          <div className="filter-grid two-column-grid">
+            <div className="form-row">
+              <label htmlFor="new-weekday">New weekday</label>
+              <select id="new-weekday" value={newWeekday} onChange={(event) => setNewWeekday(event.target.value)}>
+                {weekdayOptions.map((day) => (
+                  <option key={day.value} value={day.value}>
+                    {day.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-row compact-input">
+              <label htmlFor="duration">New duration in minutes</label>
+              <input
+                id="duration"
+                type="number"
+                min="1"
+                step="15"
+                value={durationMinutes}
+                onChange={(event) => setDurationMinutes(event.target.value)}
+              />
+            </div>
           </div>
         )}
 
@@ -174,9 +201,11 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
         {error ? <div className="alert alert-error">{error}</div> : null}
 
         <div className="modal-actions modal-actions-split">
-          <button type="button" className="manual-edit-button" onClick={() => onManualEditRequest(group)}>
-            Manual edit
-          </button>
+          <div className="modal-actions-left">
+            <button type="button" className="manual-edit-button" onClick={() => onManualEditRequest(group)}>
+              Manual edit
+            </button>
+          </div>
           <div className="modal-actions-right">
             <button type="button" className="ghost-button" onClick={onClose}>
               Cancel
@@ -191,6 +220,16 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
   );
 }
 
+const weekdayOptions = [
+  { value: 1, label: "Monday" },
+  { value: 2, label: "Tuesday" },
+  { value: 3, label: "Wednesday" },
+  { value: 4, label: "Thursday" },
+  { value: 5, label: "Friday" },
+  { value: 6, label: "Saturday" },
+  { value: 0, label: "Sunday" },
+];
+
 function safeBuildWindow(build: () => { newStartIso: string; newEndIso: string }) {
   try {
     return build();
@@ -204,15 +243,16 @@ function buildWindowForSchedule(
   schedule: ScheduleGroup["schedules"][number],
   newStartTime: string,
   newEndTime: string,
+  newWeekday: number,
   durationMinutes: number,
 ) {
   if (mode === "keep-start") {
-    return buildUpdatedTimeWindowKeepStart(schedule, durationMinutes);
+    return buildUpdatedTimeWindowKeepStartOnWeekday(schedule, durationMinutes, newWeekday);
   }
 
   if (mode === "keep-end") {
-    return buildUpdatedTimeWindowKeepEnd(schedule, durationMinutes);
+    return buildUpdatedTimeWindowKeepEndOnWeekday(schedule, durationMinutes, newWeekday);
   }
 
-  return buildUpdatedTimeWindow(schedule, newStartTime, newEndTime);
+  return buildUpdatedTimeWindowOnWeekday(schedule, newStartTime, newEndTime, newWeekday);
 }

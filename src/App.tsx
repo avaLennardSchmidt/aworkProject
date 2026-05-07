@@ -15,6 +15,7 @@ import {
 } from "./services/projectTaskMapper";
 import { mapProjectsResponse } from "./services/projectMapper";
 import { updateScheduleChanges } from "./services/scheduleUpdater";
+import { applyBlockerOperations } from "./services/scheduleOperations";
 import type {
   AworkProject,
   AworkProjectTask,
@@ -23,6 +24,8 @@ import type {
   CreateTaskSchedulePayload,
 } from "./types/awork";
 import type {
+  BlockerOperation,
+  BlockerOperationResult,
   DeleteResult,
   PlannerFilters,
   PreviewChange,
@@ -42,6 +45,7 @@ import { LoadingState } from "./components/LoadingState";
 import { ManualBlockerEditModal } from "./components/ManualBlockerEditModal";
 import { ManualEditConfirmModal } from "./components/ManualEditConfirmModal";
 import { PreviewChangesModal } from "./components/PreviewChangesModal";
+import { BlockerOperationsPreviewModal } from "./components/BlockerOperationsPreviewModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
 import {
@@ -58,6 +62,7 @@ function App() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isApplyingBlockerOperations, setIsApplyingBlockerOperations] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
@@ -72,6 +77,8 @@ function App() {
   const [updateSuccess, setUpdateSuccess] = useState<{
     count: number;
     failed: number;
+    title?: string;
+    detail?: string;
   }>();
   const [deleteSuccess, setDeleteSuccess] = useState<{
     count: number;
@@ -90,6 +97,8 @@ function App() {
   const [manualEditGroup, setManualEditGroup] = useState<ScheduleGroup>();
   const [deleteGroup, setDeleteGroup] = useState<ScheduleGroup>();
   const [previewChanges, setPreviewChanges] = useState<PreviewChange[]>();
+  const [blockerOperations, setBlockerOperations] = useState<BlockerOperation[]>();
+  const [blockerOperationResults, setBlockerOperationResults] = useState<BlockerOperationResult[]>();
   const [updateResults, setUpdateResults] = useState<UpdateResult[]>();
   const [deleteResults, setDeleteResults] = useState<DeleteResult[]>();
   const [filters, setFilters] = useState<PlannerFilters>(() => ({
@@ -198,6 +207,8 @@ function App() {
     setManualEditGroup(undefined);
     setDeleteGroup(undefined);
     setPreviewChanges(undefined);
+    setBlockerOperations(undefined);
+    setBlockerOperationResults(undefined);
     setUpdateResults(undefined);
     setDeleteResults(undefined);
     setCreateSuccess(undefined);
@@ -396,16 +407,19 @@ function App() {
 
   function handlePreview(changes: PreviewChange[]) {
     setPreviewChanges(changes);
-    setSelectedGroup(undefined);
-    setManualConfirmGroup(undefined);
-    setManualEditGroup(undefined);
     setUpdateResults(undefined);
+  }
+
+  function handleBlockerOperationsPreview(operations: BlockerOperation[]) {
+    setBlockerOperations(operations);
+    setBlockerOperationResults(undefined);
   }
 
   function handleManualEditRequest(group: ScheduleGroup) {
     setSelectedGroup(undefined);
     setManualConfirmGroup(group);
   }
+
   async function handleDeleteGroup() {
     if (!currentUser || !deleteGroup) return;
 
@@ -422,7 +436,7 @@ function App() {
       const successCount = results.filter((result) => result.success).length;
       const failureCount = results.length - successCount;
       setStatusMessage(
-        `${successCount} planned blockers deleted. ${failureCount} failed.`,
+        `${successCount} planned blockers unplanned. ${failureCount} failed.`,
       );
       if (successCount > 0 && failureCount === 0) {
         closeModals();
@@ -437,6 +451,35 @@ function App() {
       );
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  async function handleApplyBlockerOperations() {
+    if (!currentUser || !blockerOperations) return;
+
+    setIsApplyingBlockerOperations(true);
+    setError("");
+
+    try {
+      const results = await applyBlockerOperations(backendClient, currentUser, blockerOperations);
+      setBlockerOperationResults(results);
+      const successCount = results.filter((result) => result.success).length;
+      const failureCount = results.length - successCount;
+      setStatusMessage(`${successCount} blocker operations applied. ${failureCount} failed.`);
+      if (successCount > 0 && failureCount === 0) {
+        closeModals();
+        setUpdateSuccess({
+          count: successCount,
+          failed: failureCount,
+          title: "Bam, Blocker angepasst.",
+          detail: "The selected blocker updates, additions, and unplans were applied. The awork task was not deleted.",
+        });
+      }
+      if (successCount > 0) await loadSchedules();
+    } catch (operationError) {
+      setError(operationError instanceof Error ? operationError.message : "Could not apply blocker operations.");
+    } finally {
+      setIsApplyingBlockerOperations(false);
     }
   }
 
@@ -480,6 +523,8 @@ function App() {
     setManualEditGroup(undefined);
     setDeleteGroup(undefined);
     setPreviewChanges(undefined);
+    setBlockerOperations(undefined);
+    setBlockerOperationResults(undefined);
     setUpdateResults(undefined);
     setDeleteResults(undefined);
   }
@@ -597,7 +642,7 @@ function App() {
             setManualEditGroup(undefined);
           }}
           onClose={closeModals}
-          onPreview={handlePreview}
+          onPreview={handleBlockerOperationsPreview}
         />
       ) : null}
 
@@ -628,19 +673,33 @@ function App() {
 
       {deleteSuccess ? (
         <SuccessPopup
-          title="Bam, Gruppe geloescht."
-          message={`${deleteSuccess.count} planned blocker${deleteSuccess.count === 1 ? "" : "s"} deleted successfully.`}
-          detail="All selected blockers were removed from your planner."
+          title="Bam, Gruppe ausgeplant."
+          message={`${deleteSuccess.count} planned blocker${deleteSuccess.count === 1 ? "" : "s"} unplanned successfully.`}
+          detail="All selected blockers were removed from your planner. The awork task was not deleted."
           onClose={() => setDeleteSuccess(undefined)}
         />
       ) : null}
 
       {updateSuccess ? (
         <SuccessPopup
-          title="Bam, Zeitfenster angepasst."
+          title={updateSuccess.title ?? "Bam, Zeitfenster angepasst."}
           message={`${updateSuccess.count} planned blocker${updateSuccess.count === 1 ? "" : "s"} updated successfully.`}
-          detail="The new time window was applied to the whole group."
+          detail={updateSuccess.detail ?? "The new time window was applied to the selected blockers."}
           onClose={() => setUpdateSuccess(undefined)}
+        />
+      ) : null}
+
+      {blockerOperations ? (
+        <BlockerOperationsPreviewModal
+          operations={blockerOperations}
+          isApplying={isApplyingBlockerOperations}
+          results={blockerOperationResults}
+          onBack={() => {
+            setBlockerOperations(undefined);
+            setBlockerOperationResults(undefined);
+          }}
+          onCancel={closeModals}
+          onApply={handleApplyBlockerOperations}
         />
       ) : null}
 
