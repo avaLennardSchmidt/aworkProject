@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { endOfYear, format, isBefore, parseISO, startOfToday } from "date-fns";
 import { BackendClient } from "./services/backendClient";
+import { storeSessionTokenFromUrl } from "./services/backendClient";
 import { groupSchedules } from "./services/scheduleGrouping";
 import { deleteScheduleGroup } from "./services/scheduleDeleter";
 import {
@@ -97,6 +98,7 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("aworkLogin") === "success") {
+      storeSessionTokenFromUrl();
       setStatusMessage("awork login completed. Checking your session...");
       window.history.replaceState({}, document.title, window.location.pathname);
     }

@@ -8,6 +8,24 @@ const BACKEND_BASE_URL = (
   import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174"
 ).replace(/\/$/, "");
 
+const SESSION_STORAGE_KEY = "awork_planner_session";
+
+function getStoredSessionToken(): string | null {
+  return sessionStorage.getItem(SESSION_STORAGE_KEY);
+}
+
+export function storeSessionTokenFromUrl(): void {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("session");
+  if (token) {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+  }
+}
+
+export function clearStoredSessionToken(): void {
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
 interface AuthStatusResponse {
   authenticated: boolean;
   user?: unknown;
@@ -59,6 +77,7 @@ export class BackendClient {
 
   async logout(): Promise<void> {
     await this.request("/auth/logout", { method: "POST" });
+    clearStoredSessionToken();
   }
 
   async getCurrentUser(): Promise<AworkUser> {
@@ -132,6 +151,7 @@ export class BackendClient {
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const sessionToken = getStoredSessionToken();
     try {
       const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
         ...init,
@@ -139,6 +159,7 @@ export class BackendClient {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
+          ...(sessionToken ? { "X-Session-Token": sessionToken } : {}),
           ...init.headers,
         },
       });
