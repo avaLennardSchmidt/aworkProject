@@ -1,6 +1,6 @@
 import type { AworkUser, CreateProjectTaskPayload, CreateTaskSchedulePayload } from "../types/awork";
 
-const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174";
+const BACKEND_BASE_URL = (import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174").replace(/\/$/, "");
 
 interface AuthStatusResponse {
   authenticated: boolean;
