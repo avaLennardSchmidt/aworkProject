@@ -15,9 +15,16 @@ interface ProjectSection {
   groups: ScheduleGroup[];
 }
 
-export function ScheduleGroupsList({ groups, hasLoaded, onChangeTimeWindow, onDeleteGroup }: ScheduleGroupsListProps) {
+export function ScheduleGroupsList({
+  groups,
+  hasLoaded,
+  onChangeTimeWindow,
+  onDeleteGroup,
+}: ScheduleGroupsListProps) {
   const projectSections = useMemo(() => buildProjectSections(groups), [groups]);
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
+    new Set(),
+  );
 
   const toggleProject = (projectKey: string) => {
     setCollapsedProjects((prev) => {
@@ -95,49 +102,70 @@ function ProjectRows({
   onChangeTimeWindow: (group: ScheduleGroup) => void;
   onDeleteGroup: (group: ScheduleGroup) => void;
 }) {
-  const projectTotalMinutes = section.groups.reduce((sum, group) => sum + group.totalMinutes, 0);
-  const blockerCount = section.groups.reduce((sum, group) => sum + group.schedules.length, 0);
+  const projectTotalMinutes = section.groups.reduce(
+    (sum, group) => sum + group.totalMinutes,
+    0,
+  );
+  const blockerCount = section.groups.reduce(
+    (sum, group) => sum + group.schedules.length,
+    0,
+  );
 
   return (
     <>
       <tr className="project-row" onClick={onToggle}>
         <th scope="rowgroup" colSpan={7}>
-          <span className={`collapse-indicator ${collapsed ? "collapsed" : ""}`}>▼</span>
+          <span
+            className={`collapse-indicator ${collapsed ? "collapsed" : ""}`}
+          >
+            ▼
+          </span>
           <span>{section.projectName}</span>
           <small>
-            {section.groups.length} groups · {blockerCount} blockers · {formatMinutesAsHours(projectTotalMinutes)}
+            {section.groups.length} groups · {blockerCount} blockers ·{" "}
+            {formatMinutesAsHours(projectTotalMinutes)}
           </small>
         </th>
       </tr>
-      {!collapsed && section.groups.map((group) => (
-        <tr key={group.groupId}>
-          <td>
-            <div className="task-cell">
-              <strong>{group.taskName}</strong>
-              <span>{group.taskId}</span>
-            </div>
-          </td>
-          <td>
-            <span className="time-window table-time-window">
-              {group.weekdayLabel} {group.startTime}-{group.endTime}
-            </span>
-          </td>
-          <td>{group.schedules.length}</td>
-          <td>{formatMinutesAsHours(group.totalMinutes)}</td>
-          <td>{group.firstDate}</td>
-          <td>{group.lastDate}</td>
-          <td>
-            <div className="table-actions">
-              <button type="button" className="secondary-button table-action-button" onClick={() => onChangeTimeWindow(group)}>
-                Change time window
-              </button>
-              <button type="button" className="delete-x-button" title="Delete group" onClick={() => onDeleteGroup(group)}>
-                ×
-              </button>
-            </div>
-          </td>
-        </tr>
-      ))}
+      {!collapsed &&
+        section.groups.map((group) => (
+          <tr key={group.groupId}>
+            <td>
+              <div className="task-cell">
+                <strong>{group.taskName}</strong>
+                <span>{group.taskId}</span>
+              </div>
+            </td>
+            <td>
+              <span className="time-window table-time-window">
+                {group.weekdayLabel} {group.startTime}-{group.endTime}
+              </span>
+            </td>
+            <td>{group.schedules.length}</td>
+            <td>{formatMinutesAsHours(group.totalMinutes)}</td>
+            <td>{group.firstDate}</td>
+            <td>{group.lastDate}</td>
+            <td>
+              <div className="table-actions">
+                <button
+                  type="button"
+                  className="secondary-button table-action-button"
+                  onClick={() => onChangeTimeWindow(group)}
+                >
+                  Change time window
+                </button>
+                <button
+                  type="button"
+                  className="delete-x-button"
+                  title="Delete group"
+                  onClick={() => onDeleteGroup(group)}
+                >
+                  ×
+                </button>
+              </div>
+            </td>
+          </tr>
+        ))}
     </>
   );
 }
@@ -166,7 +194,10 @@ function buildProjectSections(groups: ScheduleGroup[]): ProjectSection[] {
     .sort((a, b) => a.projectName.localeCompare(b.projectName));
 }
 
-function compareGroupsWithinProject(a: ScheduleGroup, b: ScheduleGroup): number {
+function compareGroupsWithinProject(
+  a: ScheduleGroup,
+  b: ScheduleGroup,
+): number {
   return (
     a.taskName.localeCompare(b.taskName) ||
     a.weekday - b.weekday ||
