@@ -128,6 +128,14 @@ select:disabled {
   border-radius: 6px;
 }
 
+.project-filter-row select {
+  height: 44px;
+}
+
+.project-field-hint {
+  margin-top: 6px;
+}
+
 .connection-panel {
   display: grid;
   gap: 20px;

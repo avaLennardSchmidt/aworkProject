@@ -5,7 +5,9 @@ interface BackendStatusIndicatorProps {
   backendClient: BackendClient;
 }
 
-export function BackendStatusIndicator({ backendClient }: BackendStatusIndicatorProps) {
+export function BackendStatusIndicator({
+  backendClient,
+}: BackendStatusIndicatorProps) {
   const [status, setStatus] = useState<"ok" | "starting">("ok");
 
   useEffect(() => {

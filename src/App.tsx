@@ -3,16 +3,37 @@ import { endOfYear, format, isBefore, parseISO, startOfToday } from "date-fns";
 import { BackendClient } from "./services/backendClient";
 import { groupSchedules } from "./services/scheduleGrouping";
 import { deleteScheduleGroup } from "./services/scheduleDeleter";
-import { isOwnSchedule, mapTaskSchedulesResponse } from "./services/scheduleMapper";
+import {
+  isOwnSchedule,
+  mapTaskSchedulesResponse,
+} from "./services/scheduleMapper";
 import { enrichSchedulesWithProjectTasks } from "./services/scheduleEnrichment";
-import { mapProjectTaskResponse, mapProjectTasksResponse } from "./services/projectTaskMapper";
+import {
+  mapProjectTaskResponse,
+  mapProjectTasksResponse,
+} from "./services/projectTaskMapper";
 import { mapProjectsResponse } from "./services/projectMapper";
 import { updateScheduleChanges } from "./services/scheduleUpdater";
-import type { AworkProject, AworkProjectTask, AworkTaskSchedule, AworkUser, CreateTaskSchedulePayload } from "./types/awork";
-import type { DeleteResult, PlannerFilters, PreviewChange, ScheduleGroup, UpdateResult } from "./types/planner";
+import type {
+  AworkProject,
+  AworkProjectTask,
+  AworkTaskSchedule,
+  AworkUser,
+  CreateTaskSchedulePayload,
+} from "./types/awork";
+import type {
+  DeleteResult,
+  PlannerFilters,
+  PreviewChange,
+  ScheduleGroup,
+  UpdateResult,
+} from "./types/planner";
 import { BulkEditModal } from "./components/BulkEditModal";
 import { ConnectionPanel } from "./components/ConnectionPanel";
-import { CreateScheduleGroupPanel, type CreateGroupOptions } from "./components/CreateScheduleGroupPanel";
+import {
+  CreateScheduleGroupPanel,
+  type CreateGroupOptions,
+} from "./components/CreateScheduleGroupPanel";
 import { DeleteGroupModal } from "./components/DeleteGroupModal";
 import { ErrorAlert } from "./components/ErrorAlert";
 import { FilterPanel } from "./components/FilterPanel";
@@ -20,7 +41,10 @@ import { LoadingState } from "./components/LoadingState";
 import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
-import { WorkflowChooser, type PlannerWorkflow } from "./components/WorkflowChooser";
+import {
+  WorkflowChooser,
+  type PlannerWorkflow,
+} from "./components/WorkflowChooser";
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
 
 const backendClient = new BackendClient();
@@ -37,10 +61,26 @@ function App() {
   const [isCreatingSchedules, setIsCreatingSchedules] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
-  const [createSuccess, setCreateSuccess] = useState<{ count: number; failed: number; taskCreated?: string }>();
+  const [createSuccess, setCreateSuccess] = useState<{
+    count: number;
+    failed: number;
+    taskCreated?: string;
+  }>();
+  const [updateSuccess, setUpdateSuccess] = useState<{
+    count: number;
+    failed: number;
+  }>();
+  const [deleteSuccess, setDeleteSuccess] = useState<{
+    count: number;
+    failed: number;
+  }>();
   const [allSchedules, setAllSchedules] = useState<AworkTaskSchedule[]>([]);
-  const [availableProjects, setAvailableProjects] = useState<AworkProject[]>([]);
-  const [projectTasksForCreate, setProjectTasksForCreate] = useState<AworkProjectTask[]>([]);
+  const [availableProjects, setAvailableProjects] = useState<AworkProject[]>(
+    [],
+  );
+  const [projectTasksForCreate, setProjectTasksForCreate] = useState<
+    AworkProjectTask[]
+  >([]);
   const [hasLoadedSchedules, setHasLoadedSchedules] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ScheduleGroup>();
   const [deleteGroup, setDeleteGroup] = useState<ScheduleGroup>();
@@ -65,7 +105,9 @@ function App() {
 
   const projectOptions = useMemo(() => {
     const projects = new Map<string, string>();
-    const candidateSchedules = currentUser ? allSchedules.filter((schedule) => isOwnSchedule(schedule, currentUser)) : [];
+    const candidateSchedules = currentUser
+      ? allSchedules.filter((schedule) => isOwnSchedule(schedule, currentUser))
+      : [];
 
     candidateSchedules.forEach((schedule) => {
       if (schedule.projectId && schedule.projectName) {
@@ -84,18 +126,25 @@ function App() {
     const today = startOfToday();
     return allSchedules.filter((schedule) => {
       if (!isOwnSchedule(schedule, currentUser)) return false;
-      if (filters.hidePast && isBefore(parseISO(schedule.start), today)) return false;
-      if (filters.projectId && schedule.projectId !== filters.projectId) return false;
+      if (filters.hidePast && isBefore(parseISO(schedule.start), today))
+        return false;
+      if (filters.projectId && schedule.projectId !== filters.projectId)
+        return false;
       return true;
     });
   }, [allSchedules, currentUser, filters.hidePast, filters.projectId]);
 
   const ignoredOwnershipCount = useMemo(() => {
     if (!currentUser) return 0;
-    return allSchedules.filter((schedule) => !isOwnSchedule(schedule, currentUser)).length;
+    return allSchedules.filter(
+      (schedule) => !isOwnSchedule(schedule, currentUser),
+    ).length;
   }, [allSchedules, currentUser]);
 
-  const groups = useMemo(() => groupSchedules(filteredSchedules), [filteredSchedules]);
+  const groups = useMemo(
+    () => groupSchedules(filteredSchedules),
+    [filteredSchedules],
+  );
 
   async function restoreBackendSession(returnedFromLogin = false) {
     setIsConnecting(true);
@@ -105,13 +154,23 @@ function App() {
       const status = await backendClient.getAuthStatus();
       if (status.authenticated && status.user) {
         setCurrentUser(status.user);
-        setStatusMessage(returnedFromLogin ? "awork login successful. Choose a workflow." : "awork OAuth session restored.");
+        setStatusMessage(
+          returnedFromLogin
+            ? "awork login successful. Choose a workflow."
+            : "awork OAuth session restored.",
+        );
       } else if (returnedFromLogin) {
-        setError("awork login returned to the app, but no backend session was found. Please restart the backend and try again.");
+        setError(
+          "awork login returned to the app, but no backend session was found. Please restart the backend and try again.",
+        );
       }
     } catch (sessionError) {
       setCurrentUser(undefined);
-      setError(sessionError instanceof Error ? sessionError.message : "Could not check backend auth session.");
+      setError(
+        sessionError instanceof Error
+          ? sessionError.message
+          : "Could not check backend auth session.",
+      );
     } finally {
       setIsConnecting(false);
     }
@@ -134,6 +193,8 @@ function App() {
     setUpdateResults(undefined);
     setDeleteResults(undefined);
     setCreateSuccess(undefined);
+    setUpdateSuccess(undefined);
+    setDeleteSuccess(undefined);
     setStatusMessage("Disconnected.");
     setError("");
   }
@@ -155,17 +216,29 @@ function App() {
       ]);
       const mapped = mapTaskSchedulesResponse(scheduleResponse);
       const projectTasks = mapProjectTasksResponse(projectTaskResponse);
-      const enrichedSchedules = enrichSchedulesWithProjectTasks(mapped.schedules, projectTasks);
+      const enrichedSchedules = enrichSchedulesWithProjectTasks(
+        mapped.schedules,
+        projectTasks,
+      );
       setAllSchedules(enrichedSchedules);
       setHasLoadedSchedules(true);
 
       if (mapped.schedules.length === 0) {
         setStatusMessage("No schedules found for this date range.");
-      } else if (enrichedSchedules.every((schedule) => !isOwnSchedule(schedule, currentUser))) {
-        setStatusMessage("Schedules were loaded, but none could be verified as your own.");
+      } else if (
+        enrichedSchedules.every(
+          (schedule) => !isOwnSchedule(schedule, currentUser),
+        )
+      ) {
+        setStatusMessage(
+          "Schedules were loaded, but none could be verified as your own.",
+        );
       } else {
         const ownSchedulesWithProject = enrichedSchedules.filter(
-          (schedule) => isOwnSchedule(schedule, currentUser) && schedule.projectId && schedule.projectName,
+          (schedule) =>
+            isOwnSchedule(schedule, currentUser) &&
+            schedule.projectId &&
+            schedule.projectName,
         );
         setStatusMessage(
           ownSchedulesWithProject.length > 0
@@ -174,7 +247,11 @@ function App() {
         );
       }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load task schedules.");
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not load task schedules.",
+      );
     } finally {
       setIsLoadingSchedules(false);
     }
@@ -190,7 +267,11 @@ function App() {
       const response = await backendClient.getProjects();
       setAvailableProjects(mapProjectsResponse(response));
     } catch (projectError) {
-      setError(projectError instanceof Error ? projectError.message : "Could not load projects.");
+      setError(
+        projectError instanceof Error
+          ? projectError.message
+          : "Could not load projects.",
+      );
     } finally {
       setIsLoadingProjects(false);
     }
@@ -204,13 +285,20 @@ function App() {
       const response = await backendClient.getProjectTasks(projectId);
       setProjectTasksForCreate(mapProjectTasksResponse(response));
     } catch (taskError) {
-      setError(taskError instanceof Error ? taskError.message : "Could not load project tasks.");
+      setError(
+        taskError instanceof Error
+          ? taskError.message
+          : "Could not load project tasks.",
+      );
     } finally {
       setIsLoadingProjectTasks(false);
     }
   }
 
-  async function createTaskSchedules(payloads: CreateTaskSchedulePayload[], options: CreateGroupOptions) {
+  async function createTaskSchedules(
+    payloads: CreateTaskSchedulePayload[],
+    options: CreateGroupOptions,
+  ) {
     setIsCreatingSchedules(true);
     setError("");
 
@@ -221,25 +309,38 @@ function App() {
 
     try {
       if (options.newTaskName) {
-        const plannedDuration = payloads.reduce((sum, payload) => sum + payload.plannedDuration, 0);
-        const createdTaskResponse = await backendClient.createProjectTask(options.projectId, {
-          name: options.newTaskName,
-          plannedDuration,
-        });
+        const plannedDuration = payloads.reduce(
+          (sum, payload) => sum + payload.plannedDuration,
+          0,
+        );
+        const createdTaskResponse = await backendClient.createProjectTask(
+          options.projectId,
+          {
+            name: options.newTaskName,
+            plannedDuration,
+          },
+        );
         const createdTask = mapProjectTaskResponse(createdTaskResponse);
 
         if (!createdTask) {
-          throw new Error("New awork task was created, but the response could not be mapped.");
+          throw new Error(
+            "New awork task was created, but the response could not be mapped.",
+          );
         }
 
         taskId = createdTask.id;
         taskCreated = createdTask.name ?? options.newTaskName;
-        setProjectTasksForCreate((currentTasks) => [createdTask, ...currentTasks.filter((task) => task.id !== createdTask.id)]);
+        setProjectTasksForCreate((currentTasks) => [
+          createdTask,
+          ...currentTasks.filter((task) => task.id !== createdTask.id),
+        ]);
       }
 
       for (const payload of payloads) {
         if (payload.userId !== currentUser?.id) {
-          failures.push(`${payload.startDate}: ownership check failed before create.`);
+          failures.push(
+            `${payload.startDate}: ownership check failed before create.`,
+          );
           continue;
         }
 
@@ -252,7 +353,11 @@ function App() {
           await backendClient.createTaskSchedule({ ...payload, taskId });
           successCount += 1;
         } catch (createError) {
-          failures.push(createError instanceof Error ? createError.message : "Create failed.");
+          failures.push(
+            createError instanceof Error
+              ? createError.message
+              : "Create failed.",
+          );
         }
       }
 
@@ -262,12 +367,20 @@ function App() {
           : `${successCount} planned blockers created. ${failures.length} failed.`,
       );
       if (successCount > 0 || taskCreated) {
-        setCreateSuccess({ count: successCount, failed: failures.length, taskCreated });
+        setCreateSuccess({
+          count: successCount,
+          failed: failures.length,
+          taskCreated,
+        });
       }
       if (failures.length > 0) setError(failures.slice(0, 3).join(" | "));
       if (successCount > 0 && hasLoadedSchedules) await loadSchedules();
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Could not create task or planned blockers.");
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Could not create task or planned blockers.",
+      );
     } finally {
       setIsCreatingSchedules(false);
     }
@@ -284,14 +397,28 @@ function App() {
     setError("");
 
     try {
-      const results = await deleteScheduleGroup(backendClient, currentUser, deleteGroup);
+      const results = await deleteScheduleGroup(
+        backendClient,
+        currentUser,
+        deleteGroup,
+      );
       setDeleteResults(results);
       const successCount = results.filter((result) => result.success).length;
       const failureCount = results.length - successCount;
-      setStatusMessage(`${successCount} planned blockers deleted. ${failureCount} failed.`);
+      setStatusMessage(
+        `${successCount} planned blockers deleted. ${failureCount} failed.`,
+      );
+      if (successCount > 0 && failureCount === 0) {
+        closeModals();
+        setDeleteSuccess({ count: successCount, failed: failureCount });
+      }
       if (successCount > 0) await loadSchedules();
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Could not delete schedule group.");
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Could not delete schedule group.",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -304,11 +431,28 @@ function App() {
     setError("");
 
     try {
-      const results = await updateScheduleChanges(backendClient, currentUser, previewChanges);
+      const results = await updateScheduleChanges(
+        backendClient,
+        currentUser,
+        previewChanges,
+      );
       setUpdateResults(results);
+      const successCount = results.filter((result) => result.success).length;
+      const failureCount = results.length - successCount;
+      setStatusMessage(
+        `${successCount} planned blockers updated. ${failureCount} failed.`,
+      );
+      if (successCount > 0 && failureCount === 0) {
+        closeModals();
+        setUpdateSuccess({ count: successCount, failed: failureCount });
+      }
       await loadSchedules();
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "Could not apply updates.");
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Could not apply updates.",
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -330,15 +474,29 @@ function App() {
           <p className="eyebrow">awork planner utility</p>
           <h1>Self-Service Bulk Planner</h1>
         </div>
-        <p>Bulk-edit recurring task blockers for your own awork planner without exposing colleague or team controls.</p>
+        <p>
+          Bulk-edit recurring task blockers for your own awork planner without
+          exposing colleague or team controls.
+        </p>
       </header>
 
       <ErrorAlert message={error} />
-      {statusMessage ? <div className="alert alert-success">{statusMessage}</div> : null}
+      {statusMessage ? (
+        <div className="alert alert-success">{statusMessage}</div>
+      ) : null}
 
-      <ConnectionPanel currentUser={currentUser} isConnecting={isConnecting} onLogin={handleLogin} onDisconnect={handleDisconnect} />
+      <ConnectionPanel
+        currentUser={currentUser}
+        isConnecting={isConnecting}
+        onLogin={handleLogin}
+        onDisconnect={handleDisconnect}
+      />
 
-      <WorkflowChooser value={workflow} disabled={!currentUser} onChange={setWorkflow} />
+      <WorkflowChooser
+        value={workflow}
+        disabled={!currentUser}
+        onChange={setWorkflow}
+      />
 
       {workflow === "manage" ? (
         <>
@@ -352,11 +510,14 @@ function App() {
             onLoad={loadSchedules}
           />
 
-          {isLoadingSchedules ? <LoadingState label="Loading planned tasks from awork..." /> : null}
+          {isLoadingSchedules ? (
+            <LoadingState label="Loading planned tasks from awork..." />
+          ) : null}
 
           {ignoredOwnershipCount > 0 ? (
             <div className="alert alert-warning">
-              {ignoredOwnershipCount} schedules were ignored because ownership could not be verified for the connected user.
+              {ignoredOwnershipCount} schedules were ignored because ownership
+              could not be verified for the connected user.
             </div>
           ) : null}
 
@@ -385,7 +546,12 @@ function App() {
       ) : null}
 
       {selectedGroup && currentUser && !previewChanges ? (
-        <BulkEditModal group={selectedGroup} currentUser={currentUser} onClose={closeModals} onPreview={handlePreview} />
+        <BulkEditModal
+          group={selectedGroup}
+          currentUser={currentUser}
+          onClose={closeModals}
+          onPreview={handlePreview}
+        />
       ) : null}
 
       {deleteGroup ? (
@@ -402,8 +568,32 @@ function App() {
         <SuccessPopup
           title="Bam, Aufgabe erledigt."
           message={`${createSuccess.count} planned blocker${createSuccess.count === 1 ? "" : "s"} created successfully.`}
-          detail={createSuccess.taskCreated ? `Task created: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} blockers failed.` : "All blockers were planned for your own awork user."}` : createSuccess.failed > 0 ? `${createSuccess.failed} failed and stayed untouched.` : "Everything was created for your own awork user only."}
+          detail={
+            createSuccess.taskCreated
+              ? `Task created: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} blockers failed.` : "All blockers were planned for your own awork user."}`
+              : createSuccess.failed > 0
+                ? `${createSuccess.failed} failed and stayed untouched.`
+                : "Everything was created for your own awork user only."
+          }
           onClose={() => setCreateSuccess(undefined)}
+        />
+      ) : null}
+
+      {deleteSuccess ? (
+        <SuccessPopup
+          title="Bam, Gruppe geloescht."
+          message={`${deleteSuccess.count} planned blocker${deleteSuccess.count === 1 ? "" : "s"} deleted successfully.`}
+          detail="All selected blockers were removed from your planner."
+          onClose={() => setDeleteSuccess(undefined)}
+        />
+      ) : null}
+
+      {updateSuccess ? (
+        <SuccessPopup
+          title="Bam, Zeitfenster angepasst."
+          message={`${updateSuccess.count} planned blocker${updateSuccess.count === 1 ? "" : "s"} updated successfully.`}
+          detail="The new time window was applied to the whole group."
+          onClose={() => setUpdateSuccess(undefined)}
         />
       ) : null}
 

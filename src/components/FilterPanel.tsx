@@ -54,7 +54,7 @@ export function FilterPanel({
             onChange={(event) => onChange({ ...filters, to: event.target.value })}
           />
         </div>
-        <div className="form-row">
+        <div className="form-row project-filter-row">
           <label htmlFor="project-filter">Project</label>
           <select
             id="project-filter"
@@ -69,11 +69,6 @@ export function FilterPanel({
               </option>
             ))}
           </select>
-          <p className="field-hint">
-            {projectOptions.length > 0
-              ? "Project options come from your loaded planned task blockers."
-              : projectPlaceholder}
-          </p>
         </div>
       </div>
 

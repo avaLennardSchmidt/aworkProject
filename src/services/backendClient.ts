@@ -1,6 +1,12 @@
-import type { AworkUser, CreateProjectTaskPayload, CreateTaskSchedulePayload } from "../types/awork";
+import type {
+  AworkUser,
+  CreateProjectTaskPayload,
+  CreateTaskSchedulePayload,
+} from "../types/awork";
 
-const BACKEND_BASE_URL = (import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174").replace(/\/$/, "");
+const BACKEND_BASE_URL = (
+  import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174"
+).replace(/\/$/, "");
 
 interface AuthStatusResponse {
   authenticated: boolean;
@@ -76,34 +82,53 @@ export class BackendClient {
   }
 
   async getProjectTasks(projectId: string): Promise<unknown> {
-    return this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/projecttasks`);
+    return this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/projecttasks`,
+    );
   }
 
-  async createProjectTask(projectId: string, payload: CreateProjectTaskPayload): Promise<unknown> {
-    return this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/projecttasks`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+  async createProjectTask(
+    projectId: string,
+    payload: CreateProjectTaskPayload,
+  ): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/projecttasks`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
   }
 
-  async createTaskSchedule(payload: CreateTaskSchedulePayload): Promise<unknown> {
+  async createTaskSchedule(
+    payload: CreateTaskSchedulePayload,
+  ): Promise<unknown> {
     return this.request<unknown>("/api/taskschedules", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   }
 
-  async updateTaskSchedule(scheduleId: string, payload: unknown): Promise<unknown> {
-    return this.request<unknown>(`/api/taskschedules/${encodeURIComponent(scheduleId)}`, {
-      method: "PUT",
-      body: JSON.stringify(payload),
-    });
+  async updateTaskSchedule(
+    scheduleId: string,
+    payload: unknown,
+  ): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/taskschedules/${encodeURIComponent(scheduleId)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      },
+    );
   }
 
   async deleteTaskSchedule(scheduleId: string): Promise<unknown> {
-    return this.request<unknown>(`/api/taskschedules/${encodeURIComponent(scheduleId)}`, {
-      method: "DELETE",
-    });
+    return this.request<unknown>(
+      `/api/taskschedules/${encodeURIComponent(scheduleId)}`,
+      {
+        method: "DELETE",
+      },
+    );
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -125,7 +150,9 @@ export class BackendClient {
 
       if (!response.ok) {
         const message = await safeReadError(response);
-        throw new Error(message || `Backend request failed with status ${response.status}.`);
+        throw new Error(
+          message || `Backend request failed with status ${response.status}.`,
+        );
       }
 
       if (response.status === 204) {
@@ -143,12 +170,18 @@ export class BackendClient {
     }
   }
 
-  private async handleBackendStarting<T>(path: string, init: RequestInit, attempt = 0): Promise<T> {
+  private async handleBackendStarting<T>(
+    path: string,
+    init: RequestInit,
+    attempt = 0,
+  ): Promise<T> {
     const maxAttempts = 10; // Stop after ~30 seconds
     if (attempt >= maxAttempts) {
       this.isBackendStarting = false;
       this.notifyStatusChange("ok");
-      throw new Error("Backend did not start in time. Please refresh the page and try again.");
+      throw new Error(
+        "Backend did not start in time. Please refresh the page and try again.",
+      );
     }
 
     if (!this.isBackendStarting) {
@@ -184,7 +217,9 @@ async function safeReadError(response: Response): Promise<string> {
 
 function mapUser(rawUser: unknown): AworkUser {
   const userRecord = unwrapRecord(rawUser);
-  const id = userRecord ? readString(userRecord, "id") ?? readString(userRecord, "userId") : undefined;
+  const id = userRecord
+    ? (readString(userRecord, "id") ?? readString(userRecord, "userId"))
+    : undefined;
 
   if (!userRecord || !id) {
     throw new Error("The authenticated awork user could not be mapped.");
@@ -214,6 +249,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function readString(record: Record<string, unknown>, key: string): string | undefined {
+function readString(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
   return typeof record[key] === "string" ? record[key] : undefined;
 }
