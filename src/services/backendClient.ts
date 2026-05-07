@@ -143,26 +143,29 @@ export class BackendClient {
     }
   }
 
-  private async handleBackendStarting<T>(path: string, init: RequestInit): Promise<T> {
+  private async handleBackendStarting<T>(path: string, init: RequestInit, attempt = 0): Promise<T> {
+    const maxAttempts = 10; // Stop after ~30 seconds
+    if (attempt >= maxAttempts) {
+      this.isBackendStarting = false;
+      this.notifyStatusChange("ok");
+      throw new Error("Backend did not start in time. Please refresh the page and try again.");
+    }
+
     if (!this.isBackendStarting) {
       this.isBackendStarting = true;
       this.notifyStatusChange("starting");
     }
 
-    // Wait 3 seconds for backend to start
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // Check if backend is healthy
     const isHealthy = await this.checkBackendHealth();
 
     if (isHealthy) {
       this.isBackendStarting = false;
       this.notifyStatusChange("ok");
-      // Retry the original request
       return this.request<T>(path, init);
     } else {
-      // Still starting, wait more and try again
-      return this.handleBackendStarting<T>(path, init);
+      return this.handleBackendStarting<T>(path, init, attempt + 1);
     }
   }
 }
