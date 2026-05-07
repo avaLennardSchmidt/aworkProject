@@ -1,6 +1,5 @@
 import {
   addDays,
-  addMinutes,
   differenceInMinutes,
   format,
   getDay,
@@ -88,48 +87,6 @@ export function buildUpdatedTimeWindowOnWeekday(
   return {
     newStartIso: setTimeOnSameDate(shiftedStart, newStartTime),
     newEndIso: setTimeOnSameDate(shiftedEnd, newEndTime),
-  };
-}
-
-export function buildUpdatedTimeWindowKeepStart(
-  schedule: AworkTaskSchedule,
-  newDurationMinutes: number,
-): { newStartIso: string; newEndIso: string } {
-  return buildUpdatedTimeWindowKeepStartOnWeekday(schedule, newDurationMinutes, getDay(parseISO(schedule.start)));
-}
-
-export function buildUpdatedTimeWindowKeepStartOnWeekday(
-  schedule: AworkTaskSchedule,
-  newDurationMinutes: number,
-  weekday: number,
-): { newStartIso: string; newEndIso: string } {
-  const start = parseISO(setWeekdayPreservingTime(schedule.start, weekday));
-  const end = addMinutes(start, newDurationMinutes);
-
-  return {
-    newStartIso: toLocalIsoWithOffset(start),
-    newEndIso: toLocalIsoWithOffset(end),
-  };
-}
-
-export function buildUpdatedTimeWindowKeepEnd(
-  schedule: AworkTaskSchedule,
-  newDurationMinutes: number,
-): { newStartIso: string; newEndIso: string } {
-  return buildUpdatedTimeWindowKeepEndOnWeekday(schedule, newDurationMinutes, getDay(parseISO(schedule.end)));
-}
-
-export function buildUpdatedTimeWindowKeepEndOnWeekday(
-  schedule: AworkTaskSchedule,
-  newDurationMinutes: number,
-  weekday: number,
-): { newStartIso: string; newEndIso: string } {
-  const end = parseISO(setWeekdayPreservingTime(schedule.end, weekday));
-  const start = addMinutes(end, -newDurationMinutes);
-
-  return {
-    newStartIso: toLocalIsoWithOffset(start),
-    newEndIso: toLocalIsoWithOffset(end),
   };
 }
 

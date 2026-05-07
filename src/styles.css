@@ -154,8 +154,7 @@ select:disabled {
 .secondary-button,
 .ghost-button,
 .danger-button,
-.icon-button,
-.mode-tabs button {
+.icon-button {
   min-height: 42px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -670,26 +669,6 @@ select:disabled {
   font-weight: 700;
 }
 
-.mode-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 18px;
-}
-
-.mode-tabs button {
-  padding: 0 10px;
-  color: #394653;
-  background: #f7f9fa;
-  border-color: #d8e0e7;
-}
-
-.mode-tabs button.active {
-  color: #ffffff;
-  background: #29445c;
-  border-color: #29445c;
-}
-
 .compact-input {
   max-width: 260px;
 }
@@ -845,7 +824,6 @@ select:disabled {
   .app-header,
   .connection-panel .form-row,
   .filter-grid,
-  .mode-tabs,
   .create-grid,
   .workflow-toggle {
     grid-template-columns: 1fr;

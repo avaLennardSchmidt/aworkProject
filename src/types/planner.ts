@@ -23,7 +23,6 @@ export interface PlannerFilters {
   projectId: string;
 }
 
-export type BulkEditMode = "manual" | "keep-start" | "keep-end";
 
 export interface PreviewChange {
   schedule: AworkTaskSchedule;
