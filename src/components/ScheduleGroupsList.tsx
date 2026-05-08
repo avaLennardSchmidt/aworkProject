@@ -55,11 +55,23 @@ export function ScheduleGroupsList({
       return next;
     });
   };
+
+  const visibleGroups = useMemo(() => {
+    if (normalizedSearchQuery) {
+      return filteredGroups;
+    }
+
+    return projectSections.flatMap((section) =>
+      collapsedProjects.has(section.projectKey) ? [] : section.groups,
+    );
+  }, [collapsedProjects, filteredGroups, normalizedSearchQuery, projectSections]);
+
   const selectableGroupIds = useMemo(
-    () => new Set(filteredGroups.map((group) => group.groupId)),
-    [filteredGroups],
+    () => new Set(visibleGroups.map((group) => group.groupId)),
+    [visibleGroups],
   );
-  const visibleSelectedCount = filteredGroups.filter((group) =>
+
+  const visibleSelectedCount = visibleGroups.filter((group) =>
     selectedGroupIds.has(group.groupId),
   ).length;
 
@@ -124,10 +136,10 @@ export function ScheduleGroupsList({
           <input
             type="checkbox"
             checked={
-              filteredGroups.length > 0 &&
-              visibleSelectedCount === filteredGroups.length
+              visibleGroups.length > 0 &&
+              visibleSelectedCount === visibleGroups.length
             }
-            disabled={filteredGroups.length === 0}
+            disabled={visibleGroups.length === 0}
             onChange={(event) => toggleVisibleSelection(event.target.checked)}
           />
           Select visible groups
