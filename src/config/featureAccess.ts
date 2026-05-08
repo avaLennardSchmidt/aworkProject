@@ -14,7 +14,9 @@ let cachedFeatureAccess: { multiEdit: boolean } | null = null;
 /**
  * Fetch user's feature access from backend API
  */
-export async function fetchUserFeatureAccess(): Promise<{ multiEdit: boolean }> {
+export async function fetchUserFeatureAccess(): Promise<{
+  multiEdit: boolean;
+}> {
   if (cachedFeatureAccess) {
     return cachedFeatureAccess;
   }

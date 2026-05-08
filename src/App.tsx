@@ -55,7 +55,10 @@ import {
   type PlannerWorkflow,
 } from "./components/WorkflowChooser";
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
-import { isAuthorizedForMultiEdit, clearFeatureAccessCache } from "./config/featureAccess";
+import {
+  isAuthorizedForMultiEdit,
+  clearFeatureAccessCache,
+} from "./config/featureAccess";
 
 const backendClient = new BackendClient();
 
