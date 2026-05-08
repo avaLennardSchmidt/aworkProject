@@ -6,8 +6,12 @@ import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
 interface ScheduleGroupsListProps {
   groups: ScheduleGroup[];
   hasLoaded: boolean;
+  selectedGroupIds: Set<string>;
+  onSelectionChange: (groupIds: Set<string>) => void;
   onChangeTimeWindow: (group: ScheduleGroup) => void;
   onDeleteGroup: (group: ScheduleGroup) => void;
+  onMultiEdit: () => void;
+  isMultiEditAvailable?: boolean;
 }
 
 interface ProjectSection {
@@ -19,13 +23,23 @@ interface ProjectSection {
 export function ScheduleGroupsList({
   groups,
   hasLoaded,
+  selectedGroupIds,
+  onSelectionChange,
   onChangeTimeWindow,
   onDeleteGroup,
+  onMultiEdit,
+  isMultiEditAvailable = true,
 }: ScheduleGroupsListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const normalizedSearchQuery = searchQuery.trim();
-  const filteredGroups = useMemo(() => filterGroups(groups, searchQuery), [groups, searchQuery]);
-  const projectSections = useMemo(() => buildProjectSections(filteredGroups), [filteredGroups]);
+  const filteredGroups = useMemo(
+    () => filterGroups(groups, searchQuery),
+    [groups, searchQuery],
+  );
+  const projectSections = useMemo(
+    () => buildProjectSections(filteredGroups),
+    [filteredGroups],
+  );
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
     new Set(),
   );
@@ -41,6 +55,35 @@ export function ScheduleGroupsList({
       return next;
     });
   };
+  const selectableGroupIds = useMemo(
+    () => new Set(filteredGroups.map((group) => group.groupId)),
+    [filteredGroups],
+  );
+  const visibleSelectedCount = filteredGroups.filter((group) =>
+    selectedGroupIds.has(group.groupId),
+  ).length;
+
+  function toggleGroupSelection(groupId: string, selected: boolean) {
+    const next = new Set(selectedGroupIds);
+    if (selected) {
+      next.add(groupId);
+    } else {
+      next.delete(groupId);
+    }
+    onSelectionChange(next);
+  }
+
+  function toggleVisibleSelection(selected: boolean) {
+    const next = new Set(selectedGroupIds);
+    selectableGroupIds.forEach((groupId) => {
+      if (selected) {
+        next.add(groupId);
+      } else {
+        next.delete(groupId);
+      }
+    });
+    onSelectionChange(next);
+  }
 
   if (!hasLoaded) {
     return null;
@@ -50,7 +93,10 @@ export function ScheduleGroupsList({
     return (
       <section className="panel empty-state">
         <h2>No editable schedule groups found</h2>
-        <p>No own planned task blockers matched the current filters.</p>
+        <p>
+          No planned task blockers matched the current filters for the selected
+          planner user.
+        </p>
       </section>
     );
   }
@@ -73,6 +119,35 @@ export function ScheduleGroupsList({
         />
       </div>
 
+      <div className="groups-bulk-actions">
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={
+              filteredGroups.length > 0 &&
+              visibleSelectedCount === filteredGroups.length
+            }
+            disabled={filteredGroups.length === 0}
+            onChange={(event) => toggleVisibleSelection(event.target.checked)}
+          />
+          Select visible groups
+        </label>
+        <span>{selectedGroupIds.size} selected</span>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={selectedGroupIds.size < 2 || !isMultiEditAvailable}
+          title={
+            !isMultiEditAvailable
+              ? "Multi-edit not available for this user"
+              : ""
+          }
+          onClick={onMultiEdit}
+        >
+          Edit selected
+        </button>
+      </div>
+
       {filteredGroups.length === 0 ? (
         <section className="panel empty-state groups-search-empty">
           <h2>No groups match this search</h2>
@@ -83,29 +158,35 @@ export function ScheduleGroupsList({
       {filteredGroups.length > 0 ? (
         <div className="groups-table-wrap">
           <table className="groups-table">
-          <thead>
-            <tr>
-              <th scope="col">Task</th>
-              <th scope="col">Pattern</th>
-              <th scope="col">Blockers</th>
-              <th scope="col">Total</th>
-              <th scope="col">First</th>
-              <th scope="col">Last</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projectSections.map((section) => (
-              <ProjectRows
-                key={section.projectKey}
-                section={section}
-                collapsed={!normalizedSearchQuery && collapsedProjects.has(section.projectKey)}
-                onToggle={() => toggleProject(section.projectKey)}
-                onChangeTimeWindow={onChangeTimeWindow}
-                onDeleteGroup={onDeleteGroup}
-              />
-            ))}
-          </tbody>
+            <thead>
+              <tr>
+                <th scope="col">Select</th>
+                <th scope="col">Task</th>
+                <th scope="col">Pattern</th>
+                <th scope="col">Blockers</th>
+                <th scope="col">Total</th>
+                <th scope="col">First</th>
+                <th scope="col">Last</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectSections.map((section) => (
+                <ProjectRows
+                  key={section.projectKey}
+                  section={section}
+                  collapsed={
+                    !normalizedSearchQuery &&
+                    collapsedProjects.has(section.projectKey)
+                  }
+                  selectedGroupIds={selectedGroupIds}
+                  onToggle={() => toggleProject(section.projectKey)}
+                  onSelectionChange={toggleGroupSelection}
+                  onChangeTimeWindow={onChangeTimeWindow}
+                  onDeleteGroup={onDeleteGroup}
+                />
+              ))}
+            </tbody>
           </table>
         </div>
       ) : null}
@@ -117,12 +198,16 @@ function ProjectRows({
   section,
   collapsed,
   onToggle,
+  selectedGroupIds,
+  onSelectionChange,
   onChangeTimeWindow,
   onDeleteGroup,
 }: {
   section: ProjectSection;
   collapsed: boolean;
   onToggle: () => void;
+  selectedGroupIds: Set<string>;
+  onSelectionChange: (groupId: string, selected: boolean) => void;
   onChangeTimeWindow: (group: ScheduleGroup) => void;
   onDeleteGroup: (group: ScheduleGroup) => void;
 }) {
@@ -138,7 +223,7 @@ function ProjectRows({
   return (
     <>
       <tr className="project-row" onClick={onToggle}>
-        <th scope="rowgroup" colSpan={7}>
+        <th scope="rowgroup" colSpan={8}>
           <span
             className={`collapse-indicator ${collapsed ? "collapsed" : ""}`}
           >
@@ -154,6 +239,17 @@ function ProjectRows({
       {!collapsed &&
         section.groups.map((group) => (
           <tr key={group.groupId}>
+            <td>
+              <input
+                type="checkbox"
+                className="group-select-checkbox"
+                checked={selectedGroupIds.has(group.groupId)}
+                aria-label={`Select ${group.taskName}`}
+                onChange={(event) =>
+                  onSelectionChange(group.groupId, event.target.checked)
+                }
+              />
+            </td>
             <td>
               <div className="task-cell">
                 <strong>{group.taskName}</strong>

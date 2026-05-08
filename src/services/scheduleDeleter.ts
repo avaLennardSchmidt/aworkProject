@@ -3,7 +3,7 @@ import type { DeleteResult, ScheduleGroup } from "../types/planner";
 import { isOwnSchedule } from "./scheduleMapper";
 
 interface TaskScheduleDeleter {
-  deleteTaskSchedule(scheduleId: string): Promise<unknown>;
+  deleteTaskSchedule(scheduleId: string, userId?: string): Promise<unknown>;
 }
 
 export async function deleteScheduleGroup(
@@ -24,7 +24,7 @@ export async function deleteScheduleGroup(
     }
 
     try {
-      await client.deleteTaskSchedule(schedule.id);
+      await client.deleteTaskSchedule(schedule.id, currentUser.id);
       results.push({ scheduleId: schedule.id, success: true });
     } catch (error) {
       results.push({

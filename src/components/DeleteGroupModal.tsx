@@ -30,7 +30,7 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
         </div>
 
         <div className="alert alert-warning">
-          This removes the selected planner blockers from your awork calendar. It does not delete the task or project. Only blockers verified as your own can be unplanned.
+          This removes the selected planner blockers from the selected user's awork calendar. It does not delete the task or project.
         </div>
 
         <div className="preview-summary">

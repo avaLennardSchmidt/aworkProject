@@ -44,6 +44,8 @@ import { FilterPanel } from "./components/FilterPanel";
 import { LoadingState } from "./components/LoadingState";
 import { ManualBlockerEditModal } from "./components/ManualBlockerEditModal";
 import { ManualEditConfirmModal } from "./components/ManualEditConfirmModal";
+import { MultiGroupDurationEditModal } from "./components/MultiGroupDurationEditModal";
+import { PlannerUserSelector } from "./components/PlannerUserSelector";
 import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { BlockerOperationsPreviewModal } from "./components/BlockerOperationsPreviewModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
@@ -53,19 +55,23 @@ import {
   type PlannerWorkflow,
 } from "./components/WorkflowChooser";
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
+import { isAuthorizedForMultiEdit, clearFeatureAccessCache } from "./config/featureAccess";
 
 const backendClient = new BackendClient();
 
 function App() {
   const [currentUser, setCurrentUser] = useState<AworkUser>();
+  const [selectedPlannerUserId, setSelectedPlannerUserId] = useState("");
   const [workflow, setWorkflow] = useState<PlannerWorkflow>("manage");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isApplyingBlockerOperations, setIsApplyingBlockerOperations] = useState(false);
+  const [isApplyingBlockerOperations, setIsApplyingBlockerOperations] =
+    useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [isLoadingProjectTasks, setIsLoadingProjectTasks] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isCreatingSchedules, setIsCreatingSchedules] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
@@ -88,17 +94,24 @@ function App() {
   const [availableProjects, setAvailableProjects] = useState<AworkProject[]>(
     [],
   );
+  const [availableUsers, setAvailableUsers] = useState<AworkUser[]>([]);
   const [projectTasksForCreate, setProjectTasksForCreate] = useState<
     AworkProjectTask[]
   >([]);
   const [hasLoadedSchedules, setHasLoadedSchedules] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ScheduleGroup>();
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [multiEditGroups, setMultiEditGroups] = useState<ScheduleGroup[]>();
   const [manualConfirmGroup, setManualConfirmGroup] = useState<ScheduleGroup>();
   const [manualEditGroup, setManualEditGroup] = useState<ScheduleGroup>();
   const [deleteGroup, setDeleteGroup] = useState<ScheduleGroup>();
   const [previewChanges, setPreviewChanges] = useState<PreviewChange[]>();
-  const [blockerOperations, setBlockerOperations] = useState<BlockerOperation[]>();
-  const [blockerOperationResults, setBlockerOperationResults] = useState<BlockerOperationResult[]>();
+  const [blockerOperations, setBlockerOperations] =
+    useState<BlockerOperation[]>();
+  const [blockerOperationResults, setBlockerOperationResults] =
+    useState<BlockerOperationResult[]>();
   const [updateResults, setUpdateResults] = useState<UpdateResult[]>();
   const [deleteResults, setDeleteResults] = useState<DeleteResult[]>();
   const [filters, setFilters] = useState<PlannerFilters>(() => ({
@@ -107,6 +120,7 @@ function App() {
     hidePast: true,
     projectId: "",
   }));
+  const [isMultiEditAvailable, setIsMultiEditAvailable] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -118,10 +132,38 @@ function App() {
     void restoreBackendSession(params.get("aworkLogin") === "success");
   }, []);
 
+  useEffect(() => {
+    if (!currentUser) {
+      setIsMultiEditAvailable(false);
+      return;
+    }
+
+    void loadUserFeatureAccess();
+  }, [currentUser?.id]);
+
+  async function loadUserFeatureAccess() {
+    try {
+      const hasAccess = await isAuthorizedForMultiEdit();
+      setIsMultiEditAvailable(hasAccess);
+    } catch {
+      setIsMultiEditAvailable(false);
+    }
+  }
+
+  const plannerUser = useMemo(() => {
+    if (!currentUser) return undefined;
+    if (!selectedPlannerUserId) return currentUser;
+    return (
+      availableUsers.find((user) => user.id === selectedPlannerUserId) ?? {
+        id: selectedPlannerUserId,
+      }
+    );
+  }, [availableUsers, currentUser, selectedPlannerUserId]);
+
   const projectOptions = useMemo(() => {
     const projects = new Map<string, string>();
-    const candidateSchedules = currentUser
-      ? allSchedules.filter((schedule) => isOwnSchedule(schedule, currentUser))
+    const candidateSchedules = plannerUser
+      ? getPlannerSchedules(allSchedules, plannerUser)
       : [];
 
     candidateSchedules.forEach((schedule) => {
@@ -133,26 +175,28 @@ function App() {
     return Array.from(projects.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSchedules, currentUser]);
+  }, [allSchedules, plannerUser]);
 
   const filteredSchedules = useMemo(() => {
-    if (!currentUser) return [];
+    if (!plannerUser) return [];
 
     const today = startOfToday();
-    return allSchedules.filter((schedule) => {
-      if (!isOwnSchedule(schedule, currentUser)) return false;
+    return getPlannerSchedules(allSchedules, plannerUser).filter((schedule) => {
       if (filters.hidePast && isBefore(parseISO(schedule.start), today))
         return false;
       if (filters.projectId && schedule.projectId !== filters.projectId)
         return false;
       return true;
     });
-  }, [allSchedules, currentUser, filters.hidePast, filters.projectId]);
-
+  }, [allSchedules, plannerUser, filters.hidePast, filters.projectId]);
 
   const groups = useMemo(
     () => groupSchedules(filteredSchedules),
     [filteredSchedules],
+  );
+  const selectedGroups = useMemo(
+    () => groups.filter((group) => selectedGroupIds.has(group.groupId)),
+    [groups, selectedGroupIds],
   );
 
   async function restoreBackendSession(returnedFromLogin = false) {
@@ -163,6 +207,7 @@ function App() {
       const status = await backendClient.getAuthStatus();
       if (status.authenticated && status.user) {
         setCurrentUser(status.user);
+        setSelectedPlannerUserId("");
         setStatusMessage(
           returnedFromLogin
             ? "awork login successful. Choose a workflow."
@@ -189,14 +234,43 @@ function App() {
     window.location.href = backendClient.getLoginUrl();
   }
 
+  function handlePlannerUserChange(userId: string) {
+    setSelectedPlannerUserId(userId);
+    setAllSchedules([]);
+    setProjectTasksForCreate([]);
+    setHasLoadedSchedules(false);
+    setFilters((currentFilters) => ({ ...currentFilters, projectId: "" }));
+    setSelectedGroup(undefined);
+    setSelectedGroupIds(new Set());
+    setMultiEditGroups(undefined);
+    setManualConfirmGroup(undefined);
+    setManualEditGroup(undefined);
+    setDeleteGroup(undefined);
+    setPreviewChanges(undefined);
+    setBlockerOperations(undefined);
+    setBlockerOperationResults(undefined);
+    setUpdateResults(undefined);
+    setDeleteResults(undefined);
+    setCreateSuccess(undefined);
+    setUpdateSuccess(undefined);
+    setDeleteSuccess(undefined);
+    setStatusMessage("");
+    setError("");
+  }
+
   async function handleDisconnect() {
     await backendClient.logout();
+    clearFeatureAccessCache();
     setCurrentUser(undefined);
+    setSelectedPlannerUserId("");
     setAllSchedules([]);
     setAvailableProjects([]);
+    setAvailableUsers([]);
     setProjectTasksForCreate([]);
     setHasLoadedSchedules(false);
     setSelectedGroup(undefined);
+    setSelectedGroupIds(new Set());
+    setMultiEditGroups(undefined);
     setManualConfirmGroup(undefined);
     setManualEditGroup(undefined);
     setDeleteGroup(undefined);
@@ -210,10 +284,11 @@ function App() {
     setDeleteSuccess(undefined);
     setStatusMessage("Disconnected.");
     setError("");
+    setIsMultiEditAvailable(false);
   }
 
   async function loadSchedules() {
-    if (!currentUser) {
+    if (!plannerUser) {
       setError("Connect to awork before loading planned tasks.");
       return;
     }
@@ -224,16 +299,31 @@ function App() {
 
     try {
       const [scheduleResponse, projectTaskResponse] = await Promise.all([
-        backendClient.getTaskSchedules({ from: filters.from, to: filters.to }),
-        backendClient.getMyProjectTasks(),
+        backendClient.getTaskSchedules({
+          from: filters.from,
+          to: filters.to,
+          userId: selectedPlannerUserId || undefined,
+        }),
+        !selectedPlannerUserId
+          ? backendClient.getMyProjectTasks()
+          : backendClient.getUserAssignedTasks(plannerUser.id),
       ]);
       const mapped = mapTaskSchedulesResponse(scheduleResponse);
-      const projectTasks = mapProjectTasksResponse(projectTaskResponse);
-      const enrichedSchedules = enrichSchedulesWithProjectTasks(
+      const projectTasks = await loadMissingProjectTasks(
+        mapProjectTasksResponse(projectTaskResponse),
         mapped.schedules,
+      );
+      const enrichedSchedules = enrichSchedulesWithProjectTasks(
+        mapped.schedules.map((schedule) => ({
+          ...schedule,
+          userId: selectedPlannerUserId
+            ? (schedule.userId ?? plannerUser.id)
+            : schedule.userId,
+        })),
         projectTasks,
       );
       setAllSchedules(enrichedSchedules);
+      setSelectedGroupIds(new Set());
       setHasLoadedSchedules(true);
 
       if (mapped.schedules.length === 0) {
@@ -248,6 +338,41 @@ function App() {
     } finally {
       setIsLoadingSchedules(false);
     }
+  }
+
+  async function loadMissingProjectTasks(
+    projectTasks: AworkProjectTask[],
+    schedules: AworkTaskSchedule[],
+  ): Promise<AworkProjectTask[]> {
+    const tasksById = new Map(projectTasks.map((task) => [task.id, task]));
+    const missingTaskIds = Array.from(
+      new Set(
+        schedules
+          .map((schedule) => schedule.taskId)
+          .filter((taskId) => !tasksById.has(taskId)),
+      ),
+    );
+
+    if (missingTaskIds.length === 0) {
+      return projectTasks;
+    }
+
+    const resolvedTasks = await Promise.all(
+      missingTaskIds.map(async (taskId) => {
+        try {
+          return mapProjectTaskResponse(await backendClient.getTask(taskId));
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return [
+      ...projectTasks,
+      ...resolvedTasks.filter((task): task is AworkProjectTask =>
+        Boolean(task),
+      ),
+    ];
   }
 
   async function loadProjects() {
@@ -267,6 +392,26 @@ function App() {
       );
     } finally {
       setIsLoadingProjects(false);
+    }
+  }
+
+  async function loadUsers() {
+    if (!currentUser) return;
+
+    setIsLoadingUsers(true);
+    setError("");
+
+    try {
+      const users = await backendClient.getUsers();
+      setAvailableUsers(users);
+    } catch (usersError) {
+      setError(
+        usersError instanceof Error
+          ? usersError.message
+          : "Could not load awork users.",
+      );
+    } finally {
+      setIsLoadingUsers(false);
     }
   }
 
@@ -292,6 +437,11 @@ function App() {
     payloads: CreateTaskSchedulePayload[],
     options: CreateGroupOptions,
   ) {
+    if (!plannerUser) {
+      setError("Select a planner user before creating blockers.");
+      return;
+    }
+
     setIsCreatingSchedules(true);
     setError("");
 
@@ -311,6 +461,7 @@ function App() {
           {
             name: options.newTaskName,
             plannedDuration,
+            userId: plannerUser?.id,
           },
         );
         const createdTask = mapProjectTaskResponse(createdTaskResponse);
@@ -330,7 +481,7 @@ function App() {
       }
 
       for (const payload of payloads) {
-        if (payload.userId !== currentUser?.id) {
+        if (payload.userId !== plannerUser?.id) {
           failures.push(
             `${payload.startDate}: ownership check failed before create.`,
           );
@@ -395,7 +546,7 @@ function App() {
   }
 
   async function handleDeleteGroup() {
-    if (!currentUser || !deleteGroup) return;
+    if (!plannerUser || !deleteGroup) return;
 
     setIsDeleting(true);
     setError("");
@@ -403,7 +554,7 @@ function App() {
     try {
       const results = await deleteScheduleGroup(
         backendClient,
-        currentUser,
+        plannerUser,
         deleteGroup,
       );
       setDeleteResults(results);
@@ -429,36 +580,47 @@ function App() {
   }
 
   async function handleApplyBlockerOperations() {
-    if (!currentUser || !blockerOperations) return;
+    if (!plannerUser || !blockerOperations) return;
 
     setIsApplyingBlockerOperations(true);
     setError("");
 
     try {
-      const results = await applyBlockerOperations(backendClient, currentUser, blockerOperations);
+      const results = await applyBlockerOperations(
+        backendClient,
+        plannerUser,
+        blockerOperations,
+      );
       setBlockerOperationResults(results);
       const successCount = results.filter((result) => result.success).length;
       const failureCount = results.length - successCount;
-      setStatusMessage(`${successCount} blocker operations applied. ${failureCount} failed.`);
+      setStatusMessage(
+        `${successCount} blocker operations applied. ${failureCount} failed.`,
+      );
       if (successCount > 0 && failureCount === 0) {
         closeModals();
         setUpdateSuccess({
           count: successCount,
           failed: failureCount,
           title: "BÄM, Blocker angepasst.",
-          detail: "The selected blocker updates, additions, and unplans were applied. The awork task was not deleted.",
+          detail:
+            "The selected blocker updates, additions, and unplans were applied. The awork task was not deleted.",
         });
       }
       if (successCount > 0) await loadSchedules();
     } catch (operationError) {
-      setError(operationError instanceof Error ? operationError.message : "Could not apply blocker operations.");
+      setError(
+        operationError instanceof Error
+          ? operationError.message
+          : "Could not apply blocker operations.",
+      );
     } finally {
       setIsApplyingBlockerOperations(false);
     }
   }
 
   async function handleApplyChanges() {
-    if (!currentUser || !previewChanges) return;
+    if (!plannerUser || !previewChanges) return;
 
     setIsUpdating(true);
     setError("");
@@ -466,7 +628,7 @@ function App() {
     try {
       const results = await updateScheduleChanges(
         backendClient,
-        currentUser,
+        plannerUser,
         previewChanges,
       );
       setUpdateResults(results);
@@ -493,6 +655,7 @@ function App() {
 
   function closeModals() {
     setSelectedGroup(undefined);
+    setMultiEditGroups(undefined);
     setManualConfirmGroup(undefined);
     setManualEditGroup(undefined);
     setDeleteGroup(undefined);
@@ -512,8 +675,7 @@ function App() {
           <h1>Self-Service Bulk Planner</h1>
         </div>
         <p>
-          Bulk-edit recurring task blockers for your own awork planner without
-          exposing colleague or team controls.
+          Bulk-edit recurring task blockers for the selected awork planner user.
         </p>
       </header>
 
@@ -529,6 +691,17 @@ function App() {
         onDisconnect={handleDisconnect}
       />
 
+      {currentUser && isMultiEditAvailable ? (
+        <PlannerUserSelector
+          currentUser={currentUser}
+          selectedUserId={selectedPlannerUserId}
+          users={availableUsers}
+          isLoadingUsers={isLoadingUsers}
+          onLoadUsers={loadUsers}
+          onChange={handlePlannerUserChange}
+        />
+      ) : null}
+
       <WorkflowChooser
         value={workflow}
         disabled={!currentUser}
@@ -541,7 +714,7 @@ function App() {
             filters={filters}
             projectOptions={projectOptions}
             hasLoadedSchedules={hasLoadedSchedules}
-            disabled={!currentUser}
+            disabled={!plannerUser}
             isLoading={isLoadingSchedules}
             onChange={setFilters}
             onLoad={loadSchedules}
@@ -553,16 +726,20 @@ function App() {
           <ScheduleGroupsList
             groups={groups}
             hasLoaded={hasLoadedSchedules}
+            selectedGroupIds={selectedGroupIds}
+            onSelectionChange={setSelectedGroupIds}
+            onMultiEdit={() => setMultiEditGroups(selectedGroups)}
             onChangeTimeWindow={setSelectedGroup}
             onDeleteGroup={(group) => {
               setDeleteGroup(group);
               setDeleteResults(undefined);
             }}
+            isMultiEditAvailable={isMultiEditAvailable}
           />
         </>
-      ) : currentUser ? (
+      ) : workflow === "create" && plannerUser ? (
         <CreateScheduleGroupPanel
-          currentUser={currentUser}
+          currentUser={plannerUser}
           projects={availableProjects}
           tasks={projectTasksForCreate}
           isLoadingProjects={isLoadingProjects}
@@ -574,13 +751,25 @@ function App() {
         />
       ) : null}
 
-      {selectedGroup && currentUser && !previewChanges ? (
+      {selectedGroup && plannerUser && !previewChanges ? (
         <BulkEditModal
           group={selectedGroup}
-          currentUser={currentUser}
+          currentUser={plannerUser}
           onClose={closeModals}
           onPreview={handlePreview}
           onManualEditRequest={handleManualEditRequest}
+        />
+      ) : null}
+
+      {multiEditGroups &&
+      plannerUser &&
+      !previewChanges &&
+      isMultiEditAvailable ? (
+        <MultiGroupDurationEditModal
+          groups={multiEditGroups}
+          currentUser={plannerUser}
+          onClose={closeModals}
+          onPreview={handlePreview}
         />
       ) : null}
 
@@ -599,10 +788,10 @@ function App() {
         />
       ) : null}
 
-      {manualEditGroup && currentUser ? (
+      {manualEditGroup && plannerUser ? (
         <ManualBlockerEditModal
           group={manualEditGroup}
-          currentUser={currentUser}
+          currentUser={plannerUser}
           onBack={() => {
             setManualConfirmGroup(manualEditGroup);
             setManualEditGroup(undefined);
@@ -628,10 +817,10 @@ function App() {
           message={`${createSuccess.count} planned blocker${createSuccess.count === 1 ? "" : "s"} created successfully.`}
           detail={
             createSuccess.taskCreated
-              ? `Task created: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} blockers failed.` : "All blockers were planned for your own awork user."}`
+              ? `Task created: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} blockers failed.` : "All blockers were planned for the selected planner user."}`
               : createSuccess.failed > 0
                 ? `${createSuccess.failed} failed and stayed untouched.`
-                : "Everything was created for your own awork user only."
+                : "Everything was created for the selected planner user."
           }
           onClose={() => setCreateSuccess(undefined)}
         />
@@ -650,7 +839,10 @@ function App() {
         <SuccessPopup
           title={updateSuccess.title ?? "BÄM, Zeitfenster angepasst."}
           message={`${updateSuccess.count} planned blocker${updateSuccess.count === 1 ? "" : "s"} updated successfully.`}
-          detail={updateSuccess.detail ?? "The new time window was applied to the selected blockers."}
+          detail={
+            updateSuccess.detail ??
+            "The new time window was applied to the selected blockers."
+          }
           onClose={() => setUpdateSuccess(undefined)}
         />
       ) : null}
@@ -687,3 +879,10 @@ function App() {
 }
 
 export default App;
+
+function getPlannerSchedules(
+  schedules: AworkTaskSchedule[],
+  plannerUser: AworkUser,
+): AworkTaskSchedule[] {
+  return schedules.filter((schedule) => isOwnSchedule(schedule, plannerUser));
+}

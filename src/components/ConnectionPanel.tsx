@@ -71,7 +71,7 @@ export function ConnectionPanel({
       ) : null}
 
       {!isCollapsed ? <div className="alert alert-info">
-        Only your own planned task schedules are shown and editable.
+        Planner actions use the selected planner user. The OAuth session stays tied to the connected awork account.
       </div> : null}
     </section>
   );

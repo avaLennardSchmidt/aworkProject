@@ -17,8 +17,8 @@ function mapOneProjectTask(raw: unknown): AworkProjectTask | null {
     return null;
   }
 
-  const id = firstString(raw, ["id", "taskId"]);
-  const projectId = firstString(raw, ["projectId", "project.id", "entityId"]);
+  const id = firstString(raw, ["id", "taskId", "task.id"]);
+  const projectId = firstString(raw, ["projectId", "project.id", "entityId", "task.projectId", "task.project.id", "entity.id"]);
 
   if (!id || !projectId) {
     return null;
@@ -28,7 +28,7 @@ function mapOneProjectTask(raw: unknown): AworkProjectTask | null {
     id,
     name: firstString(raw, ["name", "title", "task.name"]),
     projectId,
-    projectName: firstString(raw, ["projectName", "project.name"]),
+    projectName: firstString(raw, ["projectName", "project.name", "entityName", "entity.name", "task.projectName", "task.project.name"]),
     statusId: firstString(raw, ["taskStatusId", "statusId", "task.statusId", "task.taskStatusId", "taskStatus.id", "status.id"]),
     statusName: firstString(raw, ["taskStatus.name", "status.name", "task.taskStatus.name", "task.status.name", "statusName", "taskStatusName"]),
     statusType: firstString(raw, ["taskStatus.type", "status.type", "task.taskStatus.type", "task.status.type", "statusType", "taskStatusType"]),

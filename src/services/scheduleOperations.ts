@@ -5,8 +5,8 @@ import { buildUpdatePayload } from "./scheduleUpdater";
 
 interface TaskScheduleOperationsClient {
   createTaskSchedule(payload: unknown): Promise<unknown>;
-  deleteTaskSchedule(scheduleId: string): Promise<unknown>;
-  updateTaskSchedule(scheduleId: string, payload: unknown): Promise<unknown>;
+  deleteTaskSchedule(scheduleId: string, userId?: string): Promise<unknown>;
+  updateTaskSchedule(scheduleId: string, payload: unknown, userId?: string): Promise<unknown>;
 }
 
 export async function applyBlockerOperations(
@@ -25,7 +25,7 @@ export async function applyBlockerOperations(
         }
 
         const change: PreviewChange = operation;
-        await client.updateTaskSchedule(operation.schedule.id, buildUpdatePayload(change));
+        await client.updateTaskSchedule(operation.schedule.id, buildUpdatePayload(change), currentUser.id);
         results.push({ operationId: operation.schedule.id, kind: operation.kind, success: true });
         continue;
       }
@@ -36,13 +36,13 @@ export async function applyBlockerOperations(
           continue;
         }
 
-        await client.deleteTaskSchedule(operation.schedule.id);
+        await client.deleteTaskSchedule(operation.schedule.id, currentUser.id);
         results.push({ operationId: operation.schedule.id, kind: operation.kind, success: true });
         continue;
       }
 
       if (operation.payload.userId !== currentUser.id) {
-        results.push({ operationId: operation.tempId, kind: operation.kind, success: false, error: "Create payload does not belong to current user." });
+        results.push({ operationId: operation.tempId, kind: operation.kind, success: false, error: "Create payload does not belong to the selected planner user." });
         continue;
       }
 

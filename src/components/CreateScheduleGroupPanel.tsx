@@ -1,8 +1,8 @@
 import { addDays, eachDayOfInterval, format, getDay, isAfter, parseISO, set } from "date-fns";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AworkProject, AworkProjectTask, AworkUser, CreateTaskSchedulePayload } from "../types/awork";
-import { fuzzyMatches } from "../services/fuzzySearch";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
+import { formatSearchPlaceholder, SearchableSelect } from "./SearchableSelect";
 
 export interface CreateGroupOptions {
   projectId: string;
@@ -27,11 +27,6 @@ const NEW_TASK_PLACEHOLDER_ID = "__new_task__";
 const PROJECT_FILTER_ACTIVE = "__active_projects__";
 const PROJECT_FILTER_ALL = "__all_projects__";
 const TASK_FILTER_ALL = "__all_task_statuses__";
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
 
 const weekdays = [
   { value: 1, label: "Monday" },
@@ -316,98 +311,6 @@ export function CreateScheduleGroupPanel({
       </button>
     </section>
   );
-}
-
-function SearchableSelect({
-  value,
-  options,
-  placeholder,
-  searchPlaceholder,
-  emptyLabel,
-  disabled,
-  onChange,
-}: {
-  value: string;
-  options: SelectOption[];
-  placeholder: string;
-  searchPlaceholder: string;
-  emptyLabel: string;
-  disabled?: boolean;
-  onChange: (value: string) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const selectedOption = options.find((option) => option.value === value);
-  const filteredOptions = options.filter((option) => matchesQuery(option.label, query));
-
-  function close() {
-    setIsOpen(false);
-    setQuery("");
-  }
-
-  return (
-    <div
-      ref={containerRef}
-      className="searchable-select"
-      onBlur={(event) => {
-        if (!containerRef.current?.contains(event.relatedTarget)) {
-          close();
-        }
-      }}
-    >
-      <button
-        type="button"
-        className="searchable-select-button"
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((open) => !open)}
-      >
-        <span>{selectedOption?.label ?? placeholder}</span>
-        <span aria-hidden="true">v</span>
-      </button>
-
-      {isOpen ? (
-        <div className="searchable-select-menu">
-          <input
-            type="search"
-            value={query}
-            placeholder={searchPlaceholder}
-            autoFocus
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <div className="searchable-select-options" role="listbox">
-            {filteredOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={option.value === value ? "active" : ""}
-                role="option"
-                aria-selected={option.value === value}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange(option.value);
-                  close();
-                }}
-              >
-                {option.label}
-              </button>
-            ))}
-            {filteredOptions.length === 0 ? <div className="searchable-select-empty">{emptyLabel}</div> : null}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function matchesQuery(value: string, query: string): boolean {
-  return fuzzyMatches(value, query);
-}
-
-function formatSearchPlaceholder(label: string, count: number): string {
-  return `${label} (${count} found)`;
 }
 
 function matchesProjectStatus(project: AworkProject, filter: string): boolean {

@@ -34,6 +34,7 @@ interface AuthStatusResponse {
 interface TaskScheduleQuery {
   from: string;
   to: string;
+  userId?: string;
 }
 
 type BackendStatusListener = (status: "ok" | "starting") => void;
@@ -84,16 +85,37 @@ export class BackendClient {
     return mapUser(await this.request<unknown>("/api/me"));
   }
 
+  async getUsers(): Promise<AworkUser[]> {
+    const response = await this.request<unknown>("/api/users");
+    return extractArray(response)
+      .map(mapNullableUser)
+      .filter((user): user is AworkUser => Boolean(user))
+      .sort((a, b) => formatUserName(a).localeCompare(formatUserName(b)));
+  }
+
   async getTaskSchedules(query: TaskScheduleQuery): Promise<unknown> {
     const params = new URLSearchParams({
       from: query.from,
       to: query.to,
     });
+    if (query.userId) {
+      params.set("userId", query.userId);
+    }
     return this.request<unknown>(`/api/taskschedules?${params.toString()}`);
   }
 
   async getMyProjectTasks(): Promise<unknown> {
     return this.request<unknown>("/api/me/projecttasks?pageSize=1000");
+  }
+
+  async getUserAssignedTasks(userId: string): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/users/${encodeURIComponent(userId)}/assignedtasks`,
+    );
+  }
+
+  async getTask(taskId: string): Promise<unknown> {
+    return this.request<unknown>(`/api/tasks/${encodeURIComponent(taskId)}`);
   }
 
   async getProjects(): Promise<unknown> {
@@ -131,9 +153,14 @@ export class BackendClient {
   async updateTaskSchedule(
     scheduleId: string,
     payload: unknown,
+    userId?: string,
   ): Promise<unknown> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.set("userId", userId);
+    }
     return this.request<unknown>(
-      `/api/taskschedules/${encodeURIComponent(scheduleId)}`,
+      `/api/taskschedules/${encodeURIComponent(scheduleId)}${params.size ? `?${params.toString()}` : ""}`,
       {
         method: "PUT",
         body: JSON.stringify(payload),
@@ -141,9 +168,13 @@ export class BackendClient {
     );
   }
 
-  async deleteTaskSchedule(scheduleId: string): Promise<unknown> {
+  async deleteTaskSchedule(scheduleId: string, userId?: string): Promise<unknown> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.set("userId", userId);
+    }
     return this.request<unknown>(
-      `/api/taskschedules/${encodeURIComponent(scheduleId)}`,
+      `/api/taskschedules/${encodeURIComponent(scheduleId)}${params.size ? `?${params.toString()}` : ""}`,
       {
         method: "DELETE",
       },
@@ -251,7 +282,32 @@ function mapUser(rawUser: unknown): AworkUser {
     firstName: readString(userRecord, "firstName"),
     lastName: readString(userRecord, "lastName"),
     email: readString(userRecord, "email"),
+    raw: rawUser,
   };
+}
+
+function mapNullableUser(rawUser: unknown): AworkUser | undefined {
+  try {
+    return mapUser(rawUser);
+  } catch {
+    return undefined;
+  }
+}
+
+function formatUserName(user: AworkUser): string {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || user.id;
+}
+
+function extractArray(response: unknown): unknown[] {
+  if (Array.isArray(response)) {
+    return response;
+  }
+  if (!isRecord(response)) {
+    return [];
+  }
+  const candidates = [response.items, response.data, response.results, response.users];
+  const arrayCandidate = candidates.find(Array.isArray);
+  return arrayCandidate ?? [];
 }
 
 function unwrapRecord(value: unknown): Record<string, unknown> | undefined {

@@ -3,6 +3,7 @@ export interface AworkUser {
   firstName?: string;
   lastName?: string;
   email?: string;
+  raw?: unknown;
 }
 
 export interface AworkProject {
@@ -62,4 +63,5 @@ export interface CreateTaskSchedulePayload {
 export interface CreateProjectTaskPayload {
   name: string;
   plannedDuration?: number;
+  userId?: string;
 }

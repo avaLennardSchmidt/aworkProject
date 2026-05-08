@@ -3,7 +3,7 @@ import type { PreviewChange, UpdateResult } from "../types/planner";
 import { isOwnSchedule } from "./scheduleMapper";
 
 interface TaskScheduleUpdater {
-  updateTaskSchedule(scheduleId: string, payload: unknown): Promise<unknown>;
+  updateTaskSchedule(scheduleId: string, payload: unknown, userId?: string): Promise<unknown>;
 }
 
 export async function updateScheduleChanges(
@@ -25,7 +25,7 @@ export async function updateScheduleChanges(
 
     try {
       const payload = buildUpdatePayload(change);
-      await client.updateTaskSchedule(change.schedule.id, payload);
+      await client.updateTaskSchedule(change.schedule.id, payload, currentUser.id);
       results.push({ scheduleId: change.schedule.id, success: true });
     } catch (error) {
       results.push({
