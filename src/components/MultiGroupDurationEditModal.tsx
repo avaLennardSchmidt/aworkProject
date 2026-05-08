@@ -62,7 +62,9 @@ export function MultiGroupDurationEditModal({
       return sum;
     }
 
-    return sum + calculateDurationMinutes(updated.newStartIso, updated.newEndIso);
+    return (
+      sum + calculateDurationMinutes(updated.newStartIso, updated.newEndIso)
+    );
   }, 0);
 
   function handlePreview() {
