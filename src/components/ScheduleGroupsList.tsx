@@ -64,7 +64,12 @@ export function ScheduleGroupsList({
     return projectSections.flatMap((section) =>
       collapsedProjects.has(section.projectKey) ? [] : section.groups,
     );
-  }, [collapsedProjects, filteredGroups, normalizedSearchQuery, projectSections]);
+  }, [
+    collapsedProjects,
+    filteredGroups,
+    normalizedSearchQuery,
+    projectSections,
+  ]);
 
   const selectableGroupIds = useMemo(
     () => new Set(visibleGroups.map((group) => group.groupId)),
