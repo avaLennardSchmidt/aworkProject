@@ -141,6 +141,25 @@ select:disabled {
   gap: 20px;
 }
 
+.connection-panel.is-collapsed {
+  padding-block: 16px;
+}
+
+.connection-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.connection-heading .section-copy {
+  margin-bottom: 0;
+}
+
+.connection-toggle-button {
+  flex: 0 0 auto;
+}
+
 .connection-login-button {
   width: fit-content;
 }
@@ -428,6 +447,15 @@ select:disabled {
   gap: 16px;
 }
 
+.project-selection-grid,
+.task-details-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.task-mode-grid {
+  grid-template-columns: minmax(260px, 380px);
+}
+
 .task-mode-row {
   align-content: start;
 }
@@ -454,14 +482,6 @@ select:disabled {
   border-color: #29445c;
 }
 
-.filterable-select-row input[type="search"] {
-  background: #ffffff;
-}
-
-.filterable-select-row select {
-  margin-top: 2px;
-}
-
 .create-preview {
   display: grid;
   gap: 8px;
@@ -469,6 +489,95 @@ select:disabled {
   background: #f7f9fb;
   border: 1px solid #e1e7ed;
   border-radius: 8px;
+}
+
+.searchable-select {
+  position: relative;
+  min-width: 0;
+}
+
+.searchable-select-button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: #1d2329;
+  text-align: left;
+  background: #fbfcfd;
+  border: 1px solid #cbd4dd;
+  border-radius: 6px;
+}
+
+.searchable-select-button span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchable-select-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 8px;
+  width: max(100%, 520px);
+  max-width: min(720px, calc(100vw - 40px));
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid #cbd4dd;
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgb(29 35 41 / 0.18);
+}
+
+.searchable-select-menu input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  color: #1d2329;
+  background: #fbfcfd;
+  border: 1px solid #cbd4dd;
+  border-radius: 6px;
+}
+
+.searchable-select-options {
+  display: grid;
+  gap: 4px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.searchable-select-options button {
+  display: block;
+  width: 100%;
+  min-height: unset;
+  height: auto;
+  padding: 10px 12px;
+  color: #29343f;
+  line-height: 1.35;
+  text-align: left;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  background: #ffffff;
+  border: 0;
+  border-radius: 6px;
+}
+
+.searchable-select-options button:hover,
+.searchable-select-options button.active {
+  color: #ffffff;
+  background: #29445c;
+}
+
+.searchable-select-empty {
+  padding: 10px;
+  color: #62707d;
 }
 
 .create-preview h3,
@@ -644,10 +753,14 @@ select:disabled {
 
 .manual-row-fields {
   display: grid;
-  grid-template-columns: minmax(125px, 1.15fr) minmax(86px, 0.9fr) minmax(86px, 0.9fr) 48px minmax(70px, 0.65fr);
+  grid-template-columns: minmax(125px, 1.15fr) minmax(86px, 0.9fr) minmax(86px, 0.9fr) minmax(70px, 0.65fr) 42px;
   gap: 8px;
   align-items: end;
   min-width: 0;
+}
+
+.manual-edit-row.is-new .manual-row-fields {
+  grid-template-columns: minmax(125px, 1.15fr) minmax(86px, 0.9fr) minmax(86px, 0.9fr) 42px;
 }
 
 .manual-row-fields label {
@@ -673,6 +786,20 @@ select:disabled {
   min-height: 34px;
   min-width: 0;
   padding-inline: 10px;
+}
+
+.manual-edit-row.is-new .manual-reset-button {
+  min-width: max-content;
+}
+
+.manual-remove-button {
+  align-self: end;
+}
+
+.manual-remove-button.active {
+  color: #ffffff;
+  background: #b8323a;
+  border-color: #b8323a;
 }
 
 .manual-row-error {
@@ -722,34 +849,6 @@ select:disabled {
 .manual-edit-row.is-new {
   background: #f3f8ff;
   border-color: #bdd4f4;
-}
-
-.remove-blocker-check {
-  display: grid !important;
-  grid-template-rows: auto 34px;
-  gap: 6px !important;
-  color: #34414e;
-  font-weight: 700;
-}
-
-.unplan-checkbox-field {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  background: #ffffff;
-  border: 1px solid #cbd4dd;
-  border-radius: 6px;
-}
-
-.remove-blocker-check input {
-  width: 18px;
-  height: 18px;
-  min-height: 18px;
-  margin: 0;
-  accent-color: #1f8466;
 }
 
 .manual-edit-button {
@@ -812,7 +911,11 @@ select:disabled {
   }
 
   .manual-row-fields {
-    grid-template-columns: minmax(130px, 1.2fr) minmax(92px, 1fr) minmax(92px, 1fr) 48px minmax(72px, 0.7fr);
+    grid-template-columns: minmax(130px, 1.2fr) minmax(92px, 1fr) minmax(92px, 1fr) minmax(72px, 0.7fr) 42px;
+  }
+
+  .manual-edit-row.is-new .manual-row-fields {
+    grid-template-columns: minmax(130px, 1.2fr) minmax(92px, 1fr) minmax(92px, 1fr) 42px;
   }
 }
 
@@ -821,8 +924,8 @@ select:disabled {
     grid-template-columns: repeat(2, minmax(130px, 1fr));
   }
 
-  .remove-blocker-check,
-  .manual-reset-button {
+  .manual-reset-button,
+  .manual-remove-button {
     width: 100%;
   }
 }
@@ -835,6 +938,7 @@ select:disabled {
 
   .app-header,
   .connection-panel .form-row,
+  .connection-heading,
   .filter-grid,
   .create-grid,
   .workflow-toggle {
@@ -848,6 +952,10 @@ select:disabled {
   .manual-edit-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .connection-heading {
+    align-items: stretch;
   }
 
   .stats-grid {
@@ -989,35 +1097,50 @@ select:disabled {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.table-action-button {
-  width: auto;
-  min-width: auto;
-  padding: 4px 10px;
-  font-size: 0.8rem;
-}
-
-.delete-x-button {
+.table-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 42px;
+  height: 42px;
   padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #c0392b;
-  font-size: 1rem;
-  font-weight: 700;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
-.delete-x-button:hover {
-  background: #fdecea;
+.table-edit-button {
+  color: #174f40;
+  background: #e9f6f1;
+  border-color: #bde0d2;
+}
+
+.table-edit-button:hover {
+  color: #ffffff;
+  background: #1e7a5f;
+  border-color: #1e7a5f;
+}
+
+.table-delete-button {
+  color: #9f2d35;
+  background: #fdeaea;
+  border-color: #f2b9bd;
+}
+
+.table-delete-button:hover {
+  color: #ffffff;
+  background: #b8323a;
+  border-color: #b8323a;
 }
 
 .backend-startup-indicator {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { fuzzyMatches } from "../services/fuzzySearch";
 import type { ScheduleGroup } from "../types/planner";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
 
@@ -172,19 +173,21 @@ function ProjectRows({
               <div className="table-actions">
                 <button
                   type="button"
-                  className="secondary-button table-action-button"
+                  className="table-icon-button table-edit-button"
+                  title="Change time window"
+                  aria-label="Change time window"
                   onClick={() => onChangeTimeWindow(group)}
                 >
-                  Change time window
+                  <span aria-hidden="true">✎</span>
                 </button>
                 <button
                   type="button"
-                  className="delete-x-button"
+                  className="table-icon-button table-delete-button"
                   title="Unplan group"
                   aria-label="Unplan group"
                   onClick={() => onDeleteGroup(group)}
                 >
-                  ×
+                  <span aria-hidden="true">x</span>
                 </button>
               </div>
             </td>
@@ -195,8 +198,7 @@ function ProjectRows({
 }
 
 function filterGroups(groups: ScheduleGroup[], query: string): ScheduleGroup[] {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  if (!normalizedQuery) return groups;
+  if (!query.trim()) return groups;
 
   return groups.filter((group) =>
     [
@@ -209,7 +211,7 @@ function filterGroups(groups: ScheduleGroup[], query: string): ScheduleGroup[] {
       group.weekdayLabel + " " + group.startTime + "-" + group.endTime,
     ]
       .filter(Boolean)
-      .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery)),
+      .some((value) => fuzzyMatches(String(value), query)),
   );
 }
 

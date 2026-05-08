@@ -201,8 +201,17 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
                   <label>Date<input type="date" value={view.row.date} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { date: event.target.value })} /></label>
                   <label>Start<input type="time" value={view.row.startTime} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { startTime: event.target.value })} /></label>
                   <label>End<input type="time" value={view.row.endTime} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { endTime: event.target.value })} /></label>
-                  <label className="remove-blocker-check">Unplan<span className="unplan-checkbox-field"><input type="checkbox" checked={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { remove: event.target.checked })} /></span></label>
                   <button type="button" className="ghost-button manual-reset-button" disabled={!view.changed} onClick={() => resetExistingRow(schedule.id)}>Reset</button>
+                  <button
+                    type="button"
+                    className={`table-icon-button table-delete-button manual-remove-button ${view.row.remove ? "active" : ""}`}
+                    title={view.row.remove ? "Keep blocker" : "Unplan blocker"}
+                    aria-label={view.row.remove ? "Keep blocker" : "Unplan blocker"}
+                    aria-pressed={view.row.remove}
+                    onClick={() => updateExistingRow(schedule.id, { remove: !view.row.remove })}
+                  >
+                    <span aria-hidden="true">x</span>
+                  </button>
                 </div>
                 {view.rowError ? <div className="manual-row-error">{view.rowError}</div> : null}
               </div>
@@ -218,7 +227,15 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
                   <label>Date<input type="date" value={row.date} onChange={(event) => updateNewRow(row.tempId, { date: event.target.value })} /></label>
                   <label>Start<input type="time" value={row.startTime} onChange={(event) => updateNewRow(row.tempId, { startTime: event.target.value })} /></label>
                   <label>End<input type="time" value={row.endTime} onChange={(event) => updateNewRow(row.tempId, { endTime: event.target.value })} /></label>
-                  <button type="button" className="ghost-button manual-reset-button" onClick={() => removeNewRow(row.tempId)}>Remove</button>
+                  <button
+                    type="button"
+                    className="table-icon-button table-delete-button manual-remove-button"
+                    title="Remove new blocker"
+                    aria-label="Remove new blocker"
+                    onClick={() => removeNewRow(row.tempId)}
+                  >
+                    <span aria-hidden="true">x</span>
+                  </button>
                 </div>
                 {rowError ? <div className="manual-row-error">{rowError}</div> : null}
               </div>

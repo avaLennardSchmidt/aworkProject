@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { AworkUser } from "../types/awork";
 
 interface ConnectionPanelProps {
@@ -13,21 +14,36 @@ export function ConnectionPanel({
   onLogin,
   onDisconnect,
 }: ConnectionPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const displayName = currentUser
     ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(" ") ||
       currentUser.email ||
       currentUser.id
     : "";
+  const isCollapsed = Boolean(currentUser) && !isExpanded;
 
   return (
-    <section className="panel connection-panel">
-      <div>
-        <p className="eyebrow">Connection</p>
-        <h2>Connect your awork account</h2>
-        <p className="section-copy">
-          Sign in through awork OAuth. Tokens stay in the local backend, and the
-          browser only receives a local session cookie.
-        </p>
+    <section className={`panel connection-panel ${isCollapsed ? "is-collapsed" : ""}`}>
+      <div className="connection-heading">
+        <div>
+          <p className="eyebrow">Connection</p>
+          <h2>{currentUser ? `Connected as ${displayName}` : "Connect your awork account"}</h2>
+          {!isCollapsed ? (
+            <p className="section-copy">
+              Sign in through awork OAuth. Tokens stay in the local backend, and the
+              browser only receives a local session cookie.
+            </p>
+          ) : null}
+        </div>
+        {currentUser ? (
+          <button
+            type="button"
+            className="ghost-button connection-toggle-button"
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+          >
+            {isExpanded ? "Collapse" : "Show connection"}
+          </button>
+        ) : null}
       </div>
 
       {!currentUser ? (
@@ -41,7 +57,7 @@ export function ConnectionPanel({
         </button>
       ) : null}
 
-      {currentUser ? (
+      {currentUser && !isCollapsed ? (
         <div className="connection-success">
           <div>
             <strong>Connected as {displayName}</strong>
@@ -54,9 +70,9 @@ export function ConnectionPanel({
         </div>
       ) : null}
 
-      <div className="alert alert-info">
+      {!isCollapsed ? <div className="alert alert-info">
         Only your own planned task schedules are shown and editable.
-      </div>
+      </div> : null}
     </section>
   );
 }

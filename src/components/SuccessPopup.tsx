@@ -9,7 +9,7 @@ export function SuccessPopup({ title, message, detail, onClose }: SuccessPopupPr
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="success-popup" role="dialog" aria-modal="true" aria-labelledby="success-popup-title">
-        <div className="success-badge">BAM</div>
+        <div className="success-badge">BÄM</div>
         <h2 id="success-popup-title">{title}</h2>
         <p>{message}</p>
         {detail ? <span>{detail}</span> : null}

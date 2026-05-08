@@ -1,6 +1,7 @@
 import { addDays, eachDayOfInterval, format, getDay, isAfter, parseISO, set } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AworkProject, AworkProjectTask, AworkUser, CreateTaskSchedulePayload } from "../types/awork";
+import { fuzzyMatches } from "../services/fuzzySearch";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
 
 export interface CreateGroupOptions {
@@ -23,6 +24,14 @@ interface CreateScheduleGroupPanelProps {
 type TaskMode = "existing" | "new";
 
 const NEW_TASK_PLACEHOLDER_ID = "__new_task__";
+const PROJECT_FILTER_ACTIVE = "__active_projects__";
+const PROJECT_FILTER_ALL = "__all_projects__";
+const TASK_FILTER_ALL = "__all_task_statuses__";
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
 
 const weekdays = [
   { value: 1, label: "Monday" },
@@ -54,8 +63,8 @@ export function CreateScheduleGroupPanel({
   const [weekday, setWeekday] = useState(1);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
-  const [projectQuery, setProjectQuery] = useState("");
-  const [taskQuery, setTaskQuery] = useState("");
+  const [projectStatusFilter, setProjectStatusFilter] = useState(PROJECT_FILTER_ACTIVE);
+  const [taskStatusFilter, setTaskStatusFilter] = useState(TASK_FILTER_ALL);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -68,13 +77,44 @@ export function CreateScheduleGroupPanel({
   const selectedTask = tasks.find((task) => task.id === taskId);
   const effectiveTaskId = taskMode === "existing" ? taskId : NEW_TASK_PLACEHOLDER_ID;
   const effectiveTaskName = taskMode === "existing" ? selectedTask?.name ?? "No task selected" : newTaskName.trim() || "New task";
+  const projectStatusOptions = useMemo(
+    () => [
+      { value: PROJECT_FILTER_ACTIVE, label: "All active projects" },
+      { value: PROJECT_FILTER_ALL, label: "All project statuses" },
+      ...buildStatusOptions(projects),
+    ],
+    [projects],
+  );
+  const taskStatusOptions = useMemo(
+    () => [
+      { value: TASK_FILTER_ALL, label: "All task statuses" },
+      ...buildStatusOptions(tasks),
+    ],
+    [tasks],
+  );
   const filteredProjects = useMemo(
-    () => includeSelected(projects.filter((project) => matchesQuery(project.name, projectQuery)), selectedProject),
-    [projectQuery, projects, selectedProject],
+    () =>
+      includeSelected(
+        projects.filter((project) => matchesProjectStatus(project, projectStatusFilter)),
+        selectedProject,
+      ),
+    [projectStatusFilter, projects, selectedProject],
   );
   const filteredTasks = useMemo(
-    () => includeSelected(tasks.filter((task) => matchesQuery(task.name ?? task.id, taskQuery)), selectedTask),
-    [taskQuery, tasks, selectedTask],
+    () =>
+      includeSelected(
+        tasks.filter((task) => matchesTaskStatus(task, taskStatusFilter)),
+        selectedTask,
+      ),
+    [taskStatusFilter, tasks, selectedTask],
+  );
+  const projectOptions = useMemo(
+    () => filteredProjects.map((project) => ({ value: project.id, label: formatProjectOption(project) })),
+    [filteredProjects],
+  );
+  const taskOptions = useMemo(
+    () => filteredTasks.map((task) => ({ value: task.id, label: formatTaskOption(task) })),
+    [filteredTasks],
   );
   const previewPayloads = useMemo(
     () => buildPayloads({ currentUser, taskId: effectiveTaskId, from, to, weekday, startTime, endTime }),
@@ -85,7 +125,7 @@ export function CreateScheduleGroupPanel({
   async function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
     setTaskId("");
-    setTaskQuery("");
+    setTaskStatusFilter(TASK_FILTER_ALL);
     setNewTaskName("");
     setError("");
     if (nextProjectId) {
@@ -96,7 +136,6 @@ export function CreateScheduleGroupPanel({
   function handleTaskModeChange(nextMode: TaskMode) {
     setTaskMode(nextMode);
     setTaskId("");
-    setTaskQuery("");
     setError("");
   }
 
@@ -131,26 +170,41 @@ export function CreateScheduleGroupPanel({
         <p className="section-copy">Select a project, choose an existing task or create a new one, then plan the weekly period.</p>
       </div>
 
-      <div className="create-grid">
-        <div className="form-row filterable-select-row">
-          <label htmlFor="create-project-search">Project</label>
-          <input
-            id="create-project-search"
-            type="search"
-            value={projectQuery}
+      <div className="create-grid project-selection-grid">
+        <div className="form-row">
+          <label>Project status</label>
+          <SearchableSelect
+            value={projectStatusFilter}
             disabled={isLoadingProjects}
-            placeholder="Filter projects"
-            onChange={(event) => setProjectQuery(event.target.value)}
+            options={projectStatusOptions}
+            placeholder="Select project status"
+            searchPlaceholder={formatSearchPlaceholder("Filter statuses", projectStatusOptions.length)}
+            emptyLabel="No statuses found"
+            onChange={(value) => {
+              setProjectStatusFilter(value);
+              setProjectId("");
+              setTaskId("");
+              setTaskStatusFilter(TASK_FILTER_ALL);
+              setNewTaskName("");
+            }}
           />
-          <select id="create-project" value={projectId} disabled={isLoadingProjects} onChange={(event) => void handleProjectChange(event.target.value)}>
-            <option value="">{isLoadingProjects ? "Loading projects..." : "Select project"}</option>
-            {filteredProjects.map((project) => (
-              <option key={project.id} value={project.id}>{project.name}</option>
-            ))}
-            {!isLoadingProjects && filteredProjects.length === 0 ? <option disabled>No projects found</option> : null}
-          </select>
         </div>
 
+        <div className="form-row">
+          <label>Project</label>
+          <SearchableSelect
+            value={projectId}
+            disabled={isLoadingProjects}
+            options={projectOptions}
+            placeholder={isLoadingProjects ? "Loading projects..." : "Select project"}
+            searchPlaceholder={formatSearchPlaceholder("Filter projects", projectOptions.length)}
+            emptyLabel="No projects found"
+            onChange={(value) => void handleProjectChange(value)}
+          />
+        </div>
+      </div>
+
+      <div className="create-grid task-mode-grid">
         <div className="form-row task-mode-row">
           <label>Task</label>
           <div className="task-mode-toggle" role="tablist" aria-label="Task creation mode">
@@ -162,26 +216,40 @@ export function CreateScheduleGroupPanel({
             </button>
           </div>
         </div>
+      </div>
 
+      <div className="create-grid task-details-grid">
         {taskMode === "existing" ? (
-          <div className="form-row filterable-select-row">
-            <label htmlFor="create-task-search">Existing task</label>
-            <input
-              id="create-task-search"
-              type="search"
-              value={taskQuery}
-              disabled={!projectId || isLoadingTasks}
-              placeholder="Filter tasks"
-              onChange={(event) => setTaskQuery(event.target.value)}
-            />
-            <select id="create-task" value={taskId} disabled={!projectId || isLoadingTasks} onChange={(event) => setTaskId(event.target.value)}>
-              <option value="">{isLoadingTasks ? "Loading tasks..." : "Select task"}</option>
-              {filteredTasks.map((task) => (
-                <option key={task.id} value={task.id}>{task.name ?? task.id}</option>
-              ))}
-              {!isLoadingTasks && projectId && filteredTasks.length === 0 ? <option disabled>No tasks found</option> : null}
-            </select>
-          </div>
+          <>
+            <div className="form-row">
+              <label>Task status</label>
+              <SearchableSelect
+                value={taskStatusFilter}
+                disabled={!projectId || isLoadingTasks}
+                options={taskStatusOptions}
+                placeholder="Select task status"
+                searchPlaceholder={formatSearchPlaceholder("Filter statuses", taskStatusOptions.length)}
+                emptyLabel="No statuses found"
+                onChange={(value) => {
+                  setTaskStatusFilter(value);
+                  setTaskId("");
+                }}
+              />
+            </div>
+
+            <div className="form-row">
+              <label>Existing task</label>
+              <SearchableSelect
+                value={taskId}
+                disabled={!projectId || isLoadingTasks}
+                options={taskOptions}
+                placeholder={isLoadingTasks ? "Loading tasks..." : "Select task"}
+                searchPlaceholder={formatSearchPlaceholder("Filter tasks", taskOptions.length)}
+                emptyLabel="No tasks found"
+                onChange={setTaskId}
+              />
+            </div>
+          </>
         ) : (
           <div className="form-row">
             <label htmlFor="create-new-task-name">New task name</label>
@@ -193,10 +261,11 @@ export function CreateScheduleGroupPanel({
               placeholder="e.g. Implementation blocker"
               onChange={(event) => setNewTaskName(event.target.value)}
             />
-            <p className="field-hint">This creates a real awork task in the selected project before planning it.</p>
           </div>
         )}
+      </div>
 
+      <div className="create-grid schedule-fields-grid">
         <div className="form-row">
           <label htmlFor="create-weekday">Weekday</label>
           <select id="create-weekday" value={weekday} onChange={(event) => setWeekday(Number(event.target.value))}>
@@ -249,8 +318,136 @@ export function CreateScheduleGroupPanel({
   );
 }
 
+function SearchableSelect({
+  value,
+  options,
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  options: SelectOption[];
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyLabel: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selectedOption = options.find((option) => option.value === value);
+  const filteredOptions = options.filter((option) => matchesQuery(option.label, query));
+
+  function close() {
+    setIsOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="searchable-select"
+      onBlur={(event) => {
+        if (!containerRef.current?.contains(event.relatedTarget)) {
+          close();
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="searchable-select-button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span>{selectedOption?.label ?? placeholder}</span>
+        <span aria-hidden="true">v</span>
+      </button>
+
+      {isOpen ? (
+        <div className="searchable-select-menu">
+          <input
+            type="search"
+            value={query}
+            placeholder={searchPlaceholder}
+            autoFocus
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <div className="searchable-select-options" role="listbox">
+            {filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={option.value === value ? "active" : ""}
+                role="option"
+                aria-selected={option.value === value}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onChange(option.value);
+                  close();
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+            {filteredOptions.length === 0 ? <div className="searchable-select-empty">{emptyLabel}</div> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function matchesQuery(value: string, query: string): boolean {
-  return value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+  return fuzzyMatches(value, query);
+}
+
+function formatSearchPlaceholder(label: string, count: number): string {
+  return `${label} (${count} found)`;
+}
+
+function matchesProjectStatus(project: AworkProject, filter: string): boolean {
+  if (filter === PROJECT_FILTER_ALL) return true;
+  if (filter === PROJECT_FILTER_ACTIVE) return project.isActive !== false;
+  return statusFilterValue(project) === filter;
+}
+
+function matchesTaskStatus(task: AworkProjectTask, filter: string): boolean {
+  if (filter === TASK_FILTER_ALL) return true;
+  return statusFilterValue(task) === filter;
+}
+
+function buildStatusOptions(items: Array<AworkProject | AworkProjectTask>): Array<{ value: string; label: string }> {
+  const statuses = new Map<string, string>();
+  items.forEach((item) => {
+    const value = statusFilterValue(item);
+    const label = item.statusName ?? item.statusType ?? item.statusId;
+    if (value && label) {
+      statuses.set(value, label);
+    }
+  });
+
+  return Array.from(statuses.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function statusFilterValue(item: AworkProject | AworkProjectTask): string | undefined {
+  const label = item.statusName ?? item.statusType ?? item.statusId;
+  return label?.trim().toLocaleLowerCase();
+}
+
+function formatProjectOption(project: AworkProject): string {
+  return project.statusName ? `${project.name} (${project.statusName})` : project.name;
+}
+
+function formatTaskOption(task: AworkProjectTask): string {
+  const name = task.name ?? task.id;
+  return task.statusName ? `${name} (${task.statusName})` : name;
 }
 
 function includeSelected<T extends { id: string }>(items: T[], selectedItem: T | undefined): T[] {

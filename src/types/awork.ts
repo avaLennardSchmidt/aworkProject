@@ -8,6 +8,12 @@ export interface AworkUser {
 export interface AworkProject {
   id: string;
   name: string;
+  statusId?: string;
+  statusName?: string;
+  statusType?: string;
+  closedOn?: string;
+  isActive?: boolean;
+  raw: unknown;
 }
 
 export interface AworkProjectTask {
@@ -15,6 +21,9 @@ export interface AworkProjectTask {
   name?: string;
   projectId: string;
   projectName?: string;
+  statusId?: string;
+  statusName?: string;
+  statusType?: string;
   raw: unknown;
 }
 

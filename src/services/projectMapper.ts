@@ -21,7 +21,21 @@ function mapOneProject(raw: unknown): AworkProject | null {
     return null;
   }
 
-  return { id, name };
+  const statusId = firstString(raw, ["projectStatusId", "statusId", "status.id", "projectStatus.id"]);
+  const statusName = firstString(raw, ["projectStatus.name", "status.name", "statusName", "projectStatusName"]);
+  const statusType = firstString(raw, ["projectStatus.type", "status.type", "statusType", "projectStatusType"]);
+  const closedOn = firstString(raw, ["closedOn", "closedDate", "completedOn", "archivedOn"]);
+
+  return {
+    id,
+    name,
+    statusId,
+    statusName,
+    statusType,
+    closedOn,
+    isActive: isProjectActive({ closedOn, statusName, statusType }),
+    raw,
+  };
 }
 
 function extractArray(response: unknown): unknown[] {
@@ -52,6 +66,32 @@ function firstString(record: UnknownRecord, paths: string[]): string | undefined
   }
 
   return undefined;
+}
+
+function isProjectActive({
+  closedOn,
+  statusName,
+  statusType,
+}: {
+  closedOn?: string;
+  statusName?: string;
+  statusType?: string;
+}): boolean {
+  if (closedOn) {
+    return false;
+  }
+
+  const normalizedType = statusType?.trim().toLocaleLowerCase();
+  if (normalizedType && ["closed", "completed", "cancelled", "canceled", "done", "archived"].includes(normalizedType)) {
+    return false;
+  }
+
+  const normalizedName = statusName?.trim().toLocaleLowerCase();
+  if (normalizedName && ["completed", "complete", "cancelled", "canceled", "closed", "archived"].includes(normalizedName)) {
+    return false;
+  }
+
+  return true;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
