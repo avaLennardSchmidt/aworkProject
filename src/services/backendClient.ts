@@ -70,6 +70,9 @@ export class BackendClient {
 
   async getAuthStatus(): Promise<{ authenticated: boolean; user?: AworkUser }> {
     const response = await this.request<AuthStatusResponse>("/auth/status");
+    if (!response.authenticated) {
+      clearStoredSessionToken();
+    }
     return {
       authenticated: response.authenticated,
       user: response.user ? mapUser(response.user) : undefined,
