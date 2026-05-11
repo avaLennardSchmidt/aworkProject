@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { AworkUser } from "../types/awork";
 import type { PreviewChange, ScheduleGroup } from "../types/planner";
 import { isOwnSchedule } from "../services/scheduleMapper";
+import { SearchableSelect } from "./SearchableSelect";
 import {
   calculateDurationMinutes,
   formatMinutesAsHours,
@@ -21,6 +22,30 @@ interface MultiGroupDurationEditModalProps {
 
 type Direction = "add" | "remove";
 type EditMode = "delta" | "set-window";
+
+const editModeOptions = [
+  { value: "delta", label: "Add or remove time" },
+  { value: "set-window", label: "Set time frame" },
+] as const;
+
+const editModeSelectedLabels: Record<EditMode, string> = {
+  delta: "Add",
+  "set-window": "Set",
+};
+
+const directionOptions = [
+  { value: "add", label: "Add time" },
+  { value: "remove", label: "Remove time" },
+] as const;
+
+const directionSelectedLabels: Record<Direction, string> = {
+  add: "Add",
+  remove: "Remove",
+};
+
+const weekdaySelectedLabels: Record<string, string> = {
+  "": "Keep current",
+};
 
 export function MultiGroupDurationEditModal({
   groups,
@@ -158,7 +183,7 @@ export function MultiGroupDurationEditModal({
   return (
     <div className="modal-backdrop" role="presentation">
       <div
-        className="modal"
+        className="modal multi-edit-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="multi-duration-title"
@@ -199,30 +224,34 @@ export function MultiGroupDurationEditModal({
         <div className="filter-grid multi-edit-grid">
           <div className="form-row">
             <label htmlFor="multi-mode">Mode</label>
-            <select
-              id="multi-mode"
+            <SearchableSelect
+              buttonId="multi-mode"
               value={editMode}
-              onChange={(event) => setEditMode(event.target.value as EditMode)}
-            >
-              <option value="delta">Add or remove time</option>
-              <option value="set-window">Set time frame</option>
-            </select>
+              options={[...editModeOptions]}
+              placeholder="Select mode"
+              searchPlaceholder="Filter modes (2 found)"
+              emptyLabel="No mode found."
+              selectedLabelOverride={editModeSelectedLabels}
+              menuWidth="compact"
+              onChange={(value) => setEditMode(value as EditMode)}
+            />
           </div>
 
           {editMode === "delta" ? (
             <>
               <div className="form-row">
                 <label htmlFor="multi-direction">Change</label>
-                <select
-                  id="multi-direction"
+                <SearchableSelect
+                  buttonId="multi-direction"
                   value={direction}
-                  onChange={(event) =>
-                    setDirection(event.target.value as Direction)
-                  }
-                >
-                  <option value="add">Add time</option>
-                  <option value="remove">Remove time</option>
-                </select>
+                  options={[...directionOptions]}
+                  placeholder="Select change"
+                  searchPlaceholder="Filter changes (2 found)"
+                  emptyLabel="No change found."
+                  selectedLabelOverride={directionSelectedLabels}
+                  menuWidth="compact"
+                  onChange={(value) => setDirection(value as Direction)}
+                />
               </div>
               <div className="form-row">
                 <label htmlFor="multi-hours">Hours</label>
@@ -273,18 +302,23 @@ export function MultiGroupDurationEditModal({
 
           <div className="form-row">
             <label htmlFor="multi-weekday">New weekday</label>
-            <select
-              id="multi-weekday"
+            <SearchableSelect
+              buttonId="multi-weekday"
               value={weekdayOverride}
-              onChange={(event) => setWeekdayOverride(event.target.value)}
-            >
-              <option value="">Keep current weekdays</option>
-              {weekdayOptions.map((day) => (
-                <option key={day.value} value={day.value}>
-                  {day.label}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: "Keep current weekdays" },
+                ...weekdayOptions.map((day) => ({
+                  value: String(day.value),
+                  label: day.label,
+                })),
+              ]}
+              placeholder="Select weekday"
+              searchPlaceholder="Filter weekdays (8 found)"
+              emptyLabel="No weekday found."
+              selectedLabelOverride={weekdaySelectedLabels}
+              menuWidth="compact"
+              onChange={setWeekdayOverride}
+            />
           </div>
         </div>
 

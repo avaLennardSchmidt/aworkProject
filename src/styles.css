@@ -527,8 +527,7 @@ select:disabled {
 
 .searchable-select-button {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
   align-items: center;
   width: 100%;
   min-width: 0;
@@ -562,6 +561,11 @@ select:disabled {
   border: 1px solid #cbd4dd;
   border-radius: 8px;
   box-shadow: 0 18px 48px rgb(29 35 41 / 0.18);
+}
+
+.searchable-select-menu-compact {
+  width: max(100%, 240px);
+  max-width: min(320px, calc(100vw - 40px));
 }
 
 .searchable-select-menu input {
@@ -684,10 +688,15 @@ select:disabled {
   width: min(680px, 100%);
   max-height: min(86vh, 900px);
   overflow: auto;
-  padding: 24px;
+  padding: 28px 24px;
   background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 24px 80px rgb(0 0 0 / 0.28);
+}
+
+.multi-edit-modal {
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-wide {
@@ -855,6 +864,11 @@ select:disabled {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
+}
+
+.multi-edit-modal .modal-actions {
+  margin-top: auto;
+  padding-top: 24px;
 }
 
 .modal-actions-left,

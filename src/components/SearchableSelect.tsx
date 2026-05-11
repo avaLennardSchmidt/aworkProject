@@ -7,21 +7,27 @@ export interface SelectOption {
 }
 
 interface SearchableSelectProps {
+  buttonId?: string;
   value: string;
   options: SelectOption[];
   placeholder: string;
   searchPlaceholder: string;
   emptyLabel: string;
+  selectedLabelOverride?: Record<string, string>;
+  menuWidth?: "default" | "compact";
   disabled?: boolean;
   onChange: (value: string) => void;
 }
 
 export function SearchableSelect({
+  buttonId,
   value,
   options,
   placeholder,
   searchPlaceholder,
   emptyLabel,
+  selectedLabelOverride,
+  menuWidth = "default",
   disabled,
   onChange,
 }: SearchableSelectProps) {
@@ -47,6 +53,7 @@ export function SearchableSelect({
       }}
     >
       <button
+        id={buttonId}
         type="button"
         className="searchable-select-button"
         disabled={disabled}
@@ -54,12 +61,17 @@ export function SearchableSelect({
         aria-expanded={isOpen}
         onClick={() => setIsOpen((open) => !open)}
       >
-        <span>{selectedOption?.label ?? placeholder}</span>
-        <span aria-hidden="true">v</span>
+        <span>
+          {selectedOption
+            ? selectedLabelOverride?.[selectedOption.value] ?? selectedOption.label
+            : placeholder}
+        </span>
       </button>
 
       {isOpen ? (
-        <div className="searchable-select-menu">
+        <div
+          className={`searchable-select-menu${menuWidth === "compact" ? " searchable-select-menu-compact" : ""}`}
+        >
           <input
             type="search"
             value={query}
