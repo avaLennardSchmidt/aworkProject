@@ -1,3 +1,13 @@
+import {
+  addDays,
+  endOfMonth,
+  endOfQuarter,
+  endOfYear,
+  format,
+  startOfMonth,
+  startOfQuarter,
+  startOfYear,
+} from "date-fns";
 import type { PlannerFilters } from "../types/planner";
 
 interface ProjectOption {
@@ -25,6 +35,42 @@ export function FilterPanel({
   onLoad,
 }: FilterPanelProps) {
   const projectPlaceholder = hasLoadedSchedules ? "No project data in schedules" : "Load tasks first";
+
+  function applyDatePreset(
+    preset: "this-month" | "next-4-weeks" | "this-quarter" | "this-year",
+  ) {
+    const now = new Date();
+
+    switch (preset) {
+      case "this-month":
+        onChange({
+          ...filters,
+          from: format(startOfMonth(now), "yyyy-MM-dd"),
+          to: format(endOfMonth(now), "yyyy-MM-dd"),
+        });
+        return;
+      case "next-4-weeks":
+        onChange({
+          ...filters,
+          from: format(now, "yyyy-MM-dd"),
+          to: format(addDays(now, 27), "yyyy-MM-dd"),
+        });
+        return;
+      case "this-quarter":
+        onChange({
+          ...filters,
+          from: format(startOfQuarter(now), "yyyy-MM-dd"),
+          to: format(endOfQuarter(now), "yyyy-MM-dd"),
+        });
+        return;
+      case "this-year":
+        onChange({
+          ...filters,
+          from: format(startOfYear(now), "yyyy-MM-dd"),
+          to: format(endOfYear(now), "yyyy-MM-dd"),
+        });
+    }
+  }
 
   return (
     <section className="panel">
@@ -70,6 +116,41 @@ export function FilterPanel({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="date-presets">
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={disabled}
+          onClick={() => applyDatePreset("this-month")}
+        >
+          This month
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={disabled}
+          onClick={() => applyDatePreset("next-4-weeks")}
+        >
+          Next 4 weeks
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={disabled}
+          onClick={() => applyDatePreset("this-quarter")}
+        >
+          This quarter
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={disabled}
+          onClick={() => applyDatePreset("this-year")}
+        >
+          This year
+        </button>
       </div>
 
       <div className="filter-actions">

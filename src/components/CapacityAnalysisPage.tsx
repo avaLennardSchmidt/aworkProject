@@ -2,11 +2,16 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import {
   addDays,
   differenceInCalendarDays,
-  endOfWeek,
+  endOfMonth,
+  endOfQuarter,
   endOfYear,
+  endOfWeek,
   format,
   getISOWeek,
   parseISO,
+  startOfMonth,
+  startOfQuarter,
+  startOfYear,
   startOfWeek,
 } from "date-fns";
 import { BackendClient, mapUser } from "../services/backendClient";
@@ -47,6 +52,7 @@ interface ProjectTotal {
   name: string;
   minutes: number;
   blockerCount: number;
+  unresolvedHint?: string;
 }
 
 interface UserCapacityRow {
@@ -91,6 +97,25 @@ interface CapacityResponse {
   }>;
 }
 
+type WorkloadFilterMode = "all" | "gt" | "lt";
+
+interface SelectedRowSummary {
+  row: UserCapacityRow;
+  weekRows: UserCapacityWeek[];
+  projectTotals: ProjectTotal[];
+  totals: ReturnType<typeof summarizeWeekRows>;
+}
+
+interface LoadSchedulesForUsersResult {
+  schedulesByUser: Record<string, AworkTaskSchedule[]>;
+  unresolvedHintsByTaskId: Record<string, string>;
+}
+
+interface MissingTaskResolutionResult {
+  projectTasks: AworkProjectTask[];
+  unresolvedHintsByTaskId: Record<string, string>;
+}
+
 const DEFAULT_WEEKLY_HOURS = 40;
 const DEFAULT_CUSTOMER_PERCENT = 80;
 const CAPACITY_STORAGE_KEY = "awork_capacity_inputs";
@@ -132,6 +157,11 @@ export function CapacityAnalysisPage({
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(
     new Set(),
   );
+  const [workloadFilterMode, setWorkloadFilterMode] =
+    useState<WorkloadFilterMode>("all");
+  const [workloadFilterValue, setWorkloadFilterValue] = useState(80);
+  const [unresolvedProjectHintsByTaskId, setUnresolvedProjectHintsByTaskId] =
+    useState<Record<string, string>>({});
   const [isDetailsTableCollapsed, setIsDetailsTableCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -193,21 +223,14 @@ export function CapacityAnalysisPage({
     () => rows.filter((row) => selectedUserIds.has(row.user.id)),
     [rows, selectedUserIds],
   );
-  const visibleSelectedRows = useMemo(
-    () =>
-      selectedRows.filter((row) =>
-        fuzzyMatches(formatUserName(row.user), chartUserSearch),
-      ),
-    [chartUserSearch, selectedRows],
-  );
-  const areAllSelectedUsersExpanded =
-    visibleSelectedRows.length > 0 &&
-    visibleSelectedRows.every((row) => expandedUserIds.has(row.user.id));
-
-  const selectedRowSummaries = useMemo(
+  const selectedRowSummaries = useMemo<SelectedRowSummary[]>(
     () =>
       selectedRows.map((row) => {
-        const weekRows = buildUserCapacityWeeks(row, capacityWeeks);
+        const weekRows = buildUserCapacityWeeks(
+          row,
+          capacityWeeks,
+          unresolvedProjectHintsByTaskId,
+        );
         return {
           row,
           weekRows,
@@ -215,13 +238,34 @@ export function CapacityAnalysisPage({
           totals: summarizeWeekRows(weekRows),
         };
       }),
-    [capacityWeeks, selectedRows],
+    [capacityWeeks, selectedRows, unresolvedProjectHintsByTaskId],
   );
 
-  const selectedRowSummariesByUserId = useMemo(
-    () => new Map(selectedRowSummaries.map((entry) => [entry.row.user.id, entry])),
-    [selectedRowSummaries],
+  const visibleSelectedRowSummaries = useMemo(
+    () =>
+      selectedRowSummaries.filter((entry) => {
+        if (!fuzzyMatches(formatUserName(entry.row.user), chartUserSearch)) {
+          return false;
+        }
+
+        if (workloadFilterMode === "all") {
+          return true;
+        }
+
+        if (workloadFilterMode === "gt") {
+          return entry.totals.workloadPercent >= workloadFilterValue;
+        }
+
+        return entry.totals.workloadPercent <= workloadFilterValue;
+      }),
+    [chartUserSearch, selectedRowSummaries, workloadFilterMode, workloadFilterValue],
   );
+
+  const areAllSelectedUsersExpanded =
+    visibleSelectedRowSummaries.length > 0 &&
+    visibleSelectedRowSummaries.every((entry) =>
+      expandedUserIds.has(entry.row.user.id),
+    );
 
   const summary = useMemo(() => {
     const totalPlannedHours = selectedRowSummaries.reduce(
@@ -259,7 +303,7 @@ export function CapacityAnalysisPage({
     try {
       const response = await backendClient.getCapacityAnalysis({ from, to });
       const mappedUsers = mapCapacityUsers(response);
-      const mappedSchedulesByUser = await loadSchedulesForUsers(
+      const schedulesResult = await loadSchedulesForUsers(
         backendClient,
         mappedUsers,
         currentUser,
@@ -267,7 +311,8 @@ export function CapacityAnalysisPage({
         to,
       );
       setUsers(mappedUsers);
-      setSchedulesByUser(mappedSchedulesByUser);
+      setSchedulesByUser(schedulesResult.schedulesByUser);
+      setUnresolvedProjectHintsByTaskId(schedulesResult.unresolvedHintsByTaskId);
       setSelectedUserIds(new Set(mappedUsers.map((user) => user.id)));
       setExpandedUserIds(new Set());
       setHasLoaded(true);
@@ -318,6 +363,34 @@ export function CapacityAnalysisPage({
       }
       return next;
     });
+  }
+
+  function applyDatePreset(
+    preset: "this-month" | "next-4-weeks" | "this-quarter" | "this-year",
+  ) {
+    const now = new Date();
+
+    switch (preset) {
+      case "this-month": {
+        setFrom(format(startOfMonth(now), "yyyy-MM-dd"));
+        setTo(format(endOfMonth(now), "yyyy-MM-dd"));
+        return;
+      }
+      case "next-4-weeks": {
+        setFrom(format(now, "yyyy-MM-dd"));
+        setTo(format(addDays(now, 27), "yyyy-MM-dd"));
+        return;
+      }
+      case "this-quarter": {
+        setFrom(format(startOfQuarter(now), "yyyy-MM-dd"));
+        setTo(format(endOfQuarter(now), "yyyy-MM-dd"));
+        return;
+      }
+      case "this-year": {
+        setFrom(format(startOfYear(now), "yyyy-MM-dd"));
+        setTo(format(endOfYear(now), "yyyy-MM-dd"));
+      }
+    }
   }
 
   return (
@@ -391,6 +464,40 @@ export function CapacityAnalysisPage({
               >
                 {isLoading ? "Loading..." : "Start analysis"}
               </button>
+              <div className="analysis-presets">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-month")}
+                >
+                  This month
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("next-4-weeks")}
+                >
+                  Next 4 weeks
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-quarter")}
+                >
+                  This quarter
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-year")}
+                >
+                  This year
+                </button>
+              </div>
             </div>
           </section>
 
@@ -422,7 +529,7 @@ export function CapacityAnalysisPage({
                     <p className="eyebrow">Users</p>
                     <h2>Included in analysis</h2>
                   </div>
-                  <div className="analysis-inline-actions">
+                  <div className="analysis-inline-actions analysis-inline-actions-end">
                     <button
                       type="button"
                       className="ghost-button"
@@ -474,17 +581,55 @@ export function CapacityAnalysisPage({
                     />
                   </div>
                   <div className="capacity-heading-meta">
-                    <div className="analysis-inline-actions">
+                    <div className="analysis-workload-filter">
+                      <select
+                        id="analysis-workload-filter-mode"
+                        aria-label="Workload comparison"
+                        value={workloadFilterMode}
+                        onChange={(event) =>
+                          setWorkloadFilterMode(
+                            event.target.value as WorkloadFilterMode,
+                          )
+                        }
+                      >
+                        <option value="all">All</option>
+                        <option value="gt">Greater than</option>
+                        <option value="lt">Smaller than</option>
+                      </select>
+                      <div
+                        className={`analysis-workload-threshold ${workloadFilterMode === "all" ? "is-hidden" : ""}`}
+                        aria-hidden={workloadFilterMode === "all"}
+                      >
+                        <input
+                          type="number"
+                          min="0"
+                          max="300"
+                          step="1"
+                          tabIndex={workloadFilterMode === "all" ? -1 : 0}
+                          value={workloadFilterValue}
+                          onChange={(event) =>
+                            setWorkloadFilterValue(
+                              Math.max(0, Number(event.target.value) || 0),
+                            )
+                          }
+                          aria-label="Workload threshold percent"
+                        />
+                        <span>%</span>
+                      </div>
+                    </div>
+                    <div className="analysis-inline-actions analysis-inline-actions-end">
                       <button
                         type="button"
                         className="ghost-button"
-                        disabled={visibleSelectedRows.length === 0}
+                        disabled={visibleSelectedRowSummaries.length === 0}
                         onClick={() => {
                           setExpandedUserIds(
                             areAllSelectedUsersExpanded
                               ? new Set()
                               : new Set(
-                                  visibleSelectedRows.map((row) => row.user.id),
+                                  visibleSelectedRowSummaries.map(
+                                    (entry) => entry.row.user.id,
+                                  ),
                                 ),
                           );
                         }}
@@ -494,32 +639,23 @@ export function CapacityAnalysisPage({
                           : "Expand all users"}
                       </button>
                     </div>
-                    <span
-                      className="analysis-range-note"
-                      title="The selected date range converted into weeks for capacity calculations."
-                    >
-                      {formatDecimal(weekCount)} week
-                      {weekCount === 1 ? "" : "s"}
-                    </span>
                   </div>
                 </div>
-                {visibleSelectedRows.length > 0 ? (
+                <p className="capacity-chart-note">
+                  Full bar width represents 100% of the weekly hours for that calendar week. The yellow marker shows the expected project capacity based on Customer %.
+                </p>
+                {visibleSelectedRowSummaries.length > 0 ? (
                   <div className="capacity-chart">
-                    {visibleSelectedRows.map((row) => {
-                      const summaryEntry = selectedRowSummariesByUserId.get(
-                        row.user.id,
-                      );
-                      const weekRows =
-                        summaryEntry?.weekRows ??
-                        buildUserCapacityWeeks(row, capacityWeeks);
-
+                    {visibleSelectedRowSummaries.map((entry) => {
                       return (
                         <CapacityChartRow
-                          key={row.user.id}
-                          row={row}
-                          weekRows={weekRows}
-                          isExpanded={expandedUserIds.has(row.user.id)}
-                          onToggleExpanded={() => toggleUserExpansion(row.user.id)}
+                          key={entry.row.user.id}
+                          row={entry.row}
+                          weekRows={entry.weekRows}
+                          isExpanded={expandedUserIds.has(entry.row.user.id)}
+                          onToggleExpanded={() =>
+                            toggleUserExpansion(entry.row.user.id)
+                          }
                           onInputChange={updateCapacityInput}
                         />
                       );
@@ -530,7 +666,7 @@ export function CapacityAnalysisPage({
                     <p>
                       {selectedRows.length === 0
                         ? "Select at least one user to see capacity."
-                        : "No selected users match this search."}
+                        : "No selected users match this search or workload filter."}
                     </p>
                   </div>
                 )}
@@ -542,7 +678,7 @@ export function CapacityAnalysisPage({
                     <p className="eyebrow">Details</p>
                     <h2>User capacity table</h2>
                   </div>
-                  <div className="analysis-inline-actions">
+                  <div className="analysis-inline-actions analysis-inline-actions-end">
                     <button
                       type="button"
                       className="ghost-button"
@@ -570,20 +706,26 @@ export function CapacityAnalysisPage({
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedRowSummaries.map(({ row, totals, projectTotals }) => {
+                      {visibleSelectedRowSummaries.map(
+                        ({ row, totals, projectTotals }) => {
+                          const unresolvedDetails =
+                            buildUnresolvedProjectsTooltip(projectTotals);
 
-                        return (
-                          <tr key={row.user.id}>
-                            <td>{formatUserName(row.user)}</td>
-                            <td>{formatHours(totals.plannedHours)}</td>
-                            <td>{formatHours(row.inputs.weeklyHours)}</td>
-                            <td>{formatHours(totals.targetHours)}</td>
-                            <td>{formatDecimal(totals.workloadPercent)}%</td>
-                            <td>{totals.blockerCount}</td>
-                            <td>{formatTopProjects(projectTotals)}</td>
-                          </tr>
-                        );
-                      })}
+                          return (
+                            <tr key={row.user.id}>
+                              <td>{formatUserName(row.user)}</td>
+                              <td>{formatHours(totals.plannedHours)}</td>
+                              <td>{formatHours(row.inputs.weeklyHours)}</td>
+                              <td>{formatHours(totals.targetHours)}</td>
+                              <td>{formatDecimal(totals.workloadPercent)}%</td>
+                              <td>{totals.blockerCount}</td>
+                              <td title={unresolvedDetails}>
+                                {renderTopProjects(projectTotals)}
+                              </td>
+                            </tr>
+                          );
+                        },
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -686,6 +828,7 @@ function CapacityChartRow({
 }) {
   const totals = summarizeWeekRows(weekRows);
   const projectTotals = summarizeWeekProjectTotals(weekRows);
+  const workloadColor = getWorkloadColor(totals.workloadPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
 
   function showProjectTooltip(text: string, event: MouseEvent<HTMLElement>) {
@@ -705,7 +848,10 @@ function CapacityChartRow({
       <div className="capacity-row-config">
         <div className="capacity-user">
           <strong>{formatUserName(row.user)}</strong>
-          <span title="Workload is the sum of the visible calendar week planned hours divided by total capacity for the selected date range.">
+          <span
+            style={{ color: workloadColor }}
+            title="Workload is the sum of the visible calendar week planned hours divided by total capacity for the selected date range."
+          >
             {formatHours(totals.plannedHours)} planned - {formatDecimal(totals.workloadPercent)}%
           </span>
         </div>
@@ -814,6 +960,7 @@ function CapacityWeekBar({
   const capacityZonePercent = (100 / displayPercent) * 100;
   const customerMarkerPercent = (customerPercent / displayPercent) * 100;
   const isOverbooked = weekRow.utilizationPercent > 100;
+  const customerTargetTooltip = `Expected project capacity | ${formatHours(weekRow.targetHours)}\nThis bar represents ${customerPercent}% of the weekly hours`;
 
   return (
     <div className={`capacity-week ${isOverbooked ? "is-overbooked" : ""}`}>
@@ -844,7 +991,7 @@ function CapacityWeekBar({
           >
             {weekRow.projectTotals.length > 0 && weekRow.plannedMinutes > 0 ? (
               weekRow.projectTotals.map((project) => {
-                const tooltipText = `${weekRow.week.label} | ${project.name} | ${project.blockerCount} blocker${project.blockerCount === 1 ? "" : "s"} | ${formatHours(project.minutes / 60)} planned`;
+                const tooltipText = `${project.name}\n${formatHours(project.minutes / 60)} planned\n${project.blockerCount} blocker${project.blockerCount === 1 ? "" : "s"}${project.unresolvedHint ? `\nReason: ${project.unresolvedHint}` : ""}`;
 
                 return (
                   <span
@@ -874,7 +1021,10 @@ function CapacityWeekBar({
           <span
             className="capacity-marker capacity-marker-target"
             style={{ left: `${customerMarkerPercent}%` }}
-            title={`${weekRow.week.label} customer target: ${formatHours(weekRow.targetHours)} (${customerPercent}% of week capacity)`}
+            aria-label={customerTargetTooltip}
+            onMouseEnter={(event) => onTooltip(customerTargetTooltip, event)}
+            onMouseMove={(event) => onTooltip(customerTargetTooltip, event)}
+            onMouseLeave={onTooltipClear}
           />
         </div>
       </div>
@@ -908,7 +1058,7 @@ async function loadSchedulesForUsers(
   currentUser: AworkUser | undefined,
   from: string,
   to: string,
-): Promise<Record<string, AworkTaskSchedule[]>> {
+): Promise<LoadSchedulesForUsersResult> {
   const schedulesByUser: Record<string, AworkTaskSchedule[]> = {};
   const allSchedules: AworkTaskSchedule[] = [];
   const allProjectTasks: AworkProjectTask[] = [];
@@ -937,7 +1087,7 @@ async function loadSchedulesForUsers(
     }),
   );
 
-  const projectTasks = await loadMissingProjectTasks(
+  const missingTaskResolution = await loadMissingProjectTasks(
     backendClient,
     allProjectTasks,
     allSchedules,
@@ -945,46 +1095,83 @@ async function loadSchedulesForUsers(
   Object.entries(schedulesByUser).forEach(([userId, schedules]) => {
     schedulesByUser[userId] = enrichSchedulesWithProjectTasks(
       schedules,
-      projectTasks,
+      missingTaskResolution.projectTasks,
     );
   });
 
-  return schedulesByUser;
+  return {
+    schedulesByUser,
+    unresolvedHintsByTaskId: missingTaskResolution.unresolvedHintsByTaskId,
+  };
 }
 
 async function loadMissingProjectTasks(
   backendClient: BackendClient,
   projectTasks: AworkProjectTask[],
   schedules: AworkTaskSchedule[],
-): Promise<AworkProjectTask[]> {
+): Promise<MissingTaskResolutionResult> {
   const tasksById = new Map(projectTasks.map((task) => [task.id, task]));
-  const missingTaskIds = Array.from(
-    new Set(
-      schedules.map((schedule) => schedule.taskId),
-    ),
-  ).filter((taskId) => !tasksById.has(taskId));
+  const unresolvedHintsByTaskId: Record<string, string> = {};
 
-  if (missingTaskIds.length === 0) {
-    return Array.from(tasksById.values());
+  const taskIdsNeedingLookup = Array.from(
+    new Set(schedules.map((schedule) => schedule.taskId)),
+  ).filter((taskId) => {
+    const task = tasksById.get(taskId);
+    return !task || !task.projectId || !task.projectName;
+  });
+
+  if (taskIdsNeedingLookup.length > 0) {
+    const resolvedTasks = await Promise.all(
+      taskIdsNeedingLookup.map(async (taskId) => {
+        try {
+          const mappedTask = mapProjectTaskResponse(await backendClient.getTask(taskId));
+          if (!mappedTask) {
+            unresolvedHintsByTaskId[taskId] =
+              "Task details could not be mapped from awork response.";
+          }
+          return mappedTask;
+        } catch {
+          unresolvedHintsByTaskId[taskId] =
+            "Task details could not be loaded from awork.";
+          return null;
+        }
+      }),
+    );
+
+    resolvedTasks.forEach((task) => {
+      if (task && !tasksById.has(task.id)) {
+        tasksById.set(task.id, task);
+      }
+    });
   }
 
-  const resolvedTasks = await Promise.all(
-    missingTaskIds.map(async (taskId) => {
-      try {
-        return mapProjectTaskResponse(await backendClient.getTask(taskId));
-      } catch {
-        return null;
-      }
-    }),
-  );
+  schedules.forEach((schedule) => {
+    if (schedule.projectId && schedule.projectName) {
+      return;
+    }
 
-  resolvedTasks.forEach((task) => {
-    if (task && !tasksById.has(task.id)) {
-      tasksById.set(task.id, task);
+    const task = tasksById.get(schedule.taskId);
+    if (!task) {
+      unresolvedHintsByTaskId[schedule.taskId] =
+        unresolvedHintsByTaskId[schedule.taskId] ??
+        "Task id was not found in assigned tasks and lookup failed.";
+      return;
+    }
+
+    if (!task.projectId) {
+      unresolvedHintsByTaskId[schedule.taskId] = "Task has no project id.";
+      return;
+    }
+
+    if (!task.projectName) {
+      unresolvedHintsByTaskId[schedule.taskId] = "Task has no project name.";
     }
   });
 
-  return Array.from(tasksById.values());
+  return {
+    projectTasks: Array.from(tasksById.values()),
+    unresolvedHintsByTaskId,
+  };
 }
 
 function isCapacityResponse(response: unknown): response is CapacityResponse {
@@ -998,6 +1185,7 @@ function isCapacityResponse(response: unknown): response is CapacityResponse {
 function buildUserCapacityWeeks(
   row: UserCapacityRow,
   weeks: CapacityWeek[],
+  unresolvedHintsByTaskId: Record<string, string>,
 ): UserCapacityWeek[] {
   return weeks.map((week) => {
     const projectTotalsByKey = new Map<string, WeekProjectTotal>();
@@ -1017,14 +1205,25 @@ function buildUserCapacityWeeks(
 
       const key = schedule.projectId ?? "unresolved-project";
       const name = schedule.projectName ?? "Project not resolved";
+      const unresolvedHint =
+        key === "unresolved-project"
+          ? unresolvedHintsByTaskId[schedule.taskId]
+          : undefined;
       const current = projectTotalsByKey.get(key) ?? {
         key,
         name,
         minutes: 0,
         blockerCount: 0,
+        unresolvedHint,
       };
       current.minutes += duration;
       current.blockerCount += 1;
+      if (unresolvedHint) {
+        current.unresolvedHint = mergeUnresolvedHints(
+          current.unresolvedHint,
+          unresolvedHint,
+        );
+      }
       projectTotalsByKey.set(key, current);
     });
 
@@ -1088,9 +1287,16 @@ function summarizeWeekProjectTotals(weekRows: UserCapacityWeek[]): ProjectTotal[
         name: project.name,
         minutes: 0,
         blockerCount: 0,
+        unresolvedHint: project.unresolvedHint,
       };
       current.minutes += project.minutes;
       current.blockerCount += project.blockerCount;
+      if (project.unresolvedHint) {
+        current.unresolvedHint = mergeUnresolvedHints(
+          current.unresolvedHint,
+          project.unresolvedHint,
+        );
+      }
       totalsByKey.set(project.key, current);
     });
   });
@@ -1255,6 +1461,63 @@ function formatTopProjects(projects: ProjectTotal[]): string {
     .slice(0, 3)
     .map((project) => `${project.name} (${formatHours(project.minutes / 60)})`)
     .join(", ");
+}
+
+function renderTopProjects(projects: ProjectTotal[]) {
+  if (projects.length === 0) {
+    return "No project time";
+  }
+
+  return projects.slice(0, 3).map((project, index) => (
+    <>
+      {index > 0 ? <br /> : null}
+      {`${project.name} (${formatHours(project.minutes / 60)})`}
+    </>
+  ));
+}
+
+function buildUnresolvedProjectsTooltip(projects: ProjectTotal[]): string | undefined {
+  const unresolvedProjects = projects.filter(
+    (project) => project.key === "unresolved-project",
+  );
+
+  if (unresolvedProjects.length === 0) {
+    return undefined;
+  }
+
+  const details = unresolvedProjects
+    .map((project) => project.unresolvedHint)
+    .filter((value): value is string => Boolean(value));
+
+  if (details.length === 0) {
+    return "Project details could not be resolved for one or more tasks.";
+  }
+
+  return `Unresolved project reasons: ${Array.from(new Set(details)).join(" | ")}`;
+}
+
+function mergeUnresolvedHints(
+  existingHint: string | undefined,
+  nextHint: string,
+): string {
+  if (!existingHint) {
+    return nextHint;
+  }
+
+  if (existingHint.includes(nextHint)) {
+    return existingHint;
+  }
+
+  return `${existingHint} | ${nextHint}`;
+}
+
+function getWorkloadColor(workloadPercent: number): string {
+  const clampedPercent = Math.max(0, Math.min(100, workloadPercent));
+  const progress = clampedPercent / 100;
+  const hue = 18 + progress * 110;
+  const saturation = 58 - progress * 12;
+  const lightness = 56 - progress * 14;
+  return `hsl(${Math.round(hue)} ${Math.round(saturation)}% ${Math.round(lightness)}%)`;
 }
 
 function getPlannerHref(): string {
