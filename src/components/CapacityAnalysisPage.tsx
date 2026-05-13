@@ -257,10 +257,10 @@ export function CapacityAnalysisPage({
         }
 
         if (workloadFilterMode === "gt") {
-          return entry.totals.workloadPercent >= workloadFilterValue;
+          return entry.totals.customerTargetPercent >= workloadFilterValue;
         }
 
-        return entry.totals.workloadPercent <= workloadFilterValue;
+        return entry.totals.customerTargetPercent <= workloadFilterValue;
       }),
     [chartUserSearch, selectedRowSummaries, workloadFilterMode, workloadFilterValue],
   );
@@ -797,7 +797,7 @@ export function CapacityAnalysisPage({
                               <td>{formatHours(totals.plannedHours)}</td>
                               <td>{formatHours(row.inputs.weeklyHours)}</td>
                               <td>{formatHours(totals.targetHours)}</td>
-                              <td>{formatDecimal(totals.workloadPercent)}%</td>
+                              <td>{formatDecimal(totals.customerTargetPercent)}%</td>
                               <td>{totals.blockerCount}</td>
                               <td title={unresolvedDetails}>
                                 {renderTopProjects(projectTotals)}
