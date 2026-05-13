@@ -55,6 +55,7 @@ import {
   type PlannerWorkflow,
 } from "./components/WorkflowChooser";
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
+import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
 import {
   isAuthorizedForMultiEdit,
   clearFeatureAccessCache,
@@ -62,12 +63,17 @@ import {
 
 const backendClient = new BackendClient();
 
+interface LoadSchedulesOptions {
+  refreshNotice?: string;
+}
+
 function App() {
   const [currentUser, setCurrentUser] = useState<AworkUser>();
   const [selectedPlannerUserId, setSelectedPlannerUserId] = useState("");
   const [workflow, setWorkflow] = useState<PlannerWorkflow>("manage");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
+  const [scheduleRefreshNotice, setScheduleRefreshNotice] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isApplyingBlockerOperations, setIsApplyingBlockerOperations] =
     useState(false);
@@ -124,6 +130,8 @@ function App() {
     projectId: "",
   }));
   const [isMultiEditAvailable, setIsMultiEditAvailable] = useState(false);
+  const [isCheckingFeatureAccess, setIsCheckingFeatureAccess] = useState(false);
+  const isAnalysisRoute = isCapacityAnalysisRoute();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -138,6 +146,7 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       setIsMultiEditAvailable(false);
+      setIsCheckingFeatureAccess(false);
       return;
     }
 
@@ -145,11 +154,14 @@ function App() {
   }, [currentUser?.id]);
 
   async function loadUserFeatureAccess() {
+    setIsCheckingFeatureAccess(true);
     try {
       const hasAccess = await isAuthorizedForMultiEdit();
       setIsMultiEditAvailable(hasAccess);
     } catch {
       setIsMultiEditAvailable(false);
+    } finally {
+      setIsCheckingFeatureAccess(false);
     }
   }
 
@@ -288,15 +300,17 @@ function App() {
     setStatusMessage("Disconnected.");
     setError("");
     setIsMultiEditAvailable(false);
+    setIsCheckingFeatureAccess(false);
   }
 
-  async function loadSchedules() {
+  async function loadSchedules(options: LoadSchedulesOptions = {}) {
     if (!plannerUser) {
       setError("Connect to awork before loading planned tasks.");
       return;
     }
 
     setIsLoadingSchedules(true);
+    setScheduleRefreshNotice(options.refreshNotice ?? "");
     setError("");
     setStatusMessage("");
 
@@ -340,6 +354,7 @@ function App() {
       );
     } finally {
       setIsLoadingSchedules(false);
+      setScheduleRefreshNotice("");
     }
   }
 
@@ -521,7 +536,12 @@ function App() {
         });
       }
       if (failures.length > 0) setError(failures.slice(0, 3).join(" | "));
-      if (successCount > 0 && hasLoadedSchedules) await loadSchedules();
+      if (successCount > 0 && hasLoadedSchedules) {
+        await loadSchedules({
+          refreshNotice:
+            "Updating planned tasks after creating blockers. You can keep looking at the page; fresh awork data will appear in a moment.",
+        });
+      }
     } catch (createError) {
       setError(
         createError instanceof Error
@@ -570,7 +590,12 @@ function App() {
         closeModals();
         setDeleteSuccess({ count: successCount, failed: failureCount });
       }
-      if (successCount > 0) await loadSchedules();
+      if (successCount > 0) {
+        await loadSchedules({
+          refreshNotice:
+            "Updating planned tasks after unplanning blockers. You can keep looking at the page; fresh awork data will appear in a moment.",
+        });
+      }
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -610,7 +635,12 @@ function App() {
             "The selected blocker updates, additions, and unplans were applied. The awork task was not deleted.",
         });
       }
-      if (successCount > 0) await loadSchedules();
+      if (successCount > 0) {
+        await loadSchedules({
+          refreshNotice:
+            "Updating planned tasks after applying blocker changes. You can keep looking at the page; fresh awork data will appear in a moment.",
+        });
+      }
     } catch (operationError) {
       setError(
         operationError instanceof Error
@@ -644,7 +674,10 @@ function App() {
         closeModals();
         setUpdateSuccess({ count: successCount, failed: failureCount });
       }
-      await loadSchedules();
+      await loadSchedules({
+        refreshNotice:
+          "Updating planned tasks after editing blockers. You can keep looking at the page; fresh awork data will appear in a moment.",
+      });
     } catch (updateError) {
       setError(
         updateError instanceof Error
@@ -667,6 +700,23 @@ function App() {
     setBlockerOperationResults(undefined);
     setUpdateResults(undefined);
     setDeleteResults(undefined);
+  }
+
+  if (isAnalysisRoute) {
+    return (
+      <>
+        <BackendStatusIndicator backendClient={backendClient} />
+        <CapacityAnalysisPage
+          backendClient={backendClient}
+          currentUser={currentUser}
+          isConnecting={isConnecting}
+          isAuthorized={isMultiEditAvailable}
+          isCheckingAccess={isCheckingFeatureAccess}
+          onLogin={handleLogin}
+          onDisconnect={handleDisconnect}
+        />
+      </>
+    );
   }
 
   return (
@@ -702,6 +752,7 @@ function App() {
           isLoadingUsers={isLoadingUsers}
           onLoadUsers={loadUsers}
           onChange={handlePlannerUserChange}
+          analysisHref={getCapacityAnalysisHref()}
         />
       ) : null}
 
@@ -725,6 +776,15 @@ function App() {
 
           {isLoadingSchedules ? (
             <LoadingState label="Loading planned tasks from awork..." />
+          ) : null}
+          {scheduleRefreshNotice ? (
+            <div className="refresh-notice" aria-live="polite">
+              <span className="spinner" />
+              <div>
+                <strong>Planned tasks are being updated</strong>
+                <span>{scheduleRefreshNotice}</span>
+              </div>
+            </div>
           ) : null}
           <ScheduleGroupsList
             groups={groups}
@@ -767,12 +827,17 @@ function App() {
       {multiEditGroups &&
       plannerUser &&
       !previewChanges &&
+      !blockerOperations &&
       isMultiEditAvailable ? (
         <MultiGroupDurationEditModal
           groups={multiEditGroups}
           currentUser={plannerUser}
           onClose={closeModals}
           onPreview={handlePreview}
+          onUnplanPreview={(operations) => {
+            setMultiEditGroups(undefined);
+            handleBlockerOperationsPreview(operations);
+          }}
         />
       ) : null}
 
@@ -888,4 +953,15 @@ function getPlannerSchedules(
   plannerUser: AworkUser,
 ): AworkTaskSchedule[] {
   return schedules.filter((schedule) => isOwnSchedule(schedule, plannerUser));
+}
+
+function isCapacityAnalysisRoute(): boolean {
+  const path = window.location.pathname.replace(/\/$/, "");
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  return path === `${base}/analysis` || path === "/analysis";
+}
+
+function getCapacityAnalysisHref(): string {
+  const base = import.meta.env.BASE_URL || "/";
+  return `${base.replace(/\/$/, "")}/analysis`;
 }

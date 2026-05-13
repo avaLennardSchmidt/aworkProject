@@ -1,7 +1,11 @@
 import { addMinutes, format, parseISO } from "date-fns";
 import { useMemo, useState } from "react";
 import type { AworkUser } from "../types/awork";
-import type { PreviewChange, ScheduleGroup } from "../types/planner";
+import type {
+  BlockerOperation,
+  PreviewChange,
+  ScheduleGroup,
+} from "../types/planner";
 import { isOwnSchedule } from "../services/scheduleMapper";
 import { SearchableSelect } from "./SearchableSelect";
 import {
@@ -18,6 +22,7 @@ interface MultiGroupDurationEditModalProps {
   currentUser: AworkUser;
   onClose: () => void;
   onPreview: (changes: PreviewChange[]) => void;
+  onUnplanPreview: (operations: BlockerOperation[]) => void;
 }
 
 type Direction = "add" | "remove";
@@ -52,6 +57,7 @@ export function MultiGroupDurationEditModal({
   currentUser,
   onClose,
   onPreview,
+  onUnplanPreview,
 }: MultiGroupDurationEditModalProps) {
   const [editMode, setEditMode] = useState<EditMode>("delta");
   const [direction, setDirection] = useState<Direction>("add");
@@ -131,6 +137,25 @@ export function MultiGroupDurationEditModal({
     onPreview(changes);
   }
 
+  function handleUnplanPreview() {
+    const validation = validateUnplan();
+    if (validation) {
+      setError(validation);
+      return;
+    }
+
+    onUnplanPreview(
+      schedules.map((schedule) => ({
+        kind: "delete",
+        schedule,
+        dateLabel: formatScheduleDateLabel(schedule.start),
+        oldStart: getTimeHHmm(schedule.start),
+        oldEnd: getTimeHHmm(schedule.end),
+        beforeMinutes: calculateDurationMinutes(schedule.start, schedule.end),
+      })),
+    );
+  }
+
   function validate(): string {
     if (groups.length < 2) return "Select at least two groups.";
     if (schedules.length === 0) return "The selected groups have no blockers.";
@@ -176,6 +201,15 @@ export function MultiGroupDurationEditModal({
       }
 
       return "Removing that much time would make at least one blocker end before it starts.";
+    }
+    return "";
+  }
+
+  function validateUnplan(): string {
+    if (groups.length === 0) return "Select at least one group.";
+    if (schedules.length === 0) return "The selected groups have no blockers.";
+    if (schedules.some((schedule) => !isOwnSchedule(schedule, currentUser))) {
+      return "Ownership could not be verified for every selected blocker.";
     }
     return "";
   }
@@ -331,6 +365,13 @@ export function MultiGroupDurationEditModal({
         {error ? <div className="alert alert-error">{error}</div> : null}
 
         <div className="modal-actions">
+          <button
+            type="button"
+            className="danger-button unplan-selected-button"
+            onClick={handleUnplanPreview}
+          >
+            Preview unplan selected
+          </button>
           <button type="button" className="ghost-button" onClick={onClose}>
             Cancel
           </button>

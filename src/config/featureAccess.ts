@@ -1,3 +1,5 @@
+import { getStoredSessionToken } from "../services/backendClient";
+
 /**
  * Feature Access - Fetched from Backend
  *
@@ -22,10 +24,12 @@ export async function fetchUserFeatureAccess(): Promise<{
   }
 
   try {
+    const sessionToken = getStoredSessionToken();
     const response = await fetch(`${BACKEND_BASE_URL}/api/features/access`, {
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
+        ...(sessionToken ? { "X-Session-Token": sessionToken } : {}),
       },
     });
 

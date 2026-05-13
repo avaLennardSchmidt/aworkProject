@@ -9,6 +9,7 @@ interface PlannerUserSelectorProps {
   isLoadingUsers: boolean;
   onLoadUsers: () => Promise<void>;
   onChange: (userId: string) => void;
+  analysisHref?: string;
 }
 
 export function PlannerUserSelector({
@@ -18,6 +19,7 @@ export function PlannerUserSelector({
   isLoadingUsers,
   onLoadUsers,
   onChange,
+  analysisHref,
 }: PlannerUserSelectorProps) {
   useEffect(() => {
     if (users.length === 0 && !isLoadingUsers) {
@@ -59,6 +61,11 @@ export function PlannerUserSelector({
         >
           {isLoadingUsers ? "Loading..." : "Reload users"}
         </button>
+        {analysisHref ? (
+          <a className="primary-link-button planner-analysis-link" href={analysisHref}>
+            Team capacity analysis
+          </a>
+        ) : null}
       </div>
     </section>
   );

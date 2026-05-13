@@ -34,8 +34,36 @@ Open the local Vite URL shown in the terminal.
 3. Choose one workflow:
    - **Manage existing groups** loads your existing planned task blockers, groups them by project/task/weekday/time, and lets you bulk-change their time window after a preview.
    - **Create new group** lets you select a project, choose an existing task or create a new project task, then select a weekly date/time period for new planned blockers.
+   - **Team capacity analysis** is available from the planner user section for users listed in `MULTI_EDIT_AUTHORIZED_USERS`.
 4. For existing groups, click **Load planned tasks**, pick a row, preview the changes, and apply them.
 5. For new groups, review the generated blocker preview, then create them. If you choose **New task**, the app creates the awork project task first and then plans blockers for that new task.
+
+## What Is A Blocker Group?
+
+A blocker group is a set of planned awork task schedule entries that the app treats as one recurring pattern. This lets you change the same recurring blocker across many dates at once.
+
+Planned blockers are grouped together only when all of these values match:
+
+- project id
+- task id
+- weekday
+- start time
+- end time
+
+The actual calendar date does not need to match. For example, every Wednesday 07:00-12:00 blocker for the same task in the same project becomes one group, even when those blockers happen on different Wednesdays.
+
+## Team Capacity Analysis
+
+Users listed in the backend `MULTI_EDIT_AUTHORIZED_USERS` setting can open **Team capacity analysis** from the planner user section. The analysis page loads the selected date range for all users, lets you include or exclude users, and shows planned project time against each user's configured capacity.
+
+Capacity inputs are stored per browser:
+
+- weekly hours
+- customer target percentage
+
+The calendar-week blocks show capacity per ISO calendar week. If the selected date range starts or ends mid-week, the first or last week is prorated to only the selected days. Each week block uses the user's weekly hours as 100% capacity, and the yellow marker shows the configured customer target. If planned project blockers exceed capacity, the week can go above 100%.
+
+The analysis uses the same planned task schedule loading and ownership filtering as **Manage existing groups**, so planned hours should match the blockers shown for the same user and date range. The analysis does not reduce capacity for absence, holidays, sick leave, public holidays, vacation, or other non-project availability data.
 
 ## Safety Rule
 

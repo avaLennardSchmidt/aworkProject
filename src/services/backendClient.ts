@@ -10,7 +10,7 @@ const BACKEND_BASE_URL = (
 
 const SESSION_STORAGE_KEY = "awork_planner_session";
 
-function getStoredSessionToken(): string | null {
+export function getStoredSessionToken(): string | null {
   return sessionStorage.getItem(SESSION_STORAGE_KEY);
 }
 
@@ -35,6 +35,11 @@ interface TaskScheduleQuery {
   from: string;
   to: string;
   userId?: string;
+}
+
+interface CapacityAnalysisQuery {
+  from: string;
+  to: string;
 }
 
 type BackendStatusListener = (status: "ok" | "starting") => void;
@@ -105,6 +110,14 @@ export class BackendClient {
       params.set("userId", query.userId);
     }
     return this.request<unknown>(`/api/taskschedules?${params.toString()}`);
+  }
+
+  async getCapacityAnalysis(query: CapacityAnalysisQuery): Promise<unknown> {
+    const params = new URLSearchParams({
+      from: query.from,
+      to: query.to,
+    });
+    return this.request<unknown>(`/api/analysis/capacity?${params.toString()}`);
   }
 
   async getMyProjectTasks(): Promise<unknown> {
@@ -270,7 +283,7 @@ async function safeReadError(response: Response): Promise<string> {
   }
 }
 
-function mapUser(rawUser: unknown): AworkUser {
+export function mapUser(rawUser: unknown): AworkUser {
   const userRecord = unwrapRecord(rawUser);
   const id = userRecord
     ? (readString(userRecord, "id") ?? readString(userRecord, "userId"))
