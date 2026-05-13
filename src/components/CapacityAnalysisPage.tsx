@@ -1166,7 +1166,7 @@ function mapCapacityUsers(response: unknown): AworkUser[] {
 async function loadSchedulesForUsers(
   backendClient: BackendClient,
   users: AworkUser[],
-  currentUser: AworkUser | undefined,
+  _currentUser: AworkUser | undefined,
   from: string,
   to: string,
 ): Promise<LoadSchedulesForUsersResult> {
@@ -1180,16 +1180,19 @@ async function loadSchedulesForUsers(
         backendClient.getTaskSchedules({
           from,
           to,
-          userId: user.id === currentUser?.id ? undefined : user.id,
+          userId: user.id,
         }),
-        user.id === currentUser?.id
-          ? backendClient.getMyProjectTasks()
-          : backendClient.getUserAssignedTasks(user.id),
+        backendClient.getUserAssignedTasks(user.id),
       ]);
       const mapped = mapTaskSchedulesResponse(scheduleResponse);
-      const schedules = mapped.schedules.filter((schedule) =>
-        isOwnSchedule(schedule, user),
-      );
+      const schedules = mapped.schedules
+        .map((schedule) => ({
+          ...schedule,
+          // Awork payloads can omit owner fields in some responses.
+          // For user-scoped requests we trust backend filtering and backfill userId.
+          userId: schedule.userId ?? user.id,
+        }))
+        .filter((schedule) => isOwnSchedule(schedule, user));
       const userProjectTasks = mapProjectTasksResponse(projectTaskResponse);
 
       schedulesByUser[user.id] = schedules;
@@ -1341,8 +1344,8 @@ function buildUserCapacityWeeks(
     const capacityHours = calculateWeekCapacityHours(row.inputs.weeklyHours, week);
     const targetHours = capacityHours * (row.inputs.customerPercent / 100);
     const utilizationPercent =
-      capacityHours > 0
-        ? (plannedMinutes / 60 / capacityHours) * 100
+      targetHours > 0
+        ? (plannedMinutes / 60 / targetHours) * 100
         : plannedMinutes > 0
           ? 100
           : 0;
