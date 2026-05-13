@@ -11,7 +11,10 @@ import {
 } from "date-fns";
 import { BackendClient, mapUser } from "../services/backendClient";
 import { fuzzyMatches } from "../services/fuzzySearch";
-import { mapProjectTaskResponse } from "../services/projectTaskMapper";
+import {
+  mapProjectTaskResponse,
+  mapProjectTasksResponse,
+} from "../services/projectTaskMapper";
 import { enrichSchedulesWithProjectTasks } from "../services/scheduleEnrichment";
 import { isOwnSchedule, mapTaskSchedulesResponse } from "../services/scheduleMapper";
 import { calculateDurationMinutes } from "../services/scheduleTimeCalculator";
@@ -129,6 +132,7 @@ export function CapacityAnalysisPage({
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(
     new Set(),
   );
+  const [isDetailsTableCollapsed, setIsDetailsTableCollapsed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -200,21 +204,40 @@ export function CapacityAnalysisPage({
     visibleSelectedRows.length > 0 &&
     visibleSelectedRows.every((row) => expandedUserIds.has(row.user.id));
 
+  const selectedRowSummaries = useMemo(
+    () =>
+      selectedRows.map((row) => {
+        const weekRows = buildUserCapacityWeeks(row, capacityWeeks);
+        return {
+          row,
+          weekRows,
+          projectTotals: summarizeWeekProjectTotals(weekRows),
+          totals: summarizeWeekRows(weekRows),
+        };
+      }),
+    [capacityWeeks, selectedRows],
+  );
+
+  const selectedRowSummariesByUserId = useMemo(
+    () => new Map(selectedRowSummaries.map((entry) => [entry.row.user.id, entry])),
+    [selectedRowSummaries],
+  );
+
   const summary = useMemo(() => {
-    const totalPlannedHours = selectedRows.reduce(
-      (sum, row) => sum + row.plannedMinutes / 60,
+    const totalPlannedHours = selectedRowSummaries.reduce(
+      (sum, entry) => sum + entry.totals.plannedHours,
       0,
     );
-    const totalCapacityHours = selectedRows.reduce(
-      (sum, row) => sum + row.inputs.weeklyHours * weekCount,
+    const totalCapacityHours = selectedRowSummaries.reduce(
+      (sum, entry) => sum + entry.totals.capacityHours,
       0,
     );
-    const totalBlockers = selectedRows.reduce(
-      (sum, row) => sum + row.blockerCount,
+    const totalBlockers = selectedRowSummaries.reduce(
+      (sum, entry) => sum + entry.totals.blockerCount,
       0,
     );
-    const overloadedUsers = selectedRows.filter(
-      (row) => row.plannedMinutes / 60 > row.inputs.weeklyHours * weekCount,
+    const overloadedUsers = selectedRowSummaries.filter(
+      (entry) => entry.totals.isOverloaded,
     ).length;
 
     return {
@@ -223,11 +246,11 @@ export function CapacityAnalysisPage({
       totalBlockers,
       overloadedUsers,
       averageWorkload:
-        selectedRows.length > 0 && totalCapacityHours > 0
+        selectedRowSummaries.length > 0 && totalCapacityHours > 0
           ? (totalPlannedHours / totalCapacityHours) * 100
           : 0,
     };
-  }, [selectedRows, weekCount]);
+  }, [selectedRowSummaries]);
 
   async function loadAnalysis() {
     setIsLoading(true);
@@ -441,9 +464,9 @@ export function CapacityAnalysisPage({
                     <h2>Planned time by user</h2>
                   </div>
                   <div className="analysis-chart-search">
-                    <label htmlFor="analysis-user-search">Search users</label>
                     <input
                       id="analysis-user-search"
+                      aria-label="Search users"
                       type="search"
                       value={chartUserSearch}
                       placeholder="Filter selected users..."
@@ -471,12 +494,6 @@ export function CapacityAnalysisPage({
                           : "Expand all users"}
                       </button>
                     </div>
-                    <div className="capacity-marker-legend">
-                      <span title="Yellow line: target customer/project work for the selected date range. It is weekly hours times weeks times customer %.">
-                        <i className="legend-marker-target" />
-                        Customer target
-                      </span>
-                    </div>
                     <span
                       className="analysis-range-note"
                       title="The selected date range converted into weeks for capacity calculations."
@@ -488,16 +505,25 @@ export function CapacityAnalysisPage({
                 </div>
                 {visibleSelectedRows.length > 0 ? (
                   <div className="capacity-chart">
-                    {visibleSelectedRows.map((row) => (
-                      <CapacityChartRow
-                        key={row.user.id}
-                        row={row}
-                        weeks={capacityWeeks}
-                        isExpanded={expandedUserIds.has(row.user.id)}
-                        onToggleExpanded={() => toggleUserExpansion(row.user.id)}
-                        onInputChange={updateCapacityInput}
-                      />
-                    ))}
+                    {visibleSelectedRows.map((row) => {
+                      const summaryEntry = selectedRowSummariesByUserId.get(
+                        row.user.id,
+                      );
+                      const weekRows =
+                        summaryEntry?.weekRows ??
+                        buildUserCapacityWeeks(row, capacityWeeks);
+
+                      return (
+                        <CapacityChartRow
+                          key={row.user.id}
+                          row={row}
+                          weekRows={weekRows}
+                          isExpanded={expandedUserIds.has(row.user.id)}
+                          onToggleExpanded={() => toggleUserExpansion(row.user.id)}
+                          onInputChange={updateCapacityInput}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="empty-state">
@@ -511,10 +537,25 @@ export function CapacityAnalysisPage({
               </section>
 
               <section className="panel analysis-table-panel">
-                <div>
-                  <p className="eyebrow">Details</p>
-                  <h2>User capacity table</h2>
+                <div className="analysis-section-heading">
+                  <div>
+                    <p className="eyebrow">Details</p>
+                    <h2>User capacity table</h2>
+                  </div>
+                  <div className="analysis-inline-actions">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      aria-expanded={!isDetailsTableCollapsed}
+                      onClick={() =>
+                        setIsDetailsTableCollapsed((current) => !current)
+                      }
+                    >
+                      {isDetailsTableCollapsed ? "Show table" : "Collapse table"}
+                    </button>
+                  </div>
                 </div>
+                {!isDetailsTableCollapsed ? (
                 <div className="analysis-table-wrap">
                   <table className="analysis-table">
                     <thead>
@@ -529,30 +570,24 @@ export function CapacityAnalysisPage({
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedRows.map((row) => {
-                        const capacityHours = row.inputs.weeklyHours * weekCount;
-                        const targetHours =
-                          capacityHours * (row.inputs.customerPercent / 100);
-                        const workload =
-                          capacityHours > 0
-                            ? ((row.plannedMinutes / 60) / capacityHours) * 100
-                            : 0;
+                      {selectedRowSummaries.map(({ row, totals, projectTotals }) => {
 
                         return (
                           <tr key={row.user.id}>
                             <td>{formatUserName(row.user)}</td>
-                            <td>{formatHours(row.plannedMinutes / 60)}</td>
+                            <td>{formatHours(totals.plannedHours)}</td>
                             <td>{formatHours(row.inputs.weeklyHours)}</td>
-                            <td>{formatHours(targetHours)}</td>
-                            <td>{formatDecimal(workload)}%</td>
-                            <td>{row.blockerCount}</td>
-                            <td>{formatTopProjects(row.projectTotals)}</td>
+                            <td>{formatHours(totals.targetHours)}</td>
+                            <td>{formatDecimal(totals.workloadPercent)}%</td>
+                            <td>{totals.blockerCount}</td>
+                            <td>{formatTopProjects(projectTotals)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
+                ) : null}
               </section>
             </>
           ) : null}
@@ -634,13 +669,13 @@ function SummaryCard({
 
 function CapacityChartRow({
   row,
-  weeks,
+  weekRows,
   isExpanded,
   onToggleExpanded,
   onInputChange,
 }: {
   row: UserCapacityRow;
-  weeks: CapacityWeek[];
+  weekRows: UserCapacityWeek[];
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onInputChange: (
@@ -649,18 +684,8 @@ function CapacityChartRow({
     value: number,
   ) => void;
 }) {
-  const weekRows = buildUserCapacityWeeks(row, weeks);
-  const plannedHours = weekRows.reduce(
-    (sum, week) => sum + week.plannedMinutes / 60,
-    0,
-  );
-  const capacityHours = weekRows.reduce(
-    (sum, week) => sum + week.capacityHours,
-    0,
-  );
-  const targetHours = capacityHours * (row.inputs.customerPercent / 100);
-  const workload = capacityHours > 0 ? (plannedHours / capacityHours) * 100 : 0;
-  const isOverbooked = weekRows.some((week) => week.utilizationPercent > 100);
+  const totals = summarizeWeekRows(weekRows);
+  const projectTotals = summarizeWeekProjectTotals(weekRows);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
 
   function showProjectTooltip(text: string, event: MouseEvent<HTMLElement>) {
@@ -675,13 +700,13 @@ function CapacityChartRow({
 
   return (
     <article
-      className={`capacity-row ${isOverbooked ? "is-overbooked" : ""}`}
+      className={`capacity-row ${totals.isOverloaded ? "is-overbooked" : ""}`}
     >
       <div className="capacity-row-config">
         <div className="capacity-user">
           <strong>{formatUserName(row.user)}</strong>
           <span title="Workload is the sum of the visible calendar week planned hours divided by total capacity for the selected date range.">
-            {formatHours(plannedHours)} planned - {formatDecimal(workload)}%
+            {formatHours(totals.plannedHours)} planned - {formatDecimal(totals.workloadPercent)}%
           </span>
         </div>
         <button
@@ -747,7 +772,7 @@ function CapacityChartRow({
             ))}
           </div>
           <div className="capacity-legend">
-            {row.projectTotals.slice(0, 4).map((project) => (
+            {projectTotals.slice(0, 4).map((project) => (
               <span
                 key={project.key}
                 title={`${project.name}: ${project.blockerCount} blocker${project.blockerCount === 1 ? "" : "s"}, ${formatHours(project.minutes / 60)} planned`}
@@ -886,25 +911,37 @@ async function loadSchedulesForUsers(
 ): Promise<Record<string, AworkTaskSchedule[]>> {
   const schedulesByUser: Record<string, AworkTaskSchedule[]> = {};
   const allSchedules: AworkTaskSchedule[] = [];
+  const allProjectTasks: AworkProjectTask[] = [];
 
   await Promise.all(
     users.map(async (user) => {
-      const response = await backendClient.getTaskSchedules({
-        from,
-        to,
-        userId: user.id === currentUser?.id ? undefined : user.id,
-      });
-      const mapped = mapTaskSchedulesResponse(response);
+      const [scheduleResponse, projectTaskResponse] = await Promise.all([
+        backendClient.getTaskSchedules({
+          from,
+          to,
+          userId: user.id === currentUser?.id ? undefined : user.id,
+        }),
+        user.id === currentUser?.id
+          ? backendClient.getMyProjectTasks()
+          : backendClient.getUserAssignedTasks(user.id),
+      ]);
+      const mapped = mapTaskSchedulesResponse(scheduleResponse);
       const schedules = mapped.schedules.filter((schedule) =>
         isOwnSchedule(schedule, user),
       );
+      const userProjectTasks = mapProjectTasksResponse(projectTaskResponse);
 
       schedulesByUser[user.id] = schedules;
       allSchedules.push(...schedules);
+      allProjectTasks.push(...userProjectTasks);
     }),
   );
 
-  const projectTasks = await loadMissingProjectTasks(backendClient, allSchedules);
+  const projectTasks = await loadMissingProjectTasks(
+    backendClient,
+    allProjectTasks,
+    allSchedules,
+  );
   Object.entries(schedulesByUser).forEach(([userId, schedules]) => {
     schedulesByUser[userId] = enrichSchedulesWithProjectTasks(
       schedules,
@@ -917,15 +954,19 @@ async function loadSchedulesForUsers(
 
 async function loadMissingProjectTasks(
   backendClient: BackendClient,
+  projectTasks: AworkProjectTask[],
   schedules: AworkTaskSchedule[],
 ): Promise<AworkProjectTask[]> {
+  const tasksById = new Map(projectTasks.map((task) => [task.id, task]));
   const missingTaskIds = Array.from(
     new Set(
-      schedules
-        .filter((schedule) => !schedule.projectId || !schedule.projectName)
-        .map((schedule) => schedule.taskId),
+      schedules.map((schedule) => schedule.taskId),
     ),
-  );
+  ).filter((taskId) => !tasksById.has(taskId));
+
+  if (missingTaskIds.length === 0) {
+    return Array.from(tasksById.values());
+  }
 
   const resolvedTasks = await Promise.all(
     missingTaskIds.map(async (taskId) => {
@@ -937,7 +978,13 @@ async function loadMissingProjectTasks(
     }),
   );
 
-  return resolvedTasks.filter((task): task is AworkProjectTask => Boolean(task));
+  resolvedTasks.forEach((task) => {
+    if (task && !tasksById.has(task.id)) {
+      tasksById.set(task.id, task);
+    }
+  });
+
+  return Array.from(tasksById.values());
 }
 
 function isCapacityResponse(response: unknown): response is CapacityResponse {
@@ -1001,6 +1048,54 @@ function buildUserCapacityWeeks(
       ),
     };
   });
+}
+
+function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
+  const plannedMinutes = weekRows.reduce(
+    (sum, week) => sum + week.plannedMinutes,
+    0,
+  );
+  const plannedHours = plannedMinutes / 60;
+  const capacityHours = weekRows.reduce(
+    (sum, week) => sum + week.capacityHours,
+    0,
+  );
+  const targetHours = weekRows.reduce((sum, week) => sum + week.targetHours, 0);
+  const blockerCount = weekRows.reduce(
+    (sum, week) =>
+      sum +
+      week.projectTotals.reduce((projectSum, project) => projectSum + project.blockerCount, 0),
+    0,
+  );
+
+  return {
+    plannedHours,
+    capacityHours,
+    targetHours,
+    workloadPercent: capacityHours > 0 ? (plannedHours / capacityHours) * 100 : 0,
+    blockerCount,
+    isOverloaded: weekRows.some((week) => week.utilizationPercent > 100),
+  };
+}
+
+function summarizeWeekProjectTotals(weekRows: UserCapacityWeek[]): ProjectTotal[] {
+  const totalsByKey = new Map<string, ProjectTotal>();
+
+  weekRows.forEach((week) => {
+    week.projectTotals.forEach((project) => {
+      const current = totalsByKey.get(project.key) ?? {
+        key: project.key,
+        name: project.name,
+        minutes: 0,
+        blockerCount: 0,
+      };
+      current.minutes += project.minutes;
+      current.blockerCount += project.blockerCount;
+      totalsByKey.set(project.key, current);
+    });
+  });
+
+  return Array.from(totalsByKey.values()).sort((a, b) => b.minutes - a.minutes);
 }
 
 function buildCapacityWeeks(from: string, to: string): CapacityWeek[] {
