@@ -138,7 +138,12 @@ function App() {
     if (params.get("aworkLogin") === "success") {
       storeSessionTokenFromUrl();
       setStatusMessage("awork login completed. Checking your session...");
-      window.history.replaceState({}, document.title, window.location.pathname);
+      params.delete("aworkLogin");
+      const nextQuery = params.toString();
+      const nextUrl = nextQuery
+        ? `${window.location.pathname}?${nextQuery}`
+        : window.location.pathname;
+      window.history.replaceState({}, document.title, nextUrl);
     }
     void restoreBackendSession(params.get("aworkLogin") === "success");
   }, []);
@@ -956,6 +961,11 @@ function getPlannerSchedules(
 }
 
 function isCapacityAnalysisRoute(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("view") === "analysis") {
+    return true;
+  }
+
   const path = window.location.pathname.replace(/\/$/, "");
   const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
   return path === `${base}/analysis` || path === "/analysis";
@@ -963,5 +973,5 @@ function isCapacityAnalysisRoute(): boolean {
 
 function getCapacityAnalysisHref(): string {
   const base = import.meta.env.BASE_URL || "/";
-  return `${base.replace(/\/$/, "")}/analysis`;
+  return `${base}?view=analysis`;
 }
