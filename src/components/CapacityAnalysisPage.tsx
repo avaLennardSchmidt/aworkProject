@@ -80,6 +80,7 @@ interface UserCapacityWeek {
   targetHours: number;
   plannedMinutes: number;
   utilizationPercent: number;
+  customerTargetPercent: number;
   projectTotals: WeekProjectTotal[];
 }
 
@@ -161,6 +162,8 @@ export function CapacityAnalysisPage({
   const [workloadFilterMode, setWorkloadFilterMode] =
     useState<WorkloadFilterMode>("all");
   const [workloadFilterValue, setWorkloadFilterValue] = useState(80);
+  const [bulkWeeklyHoursInput, setBulkWeeklyHoursInput] = useState("");
+  const [bulkCustomerPercentInput, setBulkCustomerPercentInput] = useState("");
   const [unresolvedProjectHintsByTaskId, setUnresolvedProjectHintsByTaskId] =
     useState<Record<string, string>>({});
   const [isDetailsTableCollapsed, setIsDetailsTableCollapsed] = useState(false);
@@ -566,7 +569,7 @@ export function CapacityAnalysisPage({
               </section>
 
               <section className="panel analysis-chart-panel">
-                <div className="analysis-section-heading">
+                <div className="analysis-section-heading analysis-section-heading-chart">
                   <div>
                     <p className="eyebrow">Projects and capacity</p>
                     <h2>Planned time by user</h2>
@@ -580,43 +583,107 @@ export function CapacityAnalysisPage({
                       placeholder="Filter selected users..."
                       onChange={(event) => setChartUserSearch(event.target.value)}
                     />
+                     <div className="analysis-workload-filter">
+                       <select
+                         id="analysis-workload-filter-mode"
+                         aria-label="Workload comparison"
+                         value={workloadFilterMode}
+                         onChange={(event) =>
+                           setWorkloadFilterMode(
+                             event.target.value as WorkloadFilterMode,
+                           )
+                         }
+                       >
+                         <option value="all">All</option>
+                         <option value="gt">Greater than</option>
+                         <option value="lt">Smaller than</option>
+                       </select>
+                       <div className="analysis-workload-threshold">
+                         <input
+                           type="number"
+                           min="0"
+                           max="300"
+                           step="1"
+                           disabled={workloadFilterMode === "all"}
+                           value={workloadFilterValue}
+                           onChange={(event) =>
+                             setWorkloadFilterValue(
+                               Math.max(0, Number(event.target.value) || 0),
+                             )
+                           }
+                           aria-label="Workload threshold percent"
+                         />
+                         <span>%</span>
+                       </div>
+                     </div>
                   </div>
                   <div className="capacity-heading-meta">
-                    <div className="analysis-workload-filter">
-                      <select
-                        id="analysis-workload-filter-mode"
-                        aria-label="Workload comparison"
-                        value={workloadFilterMode}
-                        onChange={(event) =>
-                          setWorkloadFilterMode(
-                            event.target.value as WorkloadFilterMode,
-                          )
-                        }
-                      >
-                        <option value="all">All</option>
-                        <option value="gt">Greater than</option>
-                        <option value="lt">Smaller than</option>
-                      </select>
-                      <div
-                        className={`analysis-workload-threshold ${workloadFilterMode === "all" ? "is-hidden" : ""}`}
-                        aria-hidden={workloadFilterMode === "all"}
-                      >
+                    <div className="capacity-bulk-inputs">
+                      <label>
+                        <span>Weekly hours</span>
                         <input
-                          type="number"
-                          min="0"
-                          max="300"
-                          step="1"
-                          tabIndex={workloadFilterMode === "all" ? -1 : 0}
-                          value={workloadFilterValue}
+                          type="text"
+                          inputMode="decimal"
+                          pattern="[0-9.]*"
+                          placeholder="—"
+                          value={bulkWeeklyHoursInput}
                           onChange={(event) =>
-                            setWorkloadFilterValue(
-                              Math.max(0, Number(event.target.value) || 0),
-                            )
+                            setBulkWeeklyHoursInput(event.target.value)
                           }
-                          aria-label="Workload threshold percent"
                         />
-                        <span>%</span>
-                      </div>
+                      </label>
+                      <label>
+                        <span>Customer %</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                           placeholder="70"
+                          value={bulkCustomerPercentInput}
+                          onChange={(event) =>
+                            setBulkCustomerPercentInput(event.target.value)
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        disabled={
+                          visibleSelectedRowSummaries.length === 0 &&
+                          !bulkWeeklyHoursInput &&
+                          !bulkCustomerPercentInput
+                        }
+                        onClick={() => {
+                          if (bulkWeeklyHoursInput) {
+                            const value = readPositiveNumber(
+                              bulkWeeklyHoursInput
+                            );
+                            visibleSelectedRowSummaries.forEach((entry) => {
+                              updateCapacityInput(
+                                entry.row.user.id,
+                                "weeklyHours",
+                                value
+                              );
+                            });
+                          }
+                           if (bulkCustomerPercentInput || visibleSelectedRowSummaries.length > 0) {
+                             const value = bulkCustomerPercentInput
+                               ? readPercentNumber(bulkCustomerPercentInput)
+                               : 70;
+                            visibleSelectedRowSummaries.forEach((entry) => {
+                              updateCapacityInput(
+                                entry.row.user.id,
+                                "customerPercent",
+                                value
+                              );
+                            });
+                          }
+                          setBulkWeeklyHoursInput("");
+                          setBulkCustomerPercentInput("");
+                        }}
+                      >
+                        Apply to selected
+                      </button>
                     </div>
                     <div className="analysis-inline-actions analysis-inline-actions-end">
                       <button
@@ -715,7 +782,7 @@ export function CapacityAnalysisPage({
                         <th>Customer target</th>
                         <th>Workload</th>
                         <th>Blockers</th>
-                        <th>Top projects</th>
+                        <th>Projects</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -843,7 +910,7 @@ function CapacityChartRow({
 }) {
   const totals = summarizeWeekRows(weekRows);
   const projectTotals = summarizeWeekProjectTotals(weekRows);
-  const workloadColor = getWorkloadColor(totals.workloadPercent);
+  const workloadColor = getWorkloadColor(totals.customerTargetPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
 
   function showProjectTooltip(text: string, event: MouseEvent<HTMLElement>) {
@@ -862,12 +929,17 @@ function CapacityChartRow({
     >
       <div className="capacity-row-config">
         <div className="capacity-user">
-          <strong>{formatUserName(row.user)}</strong>
+          <div className="capacity-user-name">
+            <strong>{formatUserName(row.user)}</strong>
+            {totals.customerTargetPercent > 100 && (
+              <span className="overbooked-label">Overplanned</span>
+            )}
+          </div>
           <span
             style={{ color: workloadColor }}
-            title="Workload is the sum of the visible calendar week planned hours divided by total capacity for the selected date range."
+            title="Fulfillment of customer target: planned hours divided by the customer % target for the selected date range."
           >
-            {formatHours(totals.plannedHours)} planned - {formatDecimal(totals.workloadPercent)}%
+            {formatHours(totals.plannedHours)} planned - {formatDecimal(totals.customerTargetPercent)}%
           </span>
         </div>
         <button
@@ -882,9 +954,10 @@ function CapacityChartRow({
           <label>
             Weekly hours
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9.]*"
               min="0"
-              step="0.5"
               value={row.inputs.weeklyHours}
               title="Contracted working hours per week. Each calendar week bar uses this value as its 100% capacity, prorated for partial weeks."
               onChange={(event) =>
@@ -899,10 +972,11 @@ function CapacityChartRow({
           <label>
             Customer %
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               min="0"
               max="100"
-              step="1"
               value={row.inputs.customerPercent}
               title="Target share of weekly hours for customer/project work. The yellow marker uses this percentage of total capacity."
               onChange={(event) =>
@@ -992,7 +1066,7 @@ function CapacityCombinedBar({
       <div className="capacity-range-overview-head">
         <strong>Selected range</strong>
         <span>
-          {formatHours(totals.plannedHours)} planned · {formatDecimal(totals.workloadPercent)}%
+          {formatHours(totals.plannedHours)} planned · {formatDecimal(totals.customerTargetPercent)}%
         </span>
       </div>
       <div
@@ -1070,7 +1144,7 @@ function CapacityWeekBar({
     displayPercent > 0 ? (weekRow.utilizationPercent / displayPercent) * 100 : 0;
   const capacityZonePercent = (100 / displayPercent) * 100;
   const customerMarkerPercent = (customerPercent / displayPercent) * 100;
-  const isOverbooked = weekRow.utilizationPercent > 100;
+  const isOverbooked = weekRow.customerTargetPercent > 100;
   const customerTargetTooltip = `Expected project capacity | ${formatHours(weekRow.targetHours)}\nThis bar represents ${customerPercent}% of the weekly hours`;
 
   return (
@@ -1141,7 +1215,7 @@ function CapacityWeekBar({
       </div>
       <div className="capacity-week-stats">
         <span>{formatHours(weekRow.plannedMinutes / 60)} planned</span>
-        <span>{formatDecimal(weekRow.utilizationPercent)}%</span>
+        <span>{formatDecimal(weekRow.customerTargetPercent)}%</span>
       </div>
     </div>
   );
@@ -1343,9 +1417,16 @@ function buildUserCapacityWeeks(
 
     const capacityHours = calculateWeekCapacityHours(row.inputs.weeklyHours, week);
     const targetHours = capacityHours * (row.inputs.customerPercent / 100);
+    const plannedHours = plannedMinutes / 60;
     const utilizationPercent =
+      capacityHours > 0
+        ? (plannedHours / capacityHours) * 100
+        : plannedMinutes > 0
+          ? 100
+          : 0;
+    const customerTargetPercent =
       targetHours > 0
-        ? (plannedMinutes / 60 / targetHours) * 100
+        ? (plannedHours / targetHours) * 100
         : plannedMinutes > 0
           ? 100
           : 0;
@@ -1356,6 +1437,7 @@ function buildUserCapacityWeeks(
       targetHours,
       plannedMinutes,
       utilizationPercent,
+      customerTargetPercent,
       projectTotals: Array.from(projectTotalsByKey.values()).sort(
         (a, b) => b.minutes - a.minutes,
       ),
@@ -1386,8 +1468,9 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
     capacityHours,
     targetHours,
     workloadPercent: capacityHours > 0 ? (plannedHours / capacityHours) * 100 : 0,
+    customerTargetPercent: targetHours > 0 ? (plannedHours / targetHours) * 100 : 0,
     blockerCount,
-    isOverloaded: weekRows.some((week) => week.utilizationPercent > 100),
+    isOverloaded: weekRows.some((week) => week.customerTargetPercent > 100),
   };
 }
 
@@ -1572,7 +1655,6 @@ function formatTopProjects(projects: ProjectTotal[]): string {
   }
 
   return projects
-    .slice(0, 3)
     .map((project) => `${project.name} (${formatHours(project.minutes / 60)})`)
     .join(", ");
 }
@@ -1582,7 +1664,7 @@ function renderTopProjects(projects: ProjectTotal[]) {
     return "No project time";
   }
 
-  return projects.slice(0, 3).map((project, index) => (
+  return projects.map((project, index) => (
     <>
       {index > 0 ? <br /> : null}
       {`${project.name} (${formatHours(project.minutes / 60)})`}
