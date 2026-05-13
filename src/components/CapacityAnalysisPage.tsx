@@ -157,6 +157,7 @@ export function CapacityAnalysisPage({
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(
     new Set(),
   );
+  const [showCollapsedRangeBars, setShowCollapsedRangeBars] = useState(true);
   const [workloadFilterMode, setWorkloadFilterMode] =
     useState<WorkloadFilterMode>("all");
   const [workloadFilterValue, setWorkloadFilterValue] = useState(80);
@@ -621,6 +622,17 @@ export function CapacityAnalysisPage({
                       <button
                         type="button"
                         className="ghost-button"
+                        onClick={() =>
+                          setShowCollapsedRangeBars((current) => !current)
+                        }
+                      >
+                        {showCollapsedRangeBars
+                          ? "Hide range bars"
+                          : "Show range bars"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
                         disabled={visibleSelectedRowSummaries.length === 0}
                         onClick={() => {
                           setExpandedUserIds(
@@ -653,6 +665,7 @@ export function CapacityAnalysisPage({
                           row={entry.row}
                           weekRows={entry.weekRows}
                           isExpanded={expandedUserIds.has(entry.row.user.id)}
+                          showCollapsedRangeBar={showCollapsedRangeBars}
                           onToggleExpanded={() =>
                             toggleUserExpansion(entry.row.user.id)
                           }
@@ -813,12 +826,14 @@ function CapacityChartRow({
   row,
   weekRows,
   isExpanded,
+  showCollapsedRangeBar,
   onToggleExpanded,
   onInputChange,
 }: {
   row: UserCapacityRow;
   weekRows: UserCapacityWeek[];
   isExpanded: boolean;
+  showCollapsedRangeBar: boolean;
   onToggleExpanded: () => void;
   onInputChange: (
     userId: string,
@@ -901,6 +916,15 @@ function CapacityChartRow({
           </label>
         </div>
       </div>
+      {isExpanded || showCollapsedRangeBar ? (
+        <CapacityCombinedBar
+          totals={totals}
+          projectTotals={projectTotals}
+          customerPercent={row.inputs.customerPercent}
+          onTooltip={showProjectTooltip}
+          onTooltipClear={() => setTooltip(undefined)}
+        />
+      ) : null}
       {isExpanded ? (
         <div className="capacity-row-main">
           <div
@@ -940,6 +964,93 @@ function CapacityChartRow({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function CapacityCombinedBar({
+  totals,
+  projectTotals,
+  customerPercent,
+  onTooltip,
+  onTooltipClear,
+}: {
+  totals: ReturnType<typeof summarizeWeekRows>;
+  projectTotals: ProjectTotal[];
+  customerPercent: number;
+  onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
+  onTooltipClear: () => void;
+}) {
+  const displayPercent = Math.max(100, totals.workloadPercent);
+  const stackWidthPercent =
+    displayPercent > 0 ? (totals.workloadPercent / displayPercent) * 100 : 0;
+  const capacityZonePercent = (100 / displayPercent) * 100;
+  const customerMarkerPercent = (customerPercent / displayPercent) * 100;
+  const customerTargetTooltip = `Expected project capacity | ${formatHours(totals.targetHours)}\nThis bar represents ${customerPercent}% of the selected timeframe capacity`;
+
+  return (
+    <div className="capacity-range-overview">
+      <div className="capacity-range-overview-head">
+        <strong>Selected range</strong>
+        <span>
+          {formatHours(totals.plannedHours)} planned · {formatDecimal(totals.workloadPercent)}%
+        </span>
+      </div>
+      <div
+        className="capacity-range-track"
+        aria-label={`Selected range: ${formatHours(totals.plannedHours)} planned of ${formatHours(totals.capacityHours)} capacity.`}
+      >
+        <div
+          className="capacity-range-inner"
+          style={{ width: `${displayPercent}%` }}
+        >
+          <div
+            className="capacity-zone"
+            style={{ width: `${capacityZonePercent}%` }}
+          />
+          <div
+            className="capacity-stacked-bar"
+            style={{ width: `${stackWidthPercent}%` }}
+          >
+            {projectTotals.length > 0 && totals.plannedHours > 0 ? (
+              projectTotals.map((project) => {
+                const tooltipText = `${project.name}\n${formatHours(project.minutes / 60)} planned\n${project.blockerCount} blocker${project.blockerCount === 1 ? "" : "s"}${project.unresolvedHint ? `\nReason: ${project.unresolvedHint}` : ""}`;
+
+                return (
+                  <span
+                    key={project.key}
+                    className="capacity-segment"
+                    aria-label={tooltipText}
+                    style={{
+                      width: `${(project.minutes / (totals.plannedHours * 60)) * 100}%`,
+                      background: getProjectColor(project.key),
+                    }}
+                    onMouseEnter={(event) => onTooltip(tooltipText, event)}
+                    onMouseMove={(event) => onTooltip(tooltipText, event)}
+                    onMouseLeave={onTooltipClear}
+                  />
+                );
+              })
+            ) : (
+              <span
+                className="capacity-empty-bar"
+                aria-label="No planned project time"
+                title="No planned project time"
+              >
+                -
+              </span>
+            )}
+          </div>
+          <span
+            className="capacity-marker capacity-marker-target"
+            style={{ left: `${customerMarkerPercent}%` }}
+            aria-label={customerTargetTooltip}
+            onMouseEnter={(event) => onTooltip(customerTargetTooltip, event)}
+            onMouseMove={(event) => onTooltip(customerTargetTooltip, event)}
+            onMouseLeave={onTooltipClear}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
