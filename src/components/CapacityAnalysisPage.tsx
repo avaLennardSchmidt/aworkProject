@@ -117,6 +117,8 @@ interface MissingTaskResolutionResult {
   unresolvedHintsByTaskId: Record<string, string>;
 }
 
+type ProjectColorResolver = (projectKey: string) => string;
+
 const DEFAULT_WEEKLY_HOURS = 40;
 const DEFAULT_CUSTOMER_PERCENT = 80;
 const CAPACITY_STORAGE_KEY = "awork_capacity_inputs";
@@ -910,6 +912,10 @@ function CapacityChartRow({
 }) {
   const totals = summarizeWeekRows(weekRows);
   const projectTotals = summarizeWeekProjectTotals(weekRows);
+  const projectColorFor = useMemo(
+    () => buildProjectColorResolver(projectTotals),
+    [projectTotals],
+  );
   const workloadColor = getWorkloadColor(totals.customerTargetPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
 
@@ -994,6 +1000,7 @@ function CapacityChartRow({
         <CapacityCombinedBar
           totals={totals}
           projectTotals={projectTotals}
+          projectColorFor={projectColorFor}
           customerPercent={row.inputs.customerPercent}
           onTooltip={showProjectTooltip}
           onTooltipClear={() => setTooltip(undefined)}
@@ -1009,6 +1016,7 @@ function CapacityChartRow({
               <CapacityWeekBar
                 key={weekRow.week.key}
                 weekRow={weekRow}
+                projectColorFor={projectColorFor}
                 customerPercent={row.inputs.customerPercent}
                 onTooltip={showProjectTooltip}
                 onTooltipClear={() => setTooltip(undefined)}
@@ -1021,7 +1029,7 @@ function CapacityChartRow({
                 key={project.key}
                 title={`${project.name}: ${project.blockerCount} blocker${project.blockerCount === 1 ? "" : "s"}, ${formatHours(project.minutes / 60)} planned`}
               >
-                <i style={{ background: getProjectColor(project.key) }} />
+                <i style={{ background: projectColorFor(project.key) }} />
                 {project.name}
               </span>
             ))}
@@ -1044,12 +1052,14 @@ function CapacityChartRow({
 function CapacityCombinedBar({
   totals,
   projectTotals,
+  projectColorFor,
   customerPercent,
   onTooltip,
   onTooltipClear,
 }: {
   totals: ReturnType<typeof summarizeWeekRows>;
   projectTotals: ProjectTotal[];
+  projectColorFor: ProjectColorResolver;
   customerPercent: number;
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
   onTooltipClear: () => void;
@@ -1096,7 +1106,7 @@ function CapacityCombinedBar({
                     aria-label={tooltipText}
                     style={{
                       width: `${(project.minutes / (totals.plannedHours * 60)) * 100}%`,
-                      background: getProjectColor(project.key),
+                      background: projectColorFor(project.key),
                     }}
                     onMouseEnter={(event) => onTooltip(tooltipText, event)}
                     onMouseMove={(event) => onTooltip(tooltipText, event)}
@@ -1130,11 +1140,13 @@ function CapacityCombinedBar({
 
 function CapacityWeekBar({
   weekRow,
+  projectColorFor,
   customerPercent,
   onTooltip,
   onTooltipClear,
 }: {
   weekRow: UserCapacityWeek;
+  projectColorFor: ProjectColorResolver;
   customerPercent: number;
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
   onTooltipClear: () => void;
@@ -1185,7 +1197,7 @@ function CapacityWeekBar({
                     aria-label={tooltipText}
                     style={{
                       width: `${(project.minutes / weekRow.plannedMinutes) * 100}%`,
-                      background: getProjectColor(project.key),
+                      background: projectColorFor(project.key),
                     }}
                     onMouseEnter={(event) => onTooltip(tooltipText, event)}
                     onMouseMove={(event) => onTooltip(tooltipText, event)}
@@ -1627,12 +1639,27 @@ function readPercentNumber(value: string): number {
   return Math.min(100, Math.max(0, parsed));
 }
 
-function getProjectColor(projectKey: string): string {
-  let hash = 0;
-  for (let index = 0; index < projectKey.length; index += 1) {
-    hash = (hash + projectKey.charCodeAt(index) * (index + 1)) % 997;
+function buildProjectColorResolver(projectTotals: ProjectTotal[]): ProjectColorResolver {
+  const projectKeys = Array.from(new Set(projectTotals.map((project) => project.key))).sort(
+    (a, b) => a.localeCompare(b),
+  );
+  const colorsByProjectKey = new Map<string, string>();
+
+  projectKeys.forEach((projectKey, index) => {
+    colorsByProjectKey.set(projectKey, getDistinctProjectColor(index));
+  });
+
+  return (projectKey: string) => colorsByProjectKey.get(projectKey) ?? "#52606d";
+}
+
+function getDistinctProjectColor(index: number): string {
+  if (index < PROJECT_COLORS.length) {
+    return PROJECT_COLORS[index];
   }
-  return PROJECT_COLORS[hash % PROJECT_COLORS.length];
+
+  const fallbackIndex = index - PROJECT_COLORS.length;
+  const hue = (fallbackIndex * 47) % 360;
+  return `hsl(${hue}, 58%, 44%)`;
 }
 
 function formatUserName(user: AworkUser): string {

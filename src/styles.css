@@ -1428,7 +1428,9 @@ select:disabled {
 .capacity-range-track {
   position: relative;
   min-width: 0;
-  height: 22px;
+  height: 36px;
+  padding: 8px 0 6px;
+  margin: -8px 0 -6px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
