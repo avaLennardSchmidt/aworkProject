@@ -33,24 +33,10 @@ const editModeOptions = [
   { value: "set-window", label: "Set time frame" },
 ] as const;
 
-const editModeSelectedLabels: Record<EditMode, string> = {
-  delta: "Add",
-  "set-window": "Set",
-};
-
 const directionOptions = [
   { value: "add", label: "Add time" },
   { value: "remove", label: "Remove time" },
 ] as const;
-
-const directionSelectedLabels: Record<Direction, string> = {
-  add: "Add",
-  remove: "Remove",
-};
-
-const weekdaySelectedLabels: Record<string, string> = {
-  "": "Keep current",
-};
 
 export function MultiGroupDurationEditModal({
   groups,
@@ -61,6 +47,7 @@ export function MultiGroupDurationEditModal({
 }: MultiGroupDurationEditModalProps) {
   const [editMode, setEditMode] = useState<EditMode>("delta");
   const [direction, setDirection] = useState<Direction>("add");
+  const [days, setDays] = useState("0");
   const [hours, setHours] = useState("1");
   const [minutes, setMinutes] = useState("0");
   const [windowStartTime, setWindowStartTime] = useState(
@@ -80,7 +67,7 @@ export function MultiGroupDurationEditModal({
       sum + calculateDurationMinutes(schedule.start, schedule.end),
     0,
   );
-  const deltaMinutes = buildDeltaMinutes(direction, hours, minutes);
+  const deltaMinutes = buildDeltaMinutes(direction, days, hours, minutes);
   const totalAfterMinutes = schedules.reduce((sum, schedule) => {
     const updated = buildUpdatedSchedule(schedule, {
       editMode,
@@ -157,7 +144,7 @@ export function MultiGroupDurationEditModal({
   }
 
   function validate(): string {
-    if (groups.length < 2) return "Select at least two groups.";
+    if (groups.length === 0) return "Select at least one group.";
     if (schedules.length === 0) return "The selected groups have no blockers.";
     if (schedules.some((schedule) => !isOwnSchedule(schedule, currentUser))) {
       return "Ownership could not be verified for every selected blocker.";
@@ -255,24 +242,23 @@ export function MultiGroupDurationEditModal({
           <span>{formatMinutesAsHours(totalAfterMinutes)} after</span>
         </div>
 
-        <div className="filter-grid multi-edit-grid">
-          <div className="form-row">
-            <label htmlFor="multi-mode">Mode</label>
-            <SearchableSelect
-              buttonId="multi-mode"
-              value={editMode}
-              options={[...editModeOptions]}
-              placeholder="Select mode"
-              searchPlaceholder="Filter modes (2 found)"
-              emptyLabel="No mode found."
-              selectedLabelOverride={editModeSelectedLabels}
-              menuWidth="compact"
-              onChange={(value) => setEditMode(value as EditMode)}
-            />
-          </div>
+        <div className="multi-edit-grid">
+          <div className="multi-edit-row multi-edit-row-top">
+            <div className="form-row">
+              <label htmlFor="multi-mode">Mode</label>
+              <SearchableSelect
+                buttonId="multi-mode"
+                value={editMode}
+                options={[...editModeOptions]}
+                placeholder="Select mode"
+                searchPlaceholder="Filter modes (2 found)"
+                emptyLabel="No mode found."
+                menuWidth="compact"
+                onChange={(value) => setEditMode(value as EditMode)}
+              />
+            </div>
 
-          {editMode === "delta" ? (
-            <>
+            {editMode === "delta" ? (
               <div className="form-row">
                 <label htmlFor="multi-direction">Change</label>
                 <SearchableSelect
@@ -282,9 +268,45 @@ export function MultiGroupDurationEditModal({
                   placeholder="Select change"
                   searchPlaceholder="Filter changes (2 found)"
                   emptyLabel="No change found."
-                  selectedLabelOverride={directionSelectedLabels}
                   menuWidth="compact"
                   onChange={(value) => setDirection(value as Direction)}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="form-row">
+                  <label htmlFor="multi-window-start">Start time</label>
+                  <input
+                    id="multi-window-start"
+                    type="time"
+                    value={windowStartTime}
+                    onChange={(event) => setWindowStartTime(event.target.value)}
+                  />
+                </div>
+                <div className="form-row">
+                  <label htmlFor="multi-window-end">End time</label>
+                  <input
+                    id="multi-window-end"
+                    type="time"
+                    value={windowEndTime}
+                    onChange={(event) => setWindowEndTime(event.target.value)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {editMode === "delta" ? (
+            <div className="multi-edit-row multi-edit-row-duration">
+              <div className="form-row">
+                <label htmlFor="multi-days">Days</label>
+                <input
+                  id="multi-days"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={days}
+                  onChange={(event) => setDays(event.target.value)}
                 />
               </div>
               <div className="form-row">
@@ -310,49 +332,29 @@ export function MultiGroupDurationEditModal({
                   onChange={(event) => setMinutes(event.target.value)}
                 />
               </div>
-            </>
-          ) : (
-            <>
-              <div className="form-row">
-                <label htmlFor="multi-window-start">Start time</label>
-                <input
-                  id="multi-window-start"
-                  type="time"
-                  value={windowStartTime}
-                  onChange={(event) => setWindowStartTime(event.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label htmlFor="multi-window-end">End time</label>
-                <input
-                  id="multi-window-end"
-                  type="time"
-                  value={windowEndTime}
-                  onChange={(event) => setWindowEndTime(event.target.value)}
-                />
-              </div>
-            </>
-          )}
+            </div>
+          ) : null}
 
-          <div className="form-row">
-            <label htmlFor="multi-weekday">New weekday</label>
-            <SearchableSelect
-              buttonId="multi-weekday"
-              value={weekdayOverride}
-              options={[
-                { value: "", label: "Keep current weekdays" },
-                ...weekdayOptions.map((day) => ({
-                  value: String(day.value),
-                  label: day.label,
-                })),
-              ]}
-              placeholder="Select weekday"
-              searchPlaceholder="Filter weekdays (8 found)"
-              emptyLabel="No weekday found."
-              selectedLabelOverride={weekdaySelectedLabels}
-              menuWidth="compact"
-              onChange={setWeekdayOverride}
-            />
+          <div className="multi-edit-row multi-edit-row-weekday">
+            <div className="form-row">
+              <label htmlFor="multi-weekday">New weekday</label>
+              <SearchableSelect
+                buttonId="multi-weekday"
+                value={weekdayOverride}
+                options={[
+                  { value: "", label: "Keep current weekdays" },
+                  ...weekdayOptions.map((day) => ({
+                    value: String(day.value),
+                    label: day.label,
+                  })),
+                ]}
+                placeholder="Select weekday"
+                searchPlaceholder="Filter weekdays (8 found)"
+                emptyLabel="No weekday found."
+                menuWidth="compact"
+                onChange={setWeekdayOverride}
+              />
+            </div>
           </div>
         </div>
 
@@ -400,12 +402,16 @@ const weekdayOptions = [
 
 function buildDeltaMinutes(
   direction: Direction,
+  days: string,
   hours: string,
   minutes: string,
 ): number {
+  const parsedDays = Math.max(0, Number(days) || 0);
   const parsedHours = Math.max(0, Number(hours) || 0);
   const parsedMinutes = Math.max(0, Number(minutes) || 0);
-  const totalMinutes = Math.round(parsedHours * 60 + parsedMinutes);
+  const totalMinutes = Math.round(
+    parsedDays * 24 * 60 + parsedHours * 60 + parsedMinutes,
+  );
   return direction === "add" ? totalMinutes : -totalMinutes;
 }
 

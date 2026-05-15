@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   endOfDay,
   endOfYear,
@@ -8,7 +8,10 @@ import {
   startOfToday,
 } from "date-fns";
 import { BackendClient } from "./services/backendClient";
-import { storeSessionTokenFromUrl } from "./services/backendClient";
+import {
+  getStoredSessionToken,
+  storeSessionTokenFromUrl,
+} from "./services/backendClient";
 import { groupSchedules } from "./services/scheduleGrouping";
 import { deleteScheduleGroup } from "./services/scheduleDeleter";
 import {
@@ -57,7 +60,6 @@ import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { BlockerOperationsPreviewModal } from "./components/BlockerOperationsPreviewModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
-import { UnscheduledTasksPanel } from "./components/UnscheduledTasksPanel";
 import {
   WorkflowChooser,
   type PlannerWorkflow,
@@ -73,6 +75,7 @@ interface LoadSchedulesOptions {
 }
 
 function App() {
+  const lastSessionCheckRef = useRef(0);
   const [currentUser, setCurrentUser] = useState<AworkUser>();
   const [selectedPlannerUserId, setSelectedPlannerUserId] = useState("");
   const [workflow, setWorkflow] = useState<PlannerWorkflow>("manage");
@@ -112,9 +115,6 @@ function App() {
   const [projectTasksForCreate, setProjectTasksForCreate] = useState<
     AworkProjectTask[]
   >([]);
-  const [unscheduledTasks, setUnscheduledTasks] = useState<AworkProjectTask[]>(
-    [],
-  );
   const [hasLoadedSchedules, setHasLoadedSchedules] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ScheduleGroup>();
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(
@@ -142,7 +142,9 @@ function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("aworkLogin") === "success") {
+    const returnedFromLogin = params.get("aworkLogin") === "success";
+
+    if (returnedFromLogin) {
       storeSessionTokenFromUrl();
       setStatusMessage("awork login completed. Checking your session...");
       params.delete("aworkLogin");
@@ -152,8 +154,45 @@ function App() {
         : window.location.pathname;
       window.history.replaceState({}, document.title, nextUrl);
     }
-    void restoreBackendSession(params.get("aworkLogin") === "success");
+
+    if (returnedFromLogin || getStoredSessionToken()) {
+      void restoreBackendSession(returnedFromLogin);
+    }
   }, []);
+
+  useEffect(() => {
+    function shouldCheckSession() {
+      return Boolean(currentUser || getStoredSessionToken());
+    }
+
+    function maybeRestoreSession() {
+      if (!shouldCheckSession() || isConnecting) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastSessionCheckRef.current < 5000) {
+        return;
+      }
+
+      lastSessionCheckRef.current = now;
+      void restoreBackendSession();
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        maybeRestoreSession();
+      }
+    }
+
+    window.addEventListener("focus", maybeRestoreSession);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", maybeRestoreSession);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [currentUser, isConnecting]);
 
   const plannerUser = useMemo(() => {
     if (!currentUser) return undefined;
@@ -196,8 +235,7 @@ function App() {
       if (scheduleStart > toDate || scheduleEnd < fromDate) {
         return false;
       }
-      if (filters.hidePast && isBefore(scheduleEnd, today))
-        return false;
+      if (filters.hidePast && isBefore(scheduleEnd, today)) return false;
       if (filters.projectId && schedule.projectId !== filters.projectId)
         return false;
       return true;
@@ -288,7 +326,6 @@ function App() {
     setAvailableProjects([]);
     setAvailableUsers([]);
     setProjectTasksForCreate([]);
-    setUnscheduledTasks([]);
     setHasLoadedSchedules(false);
     setSelectedGroup(undefined);
     setSelectedGroupIds(new Set());
@@ -335,7 +372,9 @@ function App() {
         mapProjectTasksResponse(projectTaskResponse),
         mapped.schedules,
       );
-      const scheduledTaskIds = new Set(mapped.schedules.map((schedule) => schedule.taskId));
+      const scheduledTaskIds = new Set(
+        mapped.schedules.map((schedule) => schedule.taskId),
+      );
       const unscheduledAssignedTasks = projectTasks
         .filter((task) => !scheduledTaskIds.has(task.id))
         .filter((task) => isTaskActive(task))
@@ -357,7 +396,6 @@ function App() {
         projectTasks,
       );
       setAllSchedules(enrichedSchedules);
-      setUnscheduledTasks(unscheduledAssignedTasks);
       setSelectedGroupIds(new Set());
       setHasLoadedSchedules(true);
 
@@ -823,10 +861,6 @@ function App() {
             }}
             isMultiEditAvailable={isMultiEditAvailable}
           />
-          <UnscheduledTasksPanel
-            tasks={unscheduledTasks}
-            hasLoaded={hasLoadedSchedules}
-          />
         </>
       ) : workflow === "create" && plannerUser ? (
         <CreateScheduleGroupPanel
@@ -978,7 +1012,10 @@ export default App;
 
 function isTaskActive(task: AworkProjectTask): boolean {
   const normalizedStatusType = task.statusType?.trim().toLowerCase();
-  return !normalizedStatusType || !["done", "completed", "closed"].includes(normalizedStatusType);
+  return (
+    !normalizedStatusType ||
+    !["done", "completed", "closed"].includes(normalizedStatusType)
+  );
 }
 
 function getPlannerSchedules(

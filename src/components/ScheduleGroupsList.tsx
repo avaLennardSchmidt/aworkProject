@@ -153,7 +153,7 @@ export function ScheduleGroupsList({
         <button
           type="button"
           className="primary-button"
-          disabled={selectedGroupIds.size < 2 || !isMultiEditAvailable}
+          disabled={selectedGroupIds.size < 1 || !isMultiEditAvailable}
           title={
             !isMultiEditAvailable
               ? "Multi-edit not available for this user"
@@ -161,7 +161,7 @@ export function ScheduleGroupsList({
           }
           onClick={onMultiEdit}
         >
-          Edit selected
+          Edit selected Groups
         </button>
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   addDays,
   differenceInCalendarDays,
@@ -16,7 +16,6 @@ import {
 } from "date-fns";
 import { BackendClient, mapUser } from "../services/backendClient";
 import { fuzzyMatches } from "../services/fuzzySearch";
-import { isUserInPdsOrSimTeam } from "../services/teamFilter";
 import {
   mapProjectTaskResponse,
   mapProjectTasksResponse,
@@ -35,6 +34,10 @@ import type {
 import { ConnectionPanel } from "./ConnectionPanel";
 import { ErrorAlert } from "./ErrorAlert";
 import { LoadingState } from "./LoadingState";
+import {
+  formatSearchPlaceholder,
+  MultiSearchableSelect,
+} from "./SearchableSelect";
 
 interface CapacityAnalysisPageProps {
   backendClient: BackendClient;
@@ -126,6 +129,11 @@ type ProjectColorResolver = (projectKey: string) => string;
 const DEFAULT_WEEKLY_HOURS = 40;
 const DEFAULT_CUSTOMER_PERCENT = 80;
 const CAPACITY_STORAGE_KEY = "awork_capacity_inputs";
+const DEFAULT_TEAM_SELECTION = "sim";
+const TEAM_PATH_SEGMENT_PATTERN =
+  /(team|group|department|unit|organization|organisation)/i;
+const MAX_TEAM_WALK_DEPTH = 6;
+const MAX_TEAM_WALK_VISITED = 500;
 const PROJECT_COLORS = [
   "#1e7a5f",
   "#3567a8",
@@ -148,14 +156,19 @@ export function CapacityAnalysisPage({
   onLogin,
   onDisconnect,
 }: CapacityAnalysisPageProps) {
+  const hasInitializedDefaultSelectionRef = useRef(false);
   const [from, setFrom] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [to, setTo] = useState(() =>
     format(endOfYear(new Date()), "yyyy-MM-dd"),
   );
+  const [availableUsers, setAvailableUsers] = useState<AworkUser[]>([]);
   const [users, setUsers] = useState<AworkUser[]>([]);
   const [schedulesByUser, setSchedulesByUser] = useState<
     Record<string, AworkTaskSchedule[]>
   >({});
+  const [selectedTeamNames, setSelectedTeamNames] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
     new Set(),
   );
@@ -175,16 +188,50 @@ export function CapacityAnalysisPage({
   const [unresolvedProjectHintsByTaskId, setUnresolvedProjectHintsByTaskId] =
     useState<Record<string, string>>({});
   const [isDetailsTableCollapsed, setIsDetailsTableCollapsed] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [isAbsenceNoticeDismissed, setIsAbsenceNoticeDismissed] =
+    useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     saveCapacityInputs(capacityInputs);
   }, [capacityInputs]);
 
+  useEffect(() => {
+    if (!currentUser || !isAuthorized || isCheckingAccess) {
+      hasInitializedDefaultSelectionRef.current = false;
+      setAvailableUsers([]);
+      setUsers([]);
+      setSelectedUserIds(new Set());
+      setSelectedTeamNames(new Set());
+      return;
+    }
+
+    void loadAvailableUsers();
+  }, [currentUser, isAuthorized, isCheckingAccess, from, to]);
+
   const weekCount = useMemo(() => calculateWeekCount(from, to), [from, to]);
   const capacityWeeks = useMemo(() => buildCapacityWeeks(from, to), [from, to]);
+  const availableTeams = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          availableUsers.flatMap((user) =>
+            getUserTeamNames(user).map((teamName) => teamName.toLowerCase()),
+          ),
+        ),
+      )
+        .map((teamName) => ({ key: teamName, label: toTeamLabel(teamName) }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [availableUsers],
+  );
+  const usersSelectedForAnalysis = useMemo(() => {
+    return availableUsers.filter((user) => selectedUserIds.has(user.id));
+  }, [availableUsers, selectedUserIds]);
+  const areAllAvailableUsersSelected =
+    availableUsers.length > 0 && selectedUserIds.size === availableUsers.length;
 
   const rows = useMemo<UserCapacityRow[]>(() => {
     return users.map((user) => {
@@ -312,21 +359,26 @@ export function CapacityAnalysisPage({
     setError("");
 
     try {
-      const response = await backendClient.getCapacityAnalysis({ from, to });
-      const mappedUsers = mapCapacityUsers(response);
+      const usersToAnalyze = usersSelectedForAnalysis;
+      if (usersToAnalyze.length === 0) {
+        throw new Error(
+          "Select at least one user or team before starting analysis.",
+        );
+      }
+
       const schedulesResult = await loadSchedulesForUsers(
         backendClient,
-        mappedUsers,
+        usersToAnalyze,
         currentUser,
         from,
         to,
       );
-      setUsers(mappedUsers);
+      setUsers(usersToAnalyze);
       setSchedulesByUser(schedulesResult.schedulesByUser);
       setUnresolvedProjectHintsByTaskId(
         schedulesResult.unresolvedHintsByTaskId,
       );
-      setSelectedUserIds(new Set(mappedUsers.map((user) => user.id)));
+      setSelectedUserIds(new Set(usersToAnalyze.map((user) => user.id)));
       setExpandedUserIds(new Set());
       setHasLoaded(true);
     } catch (loadError) {
@@ -338,6 +390,105 @@ export function CapacityAnalysisPage({
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function loadAvailableUsers() {
+    setIsLoadingUsers(true);
+    setError("");
+
+    try {
+      const response = await backendClient.getCapacityAnalysis({ from, to });
+      const mappedUsers = mapCapacityUsers(response).sort((a, b) =>
+        formatUserName(a).localeCompare(formatUserName(b)),
+      );
+      const mappedUserIds = new Set(mappedUsers.map((user) => user.id));
+      const availableTeamNames = new Set(
+        mappedUsers.flatMap((user) =>
+          getUserTeamNames(user).map((teamName) => teamName.toLowerCase()),
+        ),
+      );
+      const shouldApplyDefaultTeamSelection =
+        !hasInitializedDefaultSelectionRef.current &&
+        selectedTeamNames.size === 0 &&
+        selectedUserIds.size === 0 &&
+        availableTeamNames.has(DEFAULT_TEAM_SELECTION);
+
+      setAvailableUsers(mappedUsers);
+      if (shouldApplyDefaultTeamSelection) {
+        const defaultTeams = new Set([DEFAULT_TEAM_SELECTION]);
+        setSelectedTeamNames(defaultTeams);
+        setSelectedUserIds(
+          collectUsersMatchingTeams(mappedUsers, defaultTeams),
+        );
+        hasInitializedDefaultSelectionRef.current = true;
+        return;
+      }
+
+      setSelectedUserIds((current) => {
+        if (selectedTeamNames.size > 0) {
+          return collectUsersMatchingTeams(mappedUsers, selectedTeamNames);
+        }
+
+        if (current.size === 0) {
+          hasInitializedDefaultSelectionRef.current = true;
+          return new Set(mappedUsers.map((user) => user.id));
+        }
+
+        hasInitializedDefaultSelectionRef.current = true;
+        return new Set(
+          Array.from(current).filter((userId) => mappedUserIds.has(userId)),
+        );
+      });
+      setSelectedTeamNames((current) => {
+        if (current.size === 0) {
+          return current;
+        }
+        return new Set(
+          Array.from(current).filter((teamName) =>
+            availableTeamNames.has(teamName),
+          ),
+        );
+      });
+    } catch (loadError) {
+      setAvailableUsers([]);
+      setSelectedUserIds(new Set());
+      setSelectedTeamNames(new Set());
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not load users for capacity analysis.",
+      );
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  }
+
+  function togglePreselectionUser(userId: string, checked: boolean) {
+    setSelectedUserIds((current) => {
+      const next = new Set(current);
+      if (checked) {
+        next.add(userId);
+      } else {
+        next.delete(userId);
+      }
+      return next;
+    });
+  }
+
+  function handleTeamSelectionChange(teamNames: string[]) {
+    const nextSelectedTeams = new Set(
+      teamNames.map((team) => team.toLowerCase()),
+    );
+    setSelectedTeamNames(nextSelectedTeams);
+
+    if (nextSelectedTeams.size === 0) {
+      setSelectedUserIds(new Set(availableUsers.map((user) => user.id)));
+      return;
+    }
+
+    setSelectedUserIds(
+      collectUsersMatchingTeams(availableUsers, nextSelectedTeams),
+    );
   }
 
   function updateCapacityInput(
@@ -352,18 +503,6 @@ export function CapacityAnalysisPage({
         [field]: value,
       },
     }));
-  }
-
-  function toggleUser(userId: string, checked: boolean) {
-    setSelectedUserIds((current) => {
-      const next = new Set(current);
-      if (checked) {
-        next.add(userId);
-      } else {
-        next.delete(userId);
-      }
-      return next;
-    });
   }
 
   function toggleUserExpansion(userId: string) {
@@ -437,83 +576,178 @@ export function CapacityAnalysisPage({
       ) : !isAuthorized ? null : (
         <>
           <section className="panel analysis-control-panel">
-            <div>
+            <div className="analysis-control-heading">
               <p className="eyebrow">Analysis range</p>
               <h2>Capacity overview</h2>
             </div>
             <div className="analysis-control-grid">
-              <div className="form-row">
-                <label htmlFor="analysis-from">From</label>
-                <input
-                  id="analysis-from"
-                  type="date"
-                  value={from}
-                  disabled={isLoading}
-                  onChange={(event) => setFrom(event.target.value)}
-                />
+              <div className="analysis-date-controls">
+                <div className="form-row">
+                  <label htmlFor="analysis-from">From</label>
+                  <input
+                    id="analysis-from"
+                    type="date"
+                    value={from}
+                    disabled={isLoading}
+                    onChange={(event) => setFrom(event.target.value)}
+                  />
+                </div>
+                <div className="form-row">
+                  <label htmlFor="analysis-to">To</label>
+                  <input
+                    id="analysis-to"
+                    type="date"
+                    value={to}
+                    disabled={isLoading}
+                    onChange={(event) => setTo(event.target.value)}
+                  />
+                </div>
+                <div className="analysis-presets">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={isLoading}
+                    onClick={() => applyDatePreset("this-month")}
+                  >
+                    This month
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={isLoading}
+                    onClick={() => applyDatePreset("next-4-weeks")}
+                  >
+                    Next 4 weeks
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={isLoading}
+                    onClick={() => applyDatePreset("this-quarter")}
+                  >
+                    This quarter
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    disabled={isLoading}
+                    onClick={() => applyDatePreset("this-year")}
+                  >
+                    This year
+                  </button>
+                </div>
               </div>
-              <div className="form-row">
-                <label htmlFor="analysis-to">To</label>
-                <input
-                  id="analysis-to"
-                  type="date"
-                  value={to}
-                  disabled={isLoading}
-                  onChange={(event) => setTo(event.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={isLoading}
-                onClick={() => void loadAnalysis()}
-              >
-                {isLoading ? "Loading..." : "Start analysis"}
-              </button>
-              <div className="analysis-presets">
+              <div className="analysis-control-actions">
                 <button
                   type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("this-month")}
+                  className="primary-button"
+                  disabled={
+                    isLoading ||
+                    isLoadingUsers ||
+                    usersSelectedForAnalysis.length === 0
+                  }
+                  onClick={() => void loadAnalysis()}
                 >
-                  This month
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("next-4-weeks")}
-                >
-                  Next 4 weeks
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("this-quarter")}
-                >
-                  This quarter
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("this-year")}
-                >
-                  This year
+                  {isLoading ? "Loading..." : "Start analysis"}
                 </button>
               </div>
             </div>
+            <p className="analysis-range-note">
+              {usersSelectedForAnalysis.length} of {availableUsers.length} users
+              selected for analysis.
+            </p>
+            <div className="analysis-selection-tools">
+              <div className="form-row analysis-team-filter-row">
+                <label htmlFor="analysis-team-filter">
+                  Teams (auto-select users)
+                </label>
+                <MultiSearchableSelect
+                  buttonId="analysis-team-filter"
+                  values={Array.from(selectedTeamNames)}
+                  options={availableTeams.map((team) => ({
+                    value: team.key,
+                    label: team.label,
+                  }))}
+                  placeholder={
+                    availableTeams.length > 0
+                      ? "Choose one or more teams"
+                      : "No teams found"
+                  }
+                  searchPlaceholder={formatSearchPlaceholder(
+                    "Filter teams",
+                    availableTeams.length,
+                  )}
+                  emptyLabel="No teams found"
+                  disabled={isLoading || isLoadingUsers}
+                  onChange={handleTeamSelectionChange}
+                />
+              </div>
+              <div className="analysis-selection-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={isLoading || isLoadingUsers}
+                  onClick={() => void loadAvailableUsers()}
+                >
+                  {isLoadingUsers ? "Loading users..." : "Reload users"}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={availableUsers.length === 0}
+                  onClick={() => {
+                    if (areAllAvailableUsersSelected) {
+                      setSelectedUserIds(new Set());
+                      return;
+                    }
+
+                    setSelectedUserIds(
+                      new Set(availableUsers.map((user) => user.id)),
+                    );
+                  }}
+                >
+                  {areAllAvailableUsersSelected ? "Clear all" : "Select all"}
+                </button>
+              </div>
+            </div>
+            <div
+              className="analysis-preselection-grid"
+              role="group"
+              aria-label="Users"
+            >
+              {availableUsers.map((user) => (
+                <label className="analysis-user-check" key={user.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedUserIds.has(user.id)}
+                    onChange={(event) =>
+                      togglePreselectionUser(user.id, event.target.checked)
+                    }
+                  />
+                  <span>{formatUserName(user)}</span>
+                </label>
+              ))}
+            </div>
           </section>
 
-          <section className="analysis-absence-warning" role="note">
-            <strong>Important: absences are not included.</strong>
-            <span>
-              This analysis does not reduce capacity for holidays, sick leave,
-              public holidays, vacation, or other absence entries.
-            </span>
-          </section>
+          {!isAbsenceNoticeDismissed ? (
+            <section className="analysis-absence-warning" role="note">
+              <div>
+                <strong>Absences are not included.</strong>
+                <span>
+                  This analysis does not reduce capacity for holidays, sick
+                  leave, public holidays, vacation, or other absence entries.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="ghost-button analysis-absence-dismiss"
+                onClick={() => setIsAbsenceNoticeDismissed(true)}
+              >
+                OK, that&apos;s fine
+              </button>
+            </section>
+          ) : null}
 
           {isLoading ? <LoadingState label="Loading team capacity..." /> : null}
 
@@ -539,49 +773,6 @@ export function CapacityAnalysisPage({
                 totalBlockers={summary.totalBlockers}
                 overloadedUsers={summary.overloadedUsers}
               />
-
-              <section className="panel analysis-user-selector">
-                <div className="analysis-section-heading">
-                  <div>
-                    <p className="eyebrow">Users</p>
-                    <h2>Included in analysis</h2>
-                  </div>
-                  <div className="analysis-inline-actions analysis-inline-actions-end">
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() =>
-                        setSelectedUserIds(
-                          new Set(users.map((user) => user.id)),
-                        )
-                      }
-                    >
-                      Select all
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() => setSelectedUserIds(new Set())}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-                <div className="analysis-user-grid">
-                  {rows.map((row) => (
-                    <label className="analysis-user-check" key={row.user.id}>
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.has(row.user.id)}
-                        onChange={(event) =>
-                          toggleUser(row.user.id, event.target.checked)
-                        }
-                      />
-                      <span>{formatUserName(row.user)}</span>
-                    </label>
-                  ))}
-                </div>
-              </section>
 
               <section className="panel analysis-chart-panel">
                 <div className="analysis-section-heading analysis-section-heading-chart">
@@ -1274,8 +1465,137 @@ function mapCapacityUsers(response: unknown): AworkUser[] {
         return null;
       }
     })
-    .filter((user): user is AworkUser => Boolean(user))
-    .filter(isUserInPdsOrSimTeam);
+    .filter((user): user is AworkUser => Boolean(user));
+}
+
+function getUserTeamNames(user: AworkUser): string[] {
+  const candidates = collectTeamCandidates(user.raw);
+  const normalized = candidates
+    .flatMap((candidate) =>
+      candidate
+        .split(/[\/|;,]/)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    )
+    .filter((candidate) => isValidTeamCandidate(candidate))
+    .map((candidate) => normalizeTeamName(candidate));
+
+  return Array.from(new Set(normalized));
+}
+
+function collectUsersMatchingTeams(
+  users: AworkUser[],
+  selectedTeamNames: Set<string>,
+): Set<string> {
+  return new Set(
+    users
+      .filter((user) => {
+        const userTeamNames = new Set(
+          getUserTeamNames(user).map((teamName) => teamName.toLowerCase()),
+        );
+        return Array.from(selectedTeamNames).some((teamName) =>
+          userTeamNames.has(teamName),
+        );
+      })
+      .map((user) => user.id),
+  );
+}
+
+function toTeamLabel(teamName: string): string {
+  return teamName
+    .replace(/[._-]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => {
+      if (part.length <= 4) {
+        return part.toUpperCase();
+      }
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join(" ");
+}
+
+function normalizeTeamName(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function isValidTeamCandidate(value: string): boolean {
+  const normalized = value.trim();
+  if (normalized.length < 2 || normalized.length > 48) {
+    return false;
+  }
+
+  if (!/[a-zA-Z]/.test(normalized)) {
+    return false;
+  }
+
+  // Drop unresolved ids (UUID-like values and long hash-like tokens).
+  if (
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+      normalized,
+    )
+  ) {
+    return false;
+  }
+
+  if (/^[0-9a-fA-F_-]{20,}$/.test(normalized)) {
+    return false;
+  }
+
+  return true;
+}
+
+function collectTeamCandidates(raw: unknown): string[] {
+  const candidates: string[] = [];
+  const visited = { count: 0 };
+  walkTeamPayload(raw, [], candidates, visited, 0);
+  return candidates;
+}
+
+function walkTeamPayload(
+  value: unknown,
+  path: string[],
+  candidates: string[],
+  visited: { count: number },
+  depth: number,
+): void {
+  if (depth > MAX_TEAM_WALK_DEPTH || visited.count >= MAX_TEAM_WALK_VISITED) {
+    return;
+  }
+
+  visited.count += 1;
+
+  if (typeof value === "string") {
+    if (path.some((segment) => TEAM_PATH_SEGMENT_PATTERN.test(segment))) {
+      candidates.push(value);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      walkTeamPayload(
+        item,
+        [...path, String(index)],
+        candidates,
+        visited,
+        depth + 1,
+      );
+    });
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  Object.entries(value).forEach(([key, nested]) => {
+    walkTeamPayload(nested, [...path, key], candidates, visited, depth + 1);
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 async function loadSchedulesForUsers(
