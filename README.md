@@ -34,7 +34,7 @@ Open the local Vite URL shown in the terminal.
 3. Choose one workflow:
    - **Manage existing groups** loads your existing planned task blockers, groups them by project/task/weekday/time, and lets you bulk-change their time window after a preview.
    - **Create new group** lets you select a project, choose an existing task or create a new project task, then select a weekly date/time period for new planned blockers.
-   - **Team capacity analysis** is available from the planner user section for users listed in `MULTI_EDIT_AUTHORIZED_USERS`.
+   - **Team capacity analysis** is available from the planner user section for any signed-in user.
 4. For existing groups, click **Load planned tasks**, pick a row, preview the changes, and apply them.
 5. For new groups, review the generated blocker preview, then create them. If you choose **New task**, the app creates the awork project task first and then plans blockers for that new task.
 
@@ -54,7 +54,7 @@ The actual calendar date does not need to match. For example, every Wednesday 07
 
 ## Team Capacity Analysis
 
-Users listed in the backend `MULTI_EDIT_AUTHORIZED_USERS` setting can open **Team capacity analysis** from the planner user section. The analysis page loads the selected date range for all users, lets you include or exclude users, and shows planned project time against each user's configured capacity.
+Any signed-in user can open **Team capacity analysis** from the planner user section. The analysis page loads the selected date range for all users, lets you include or exclude users, and shows planned project time against each user's configured capacity.
 
 Capacity inputs are stored per browser:
 

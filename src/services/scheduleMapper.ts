@@ -61,6 +61,7 @@ function mapOneSchedule(raw: unknown): AworkTaskSchedule | null {
       "userId",
       "user.id",
       "assignedUserId",
+      "assignedUser.id",
       "taskScheduleUserId",
       "task.userId",
       "task.user.id",

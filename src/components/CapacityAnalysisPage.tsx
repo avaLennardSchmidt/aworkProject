@@ -21,7 +21,10 @@ import {
   mapProjectTasksResponse,
 } from "../services/projectTaskMapper";
 import { enrichSchedulesWithProjectTasks } from "../services/scheduleEnrichment";
-import { isOwnSchedule, mapTaskSchedulesResponse } from "../services/scheduleMapper";
+import {
+  isOwnSchedule,
+  mapTaskSchedulesResponse,
+} from "../services/scheduleMapper";
 import { calculateDurationMinutes } from "../services/scheduleTimeCalculator";
 import type {
   AworkProjectTask,
@@ -145,7 +148,9 @@ export function CapacityAnalysisPage({
   onDisconnect,
 }: CapacityAnalysisPageProps) {
   const [from, setFrom] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  const [to, setTo] = useState(() => format(endOfYear(new Date()), "yyyy-MM-dd"));
+  const [to, setTo] = useState(() =>
+    format(endOfYear(new Date()), "yyyy-MM-dd"),
+  );
   const [users, setUsers] = useState<AworkUser[]>([]);
   const [schedulesByUser, setSchedulesByUser] = useState<
     Record<string, AworkTaskSchedule[]>
@@ -264,7 +269,12 @@ export function CapacityAnalysisPage({
 
         return entry.totals.customerTargetPercent <= workloadFilterValue;
       }),
-    [chartUserSearch, selectedRowSummaries, workloadFilterMode, workloadFilterValue],
+    [
+      chartUserSearch,
+      selectedRowSummaries,
+      workloadFilterMode,
+      workloadFilterValue,
+    ],
   );
 
   const areAllSelectedUsersExpanded =
@@ -318,7 +328,9 @@ export function CapacityAnalysisPage({
       );
       setUsers(mappedUsers);
       setSchedulesByUser(schedulesResult.schedulesByUser);
-      setUnresolvedProjectHintsByTaskId(schedulesResult.unresolvedHintsByTaskId);
+      setUnresolvedProjectHintsByTaskId(
+        schedulesResult.unresolvedHintsByTaskId,
+      );
       setSelectedUserIds(new Set(mappedUsers.map((user) => user.id)));
       setExpandedUserIds(new Set());
       setHasLoaded(true);
@@ -407,7 +419,9 @@ export function CapacityAnalysisPage({
           <h1>Team Capacity Analysis</h1>
         </div>
         <div className="analysis-header-actions">
-          <p>See planned project time and available team capacity in one view.</p>
+          <p>
+            See planned project time and available team capacity in one view.
+          </p>
           <a className="ghost-link-button" href={getPlannerHref()}>
             Back to planner
           </a>
@@ -425,16 +439,7 @@ export function CapacityAnalysisPage({
 
       {!currentUser ? null : isCheckingAccess ? (
         <LoadingState label="Checking analysis access..." />
-      ) : !isAuthorized ? (
-        <section className="panel empty-state">
-          <p className="eyebrow">Access denied</p>
-          <h2>Team capacity analysis is not available for your account.</h2>
-          <p>
-            Access is managed through the backend
-            MULTI_EDIT_AUTHORIZED_USERS setting.
-          </p>
-        </section>
-      ) : (
+      ) : !isAuthorized ? null : (
         <>
           <section className="panel analysis-control-panel">
             <div>
@@ -540,7 +545,9 @@ export function CapacityAnalysisPage({
                       type="button"
                       className="ghost-button"
                       onClick={() =>
-                        setSelectedUserIds(new Set(users.map((user) => user.id)))
+                        setSelectedUserIds(
+                          new Set(users.map((user) => user.id)),
+                        )
                       }
                     >
                       Select all
@@ -583,41 +590,43 @@ export function CapacityAnalysisPage({
                       type="search"
                       value={chartUserSearch}
                       placeholder="Filter selected users..."
-                      onChange={(event) => setChartUserSearch(event.target.value)}
+                      onChange={(event) =>
+                        setChartUserSearch(event.target.value)
+                      }
                     />
-                     <div className="analysis-workload-filter">
-                       <select
-                         id="analysis-workload-filter-mode"
-                         aria-label="Workload comparison"
-                         value={workloadFilterMode}
-                         onChange={(event) =>
-                           setWorkloadFilterMode(
-                             event.target.value as WorkloadFilterMode,
-                           )
-                         }
-                       >
-                         <option value="all">All</option>
-                         <option value="gt">Greater than</option>
-                         <option value="lt">Smaller than</option>
-                       </select>
-                       <div className="analysis-workload-threshold">
-                         <input
-                           type="number"
-                           min="0"
-                           max="300"
-                           step="1"
-                           disabled={workloadFilterMode === "all"}
-                           value={workloadFilterValue}
-                           onChange={(event) =>
-                             setWorkloadFilterValue(
-                               Math.max(0, Number(event.target.value) || 0),
-                             )
-                           }
-                           aria-label="Workload threshold percent"
-                         />
-                         <span>%</span>
-                       </div>
-                     </div>
+                    <div className="analysis-workload-filter">
+                      <select
+                        id="analysis-workload-filter-mode"
+                        aria-label="Workload comparison"
+                        value={workloadFilterMode}
+                        onChange={(event) =>
+                          setWorkloadFilterMode(
+                            event.target.value as WorkloadFilterMode,
+                          )
+                        }
+                      >
+                        <option value="all">All</option>
+                        <option value="gt">Greater than</option>
+                        <option value="lt">Smaller than</option>
+                      </select>
+                      <div className="analysis-workload-threshold">
+                        <input
+                          type="number"
+                          min="0"
+                          max="300"
+                          step="1"
+                          disabled={workloadFilterMode === "all"}
+                          value={workloadFilterValue}
+                          onChange={(event) =>
+                            setWorkloadFilterValue(
+                              Math.max(0, Number(event.target.value) || 0),
+                            )
+                          }
+                          aria-label="Workload threshold percent"
+                        />
+                        <span>%</span>
+                      </div>
+                    </div>
                   </div>
                   <div className="capacity-heading-meta">
                     <div className="capacity-bulk-inputs">
@@ -640,7 +649,7 @@ export function CapacityAnalysisPage({
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                           placeholder="70"
+                          placeholder="70"
                           value={bulkCustomerPercentInput}
                           onChange={(event) =>
                             setBulkCustomerPercentInput(event.target.value)
@@ -657,26 +666,28 @@ export function CapacityAnalysisPage({
                         }
                         onClick={() => {
                           if (bulkWeeklyHoursInput) {
-                            const value = readPositiveNumber(
-                              bulkWeeklyHoursInput
-                            );
+                            const value =
+                              readPositiveNumber(bulkWeeklyHoursInput);
                             visibleSelectedRowSummaries.forEach((entry) => {
                               updateCapacityInput(
                                 entry.row.user.id,
                                 "weeklyHours",
-                                value
+                                value,
                               );
                             });
                           }
-                           if (bulkCustomerPercentInput || visibleSelectedRowSummaries.length > 0) {
-                             const value = bulkCustomerPercentInput
-                               ? readPercentNumber(bulkCustomerPercentInput)
-                               : 70;
+                          if (
+                            bulkCustomerPercentInput ||
+                            visibleSelectedRowSummaries.length > 0
+                          ) {
+                            const value = bulkCustomerPercentInput
+                              ? readPercentNumber(bulkCustomerPercentInput)
+                              : 70;
                             visibleSelectedRowSummaries.forEach((entry) => {
                               updateCapacityInput(
                                 entry.row.user.id,
                                 "customerPercent",
-                                value
+                                value,
                               );
                             });
                           }
@@ -723,7 +734,9 @@ export function CapacityAnalysisPage({
                   </div>
                 </div>
                 <p className="capacity-chart-note">
-                  Full bar width represents 100% of the weekly hours for that calendar week. The yellow marker shows the expected project capacity based on Customer %.
+                  Full bar width represents 100% of the weekly hours for that
+                  calendar week. The yellow marker shows the expected project
+                  capacity based on Customer %.
                 </p>
                 {visibleSelectedRowSummaries.length > 0 ? (
                   <div className="capacity-chart">
@@ -769,48 +782,52 @@ export function CapacityAnalysisPage({
                         setIsDetailsTableCollapsed((current) => !current)
                       }
                     >
-                      {isDetailsTableCollapsed ? "Show table" : "Collapse table"}
+                      {isDetailsTableCollapsed
+                        ? "Show table"
+                        : "Collapse table"}
                     </button>
                   </div>
                 </div>
                 {!isDetailsTableCollapsed ? (
-                <div className="analysis-table-wrap">
-                  <table className="analysis-table">
-                    <thead>
-                      <tr>
-                        <th>User</th>
-                        <th>Planned</th>
-                        <th>Weekly hours</th>
-                        <th>Customer target</th>
-                        <th>Workload</th>
-                        <th>Blockers</th>
-                        <th>Projects</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleSelectedRowSummaries.map(
-                        ({ row, totals, projectTotals }) => {
-                          const unresolvedDetails =
-                            buildUnresolvedProjectsTooltip(projectTotals);
+                  <div className="analysis-table-wrap">
+                    <table className="analysis-table">
+                      <thead>
+                        <tr>
+                          <th>User</th>
+                          <th>Planned</th>
+                          <th>Weekly hours</th>
+                          <th>Customer target</th>
+                          <th>Workload</th>
+                          <th>Blockers</th>
+                          <th>Projects</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleSelectedRowSummaries.map(
+                          ({ row, totals, projectTotals }) => {
+                            const unresolvedDetails =
+                              buildUnresolvedProjectsTooltip(projectTotals);
 
-                          return (
-                            <tr key={row.user.id}>
-                              <td>{formatUserName(row.user)}</td>
-                              <td>{formatHours(totals.plannedHours)}</td>
-                              <td>{formatHours(row.inputs.weeklyHours)}</td>
-                              <td>{formatHours(totals.targetHours)}</td>
-                              <td>{formatDecimal(totals.customerTargetPercent)}%</td>
-                              <td>{totals.blockerCount}</td>
-                              <td title={unresolvedDetails}>
-                                {renderTopProjects(projectTotals)}
-                              </td>
-                            </tr>
-                          );
-                        },
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                            return (
+                              <tr key={row.user.id}>
+                                <td>{formatUserName(row.user)}</td>
+                                <td>{formatHours(totals.plannedHours)}</td>
+                                <td>{formatHours(row.inputs.weeklyHours)}</td>
+                                <td>{formatHours(totals.targetHours)}</td>
+                                <td>
+                                  {formatDecimal(totals.customerTargetPercent)}%
+                                </td>
+                                <td>{totals.blockerCount}</td>
+                                <td title={unresolvedDetails}>
+                                  {renderTopProjects(projectTotals)}
+                                </td>
+                              </tr>
+                            );
+                          },
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : null}
               </section>
             </>
@@ -945,7 +962,8 @@ function CapacityChartRow({
             style={{ color: workloadColor }}
             title="Fulfillment of customer target: planned hours divided by the customer % target for the selected date range."
           >
-            {formatHours(totals.plannedHours)} planned - {formatDecimal(totals.customerTargetPercent)}%
+            {formatHours(totals.plannedHours)} planned -{" "}
+            {formatDecimal(totals.customerTargetPercent)}%
           </span>
         </div>
         <button
@@ -1076,7 +1094,8 @@ function CapacityCombinedBar({
       <div className="capacity-range-overview-head">
         <strong>Selected range</strong>
         <span>
-          {formatHours(totals.plannedHours)} planned · {formatDecimal(totals.customerTargetPercent)}%
+          {formatHours(totals.plannedHours)} planned ·{" "}
+          {formatDecimal(totals.customerTargetPercent)}%
         </span>
       </div>
       <div
@@ -1153,7 +1172,9 @@ function CapacityWeekBar({
 }) {
   const displayPercent = Math.max(100, weekRow.utilizationPercent);
   const stackWidthPercent =
-    displayPercent > 0 ? (weekRow.utilizationPercent / displayPercent) * 100 : 0;
+    displayPercent > 0
+      ? (weekRow.utilizationPercent / displayPercent) * 100
+      : 0;
   const capacityZonePercent = (100 / displayPercent) * 100;
   const customerMarkerPercent = (customerPercent / displayPercent) * 100;
   const isOverbooked = weekRow.customerTargetPercent > 100;
@@ -1167,7 +1188,8 @@ function CapacityWeekBar({
       >
         <strong>{weekRow.week.label}</strong>
         <span>
-          {format(weekRow.week.from, "dd.MM")} - {format(weekRow.week.to, "dd.MM")}
+          {format(weekRow.week.from, "dd.MM")} -{" "}
+          {format(weekRow.week.to, "dd.MM")}
         </span>
       </div>
       <div
@@ -1274,9 +1296,8 @@ async function loadSchedulesForUsers(
       const schedules = mapped.schedules
         .map((schedule) => ({
           ...schedule,
-          // Awork payloads can omit owner fields in some responses.
-          // For user-scoped requests we trust backend filtering and backfill userId.
-          userId: schedule.userId ?? user.id,
+          // For user-scoped requests we trust backend filtering completely.
+          userId: user.id,
         }))
         .filter((schedule) => isOwnSchedule(schedule, user));
       const userProjectTasks = mapProjectTasksResponse(projectTaskResponse);
@@ -1324,7 +1345,9 @@ async function loadMissingProjectTasks(
     const resolvedTasks = await Promise.all(
       taskIdsNeedingLookup.map(async (taskId) => {
         try {
-          const mappedTask = mapProjectTaskResponse(await backendClient.getTask(taskId));
+          const mappedTask = mapProjectTaskResponse(
+            await backendClient.getTask(taskId),
+          );
           if (!mappedTask) {
             unresolvedHintsByTaskId[taskId] =
               "Task details could not be mapped from awork response.";
@@ -1427,7 +1450,10 @@ function buildUserCapacityWeeks(
       projectTotalsByKey.set(key, current);
     });
 
-    const capacityHours = calculateWeekCapacityHours(row.inputs.weeklyHours, week);
+    const capacityHours = calculateWeekCapacityHours(
+      row.inputs.weeklyHours,
+      week,
+    );
     const targetHours = capacityHours * (row.inputs.customerPercent / 100);
     const plannedHours = plannedMinutes / 60;
     const utilizationPercent =
@@ -1471,7 +1497,10 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
   const blockerCount = weekRows.reduce(
     (sum, week) =>
       sum +
-      week.projectTotals.reduce((projectSum, project) => projectSum + project.blockerCount, 0),
+      week.projectTotals.reduce(
+        (projectSum, project) => projectSum + project.blockerCount,
+        0,
+      ),
     0,
   );
 
@@ -1479,14 +1508,18 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
     plannedHours,
     capacityHours,
     targetHours,
-    workloadPercent: capacityHours > 0 ? (plannedHours / capacityHours) * 100 : 0,
-    customerTargetPercent: targetHours > 0 ? (plannedHours / targetHours) * 100 : 0,
+    workloadPercent:
+      capacityHours > 0 ? (plannedHours / capacityHours) * 100 : 0,
+    customerTargetPercent:
+      targetHours > 0 ? (plannedHours / targetHours) * 100 : 0,
     blockerCount,
     isOverloaded: weekRows.some((week) => week.customerTargetPercent > 100),
   };
 }
 
-function summarizeWeekProjectTotals(weekRows: UserCapacityWeek[]): ProjectTotal[] {
+function summarizeWeekProjectTotals(
+  weekRows: UserCapacityWeek[],
+): ProjectTotal[] {
   const totalsByKey = new Map<string, ProjectTotal>();
 
   weekRows.forEach((week) => {
@@ -1526,7 +1559,8 @@ function buildCapacityWeeks(from: string, to: string): CapacityWeek[] {
 
   while (currentWeekStart <= rangeEnd) {
     const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
-    const clippedStart = currentWeekStart < rangeStart ? rangeStart : currentWeekStart;
+    const clippedStart =
+      currentWeekStart < rangeStart ? rangeStart : currentWeekStart;
     const clippedEnd = currentWeekEnd > rangeEnd ? rangeEnd : currentWeekEnd;
     const isoWeek = getISOWeek(currentWeekStart);
     const year = format(currentWeekStart, "RRRR");
@@ -1639,17 +1673,20 @@ function readPercentNumber(value: string): number {
   return Math.min(100, Math.max(0, parsed));
 }
 
-function buildProjectColorResolver(projectTotals: ProjectTotal[]): ProjectColorResolver {
-  const projectKeys = Array.from(new Set(projectTotals.map((project) => project.key))).sort(
-    (a, b) => a.localeCompare(b),
-  );
+function buildProjectColorResolver(
+  projectTotals: ProjectTotal[],
+): ProjectColorResolver {
+  const projectKeys = Array.from(
+    new Set(projectTotals.map((project) => project.key)),
+  ).sort((a, b) => a.localeCompare(b));
   const colorsByProjectKey = new Map<string, string>();
 
   projectKeys.forEach((projectKey, index) => {
     colorsByProjectKey.set(projectKey, getDistinctProjectColor(index));
   });
 
-  return (projectKey: string) => colorsByProjectKey.get(projectKey) ?? "#52606d";
+  return (projectKey: string) =>
+    colorsByProjectKey.get(projectKey) ?? "#52606d";
 }
 
 function getDistinctProjectColor(index: number): string {
@@ -1699,7 +1736,9 @@ function renderTopProjects(projects: ProjectTotal[]) {
   ));
 }
 
-function buildUnresolvedProjectsTooltip(projects: ProjectTotal[]): string | undefined {
+function buildUnresolvedProjectsTooltip(
+  projects: ProjectTotal[],
+): string | undefined {
   const unresolvedProjects = projects.filter(
     (project) => project.key === "unresolved-project",
   );

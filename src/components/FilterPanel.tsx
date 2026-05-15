@@ -34,7 +34,9 @@ export function FilterPanel({
   onChange,
   onLoad,
 }: FilterPanelProps) {
-  const projectPlaceholder = hasLoadedSchedules ? "No project data in schedules" : "Load tasks first";
+  const projectPlaceholder = hasLoadedSchedules
+    ? "No project data in schedules"
+    : "Load tasks first";
 
   function applyDatePreset(
     preset: "this-month" | "next-4-weeks" | "this-quarter" | "this-year",
@@ -87,7 +89,9 @@ export function FilterPanel({
             type="date"
             value={filters.from}
             disabled={disabled}
-            onChange={(event) => onChange({ ...filters, from: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...filters, from: event.target.value })
+            }
           />
         </div>
         <div className="form-row">
@@ -97,7 +101,9 @@ export function FilterPanel({
             type="date"
             value={filters.to}
             disabled={disabled}
-            onChange={(event) => onChange({ ...filters, to: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...filters, to: event.target.value })
+            }
           />
         </div>
         <div className="form-row project-filter-row">
@@ -106,9 +112,13 @@ export function FilterPanel({
             id="project-filter"
             value={filters.projectId}
             disabled={disabled || projectOptions.length === 0}
-            onChange={(event) => onChange({ ...filters, projectId: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...filters, projectId: event.target.value })
+            }
           >
-            <option value="">{projectOptions.length > 0 ? "All projects" : projectPlaceholder}</option>
+            <option value="">
+              {projectOptions.length > 0 ? "All projects" : projectPlaceholder}
+            </option>
             {projectOptions.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
@@ -159,11 +169,18 @@ export function FilterPanel({
             type="checkbox"
             checked={filters.hidePast}
             disabled={disabled}
-            onChange={(event) => onChange({ ...filters, hidePast: event.target.checked })}
+            onChange={(event) =>
+              onChange({ ...filters, hidePast: event.target.checked })
+            }
           />
           Hide past blockers
         </label>
-        <button type="button" className="primary-button" disabled={disabled || isLoading} onClick={onLoad}>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={disabled || isLoading}
+          onClick={onLoad}
+        >
           {isLoading ? "Loading..." : "Load planned tasks"}
         </button>
       </div>

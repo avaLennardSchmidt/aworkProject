@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { endOfYear, format, isBefore, parseISO, startOfToday } from "date-fns";
+import {
+  endOfDay,
+  endOfYear,
+  format,
+  isBefore,
+  parseISO,
+  startOfToday,
+} from "date-fns";
 import { BackendClient } from "./services/backendClient";
 import { storeSessionTokenFromUrl } from "./services/backendClient";
 import { groupSchedules } from "./services/scheduleGrouping";
@@ -50,16 +57,14 @@ import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { BlockerOperationsPreviewModal } from "./components/BlockerOperationsPreviewModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
+import { UnscheduledTasksPanel } from "./components/UnscheduledTasksPanel";
 import {
   WorkflowChooser,
   type PlannerWorkflow,
 } from "./components/WorkflowChooser";
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
-import {
-  isAuthorizedForMultiEdit,
-  clearFeatureAccessCache,
-} from "./config/featureAccess";
+import { clearFeatureAccessCache } from "./config/featureAccess";
 
 const backendClient = new BackendClient();
 
@@ -107,6 +112,9 @@ function App() {
   const [projectTasksForCreate, setProjectTasksForCreate] = useState<
     AworkProjectTask[]
   >([]);
+  const [unscheduledTasks, setUnscheduledTasks] = useState<AworkProjectTask[]>(
+    [],
+  );
   const [hasLoadedSchedules, setHasLoadedSchedules] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ScheduleGroup>();
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(
@@ -129,8 +137,7 @@ function App() {
     hidePast: true,
     projectId: "",
   }));
-  const [isMultiEditAvailable, setIsMultiEditAvailable] = useState(false);
-  const [isCheckingFeatureAccess, setIsCheckingFeatureAccess] = useState(false);
+  const [isMultiEditAvailable] = useState(true);
   const isAnalysisRoute = isCapacityAnalysisRoute();
 
   useEffect(() => {
@@ -147,28 +154,6 @@ function App() {
     }
     void restoreBackendSession(params.get("aworkLogin") === "success");
   }, []);
-
-  useEffect(() => {
-    if (!currentUser) {
-      setIsMultiEditAvailable(false);
-      setIsCheckingFeatureAccess(false);
-      return;
-    }
-
-    void loadUserFeatureAccess();
-  }, [currentUser?.id]);
-
-  async function loadUserFeatureAccess() {
-    setIsCheckingFeatureAccess(true);
-    try {
-      const hasAccess = await isAuthorizedForMultiEdit();
-      setIsMultiEditAvailable(hasAccess);
-    } catch {
-      setIsMultiEditAvailable(false);
-    } finally {
-      setIsCheckingFeatureAccess(false);
-    }
-  }
 
   const plannerUser = useMemo(() => {
     if (!currentUser) return undefined;
@@ -201,14 +186,30 @@ function App() {
     if (!plannerUser) return [];
 
     const today = startOfToday();
+    const fromDate = parseISO(filters.from);
+    const toDate = endOfDay(parseISO(filters.to));
+
     return getPlannerSchedules(allSchedules, plannerUser).filter((schedule) => {
-      if (filters.hidePast && isBefore(parseISO(schedule.start), today))
+      const scheduleStart = parseISO(schedule.start);
+      const scheduleEnd = parseISO(schedule.end);
+
+      if (scheduleStart > toDate || scheduleEnd < fromDate) {
+        return false;
+      }
+      if (filters.hidePast && isBefore(scheduleEnd, today))
         return false;
       if (filters.projectId && schedule.projectId !== filters.projectId)
         return false;
       return true;
     });
-  }, [allSchedules, plannerUser, filters.hidePast, filters.projectId]);
+  }, [
+    allSchedules,
+    plannerUser,
+    filters.from,
+    filters.to,
+    filters.hidePast,
+    filters.projectId,
+  ]);
 
   const groups = useMemo(
     () => groupSchedules(filteredSchedules),
@@ -287,6 +288,7 @@ function App() {
     setAvailableProjects([]);
     setAvailableUsers([]);
     setProjectTasksForCreate([]);
+    setUnscheduledTasks([]);
     setHasLoadedSchedules(false);
     setSelectedGroup(undefined);
     setSelectedGroupIds(new Set());
@@ -304,8 +306,6 @@ function App() {
     setDeleteSuccess(undefined);
     setStatusMessage("Disconnected.");
     setError("");
-    setIsMultiEditAvailable(false);
-    setIsCheckingFeatureAccess(false);
   }
 
   async function loadSchedules(options: LoadSchedulesOptions = {}) {
@@ -335,21 +335,40 @@ function App() {
         mapProjectTasksResponse(projectTaskResponse),
         mapped.schedules,
       );
+      const scheduledTaskIds = new Set(mapped.schedules.map((schedule) => schedule.taskId));
+      const unscheduledAssignedTasks = projectTasks
+        .filter((task) => !scheduledTaskIds.has(task.id))
+        .filter((task) => isTaskActive(task))
+        .sort((a, b) => {
+          const projectOrder = (a.projectName ?? "").localeCompare(
+            b.projectName ?? "",
+          );
+          if (projectOrder !== 0) {
+            return projectOrder;
+          }
+
+          return (a.name ?? "").localeCompare(b.name ?? "");
+        });
       const enrichedSchedules = enrichSchedulesWithProjectTasks(
         mapped.schedules.map((schedule) => ({
           ...schedule,
-          userId: selectedPlannerUserId
-            ? (schedule.userId ?? plannerUser.id)
-            : schedule.userId,
+          userId: selectedPlannerUserId ? plannerUser.id : schedule.userId,
         })),
         projectTasks,
       );
       setAllSchedules(enrichedSchedules);
+      setUnscheduledTasks(unscheduledAssignedTasks);
       setSelectedGroupIds(new Set());
       setHasLoadedSchedules(true);
 
       if (mapped.schedules.length === 0) {
-        setStatusMessage("No planned blockers found for this date range.");
+        setStatusMessage(
+          mapped.warnings.length > 0
+            ? "awork returned schedules, but the app could not read their task, start, or end fields."
+            : unscheduledAssignedTasks.length > 0
+              ? `${unscheduledAssignedTasks.length} active awork tasks were found, but none have schedule blocks in this range.`
+              : "No planned blockers found for this date range.",
+        );
       }
     } catch (loadError) {
       setError(
@@ -715,8 +734,8 @@ function App() {
           backendClient={backendClient}
           currentUser={currentUser}
           isConnecting={isConnecting}
-          isAuthorized={isMultiEditAvailable}
-          isCheckingAccess={isCheckingFeatureAccess}
+          isAuthorized
+          isCheckingAccess={false}
           onLogin={handleLogin}
           onDisconnect={handleDisconnect}
         />
@@ -749,7 +768,7 @@ function App() {
         onDisconnect={handleDisconnect}
       />
 
-      {currentUser && isMultiEditAvailable ? (
+      {currentUser ? (
         <PlannerUserSelector
           currentUser={currentUser}
           selectedUserId={selectedPlannerUserId}
@@ -803,6 +822,10 @@ function App() {
               setDeleteResults(undefined);
             }}
             isMultiEditAvailable={isMultiEditAvailable}
+          />
+          <UnscheduledTasksPanel
+            tasks={unscheduledTasks}
+            hasLoaded={hasLoadedSchedules}
           />
         </>
       ) : workflow === "create" && plannerUser ? (
@@ -952,6 +975,11 @@ function App() {
 }
 
 export default App;
+
+function isTaskActive(task: AworkProjectTask): boolean {
+  const normalizedStatusType = task.statusType?.trim().toLowerCase();
+  return !normalizedStatusType || !["done", "completed", "closed"].includes(normalizedStatusType);
+}
 
 function getPlannerSchedules(
   schedules: AworkTaskSchedule[],
