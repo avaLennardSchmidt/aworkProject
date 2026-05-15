@@ -16,6 +16,7 @@ import {
 } from "date-fns";
 import { BackendClient, mapUser } from "../services/backendClient";
 import { fuzzyMatches } from "../services/fuzzySearch";
+import { isUserInPdsOrSimTeam } from "../services/teamFilter";
 import {
   mapProjectTaskResponse,
   mapProjectTasksResponse,
@@ -181,12 +182,6 @@ export function CapacityAnalysisPage({
   useEffect(() => {
     saveCapacityInputs(capacityInputs);
   }, [capacityInputs]);
-
-  useEffect(() => {
-    if (currentUser && isAuthorized && !hasLoaded && !isLoading) {
-      void loadAnalysis();
-    }
-  }, [currentUser?.id, isAuthorized, hasLoaded, isLoading]);
 
   const weekCount = useMemo(() => calculateWeekCount(from, to), [from, to]);
   const capacityWeeks = useMemo(() => buildCapacityWeeks(from, to), [from, to]);
@@ -521,6 +516,17 @@ export function CapacityAnalysisPage({
           </section>
 
           {isLoading ? <LoadingState label="Loading team capacity..." /> : null}
+
+          {!hasLoaded && !isLoading ? (
+            <section className="panel">
+              <div className="empty-state">
+                <p>
+                  Choose a date range and press Start analysis to load team
+                  capacity.
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           {hasLoaded ? (
             <>
@@ -1268,7 +1274,8 @@ function mapCapacityUsers(response: unknown): AworkUser[] {
         return null;
       }
     })
-    .filter((user): user is AworkUser => Boolean(user));
+    .filter((user): user is AworkUser => Boolean(user))
+    .filter(isUserInPdsOrSimTeam);
 }
 
 async function loadSchedulesForUsers(

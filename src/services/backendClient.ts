@@ -3,6 +3,7 @@ import type {
   CreateProjectTaskPayload,
   CreateTaskSchedulePayload,
 } from "../types/awork";
+import { isUserInPdsOrSimTeam } from "./teamFilter";
 
 const BACKEND_BASE_URL = (
   import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174"
@@ -98,6 +99,7 @@ export class BackendClient {
     return extractArray(response)
       .map(mapNullableUser)
       .filter((user): user is AworkUser => Boolean(user))
+      .filter(isUserInPdsOrSimTeam)
       .sort((a, b) => formatUserName(a).localeCompare(formatUserName(b)));
   }
 
