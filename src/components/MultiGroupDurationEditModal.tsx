@@ -26,17 +26,33 @@ interface MultiGroupDurationEditModalProps {
 }
 
 type Direction = "add" | "remove";
-type EditMode = "delta" | "set-window";
+type EditMode = "delta" | "shift" | "set-window";
 
 const editModeOptions = [
   { value: "delta", label: "Add or remove time" },
+  { value: "shift", label: "Move blockers" },
   { value: "set-window", label: "Set time frame" },
 ] as const;
 
-const directionOptions = [
+const durationDirectionOptions = [
   { value: "add", label: "Add time" },
   { value: "remove", label: "Remove time" },
 ] as const;
+
+const moveDirectionOptions = [
+  { value: "add", label: "Move up" },
+  { value: "remove", label: "Move down" },
+] as const;
+
+const weekdayOptions = [
+  { value: 1, label: "Monday" },
+  { value: 2, label: "Tuesday" },
+  { value: 3, label: "Wednesday" },
+  { value: 4, label: "Thursday" },
+  { value: 5, label: "Friday" },
+  { value: 6, label: "Saturday" },
+  { value: 0, label: "Sunday" },
+];
 
 export function MultiGroupDurationEditModal({
   groups,
@@ -58,6 +74,7 @@ export function MultiGroupDurationEditModal({
   );
   const [weekdayOverride, setWeekdayOverride] = useState("");
   const [error, setError] = useState("");
+
   const schedules = useMemo(
     () => groups.flatMap((group) => group.schedules),
     [groups],
@@ -68,13 +85,15 @@ export function MultiGroupDurationEditModal({
     0,
   );
   const deltaMinutes = buildDeltaMinutes(direction, days, hours, minutes);
+  const isDurationEditMode = editMode === "delta" || editMode === "shift";
+  const effectiveWeekdayOverride = editMode === "shift" ? "" : weekdayOverride;
   const totalAfterMinutes = schedules.reduce((sum, schedule) => {
     const updated = buildUpdatedSchedule(schedule, {
       editMode,
       deltaMinutes,
       windowStartTime,
       windowEndTime,
-      weekdayOverride,
+      weekdayOverride: effectiveWeekdayOverride,
     });
     if (!updated) {
       return sum;
@@ -98,7 +117,7 @@ export function MultiGroupDurationEditModal({
         deltaMinutes,
         windowStartTime,
         windowEndTime,
-        weekdayOverride,
+        weekdayOverride: effectiveWeekdayOverride,
       });
       if (!updated) {
         throw new Error("Invalid updated schedule values.");
@@ -149,8 +168,11 @@ export function MultiGroupDurationEditModal({
     if (schedules.some((schedule) => !isOwnSchedule(schedule, currentUser))) {
       return "Ownership could not be verified for every selected blocker.";
     }
-    if (editMode === "delta" && deltaMinutes === 0 && !weekdayOverride) {
-      return "Enter a duration to add/remove or choose a new weekday.";
+
+    if (isDurationEditMode && deltaMinutes === 0 && !effectiveWeekdayOverride) {
+      return editMode === "shift"
+        ? "Enter a time offset to move blockers."
+        : "Enter a duration to add/remove or choose a new weekday.";
     }
 
     if (
@@ -172,7 +194,7 @@ export function MultiGroupDurationEditModal({
           deltaMinutes,
           windowStartTime,
           windowEndTime,
-          weekdayOverride,
+          weekdayOverride: effectiveWeekdayOverride,
         });
         if (!updated) {
           return true;
@@ -187,8 +209,11 @@ export function MultiGroupDurationEditModal({
         return "New start time must be before new end time.";
       }
 
-      return "Removing that much time would make at least one blocker end before it starts.";
+      return editMode === "shift"
+        ? "Moving these blockers produced an invalid time range."
+        : "Removing that much time would make at least one blocker end before it starts.";
     }
+
     return "";
   }
 
@@ -234,6 +259,11 @@ export function MultiGroupDurationEditModal({
               {deltaMinutes >= 0 ? "+" : ""}
               {formatMinutesAsHours(deltaMinutes)} per blocker
             </span>
+          ) : editMode === "shift" ? (
+            <span>
+              {direction === "add" ? "Move up" : "Move down"}{" "}
+              {formatMinutesAsHours(Math.abs(deltaMinutes))} per blocker
+            </span>
           ) : (
             <span>
               {windowStartTime}-{windowEndTime} per blocker
@@ -251,22 +281,30 @@ export function MultiGroupDurationEditModal({
                 value={editMode}
                 options={[...editModeOptions]}
                 placeholder="Select mode"
-                searchPlaceholder="Filter modes (2 found)"
+                searchPlaceholder="Filter modes (3 found)"
                 emptyLabel="No mode found."
                 menuWidth="compact"
                 onChange={(value) => setEditMode(value as EditMode)}
               />
             </div>
 
-            {editMode === "delta" ? (
+            {isDurationEditMode ? (
               <div className="form-row">
                 <label htmlFor="multi-direction">Change</label>
                 <SearchableSelect
                   buttonId="multi-direction"
                   value={direction}
-                  options={[...directionOptions]}
+                  options={[
+                    ...(editMode === "shift"
+                      ? moveDirectionOptions
+                      : durationDirectionOptions),
+                  ]}
                   placeholder="Select change"
-                  searchPlaceholder="Filter changes (2 found)"
+                  searchPlaceholder={
+                    editMode === "shift"
+                      ? "Filter move directions (2 found)"
+                      : "Filter changes (2 found)"
+                  }
                   emptyLabel="No change found."
                   menuWidth="compact"
                   onChange={(value) => setDirection(value as Direction)}
@@ -296,7 +334,7 @@ export function MultiGroupDurationEditModal({
             )}
           </div>
 
-          {editMode === "delta" ? (
+          {isDurationEditMode ? (
             <div className="multi-edit-row multi-edit-row-duration">
               <div className="form-row">
                 <label htmlFor="multi-days">Days</label>
@@ -335,30 +373,32 @@ export function MultiGroupDurationEditModal({
             </div>
           ) : null}
 
-          <div className="multi-edit-row multi-edit-row-weekday">
-            <div className="form-row">
-              <label htmlFor="multi-weekday">New weekday</label>
-              <SearchableSelect
-                buttonId="multi-weekday"
-                value={weekdayOverride}
-                options={[
-                  { value: "", label: "Keep current weekdays" },
-                  ...weekdayOptions.map((day) => ({
-                    value: String(day.value),
-                    label: day.label,
-                  })),
-                ]}
-                placeholder="Select weekday"
-                searchPlaceholder="Filter weekdays (8 found)"
-                emptyLabel="No weekday found."
-                menuWidth="compact"
-                onChange={setWeekdayOverride}
-              />
+          {editMode !== "shift" ? (
+            <div className="multi-edit-row multi-edit-row-weekday">
+              <div className="form-row">
+                <label htmlFor="multi-weekday">New weekday</label>
+                <SearchableSelect
+                  buttonId="multi-weekday"
+                  value={weekdayOverride}
+                  options={[
+                    { value: "", label: "Keep current weekdays" },
+                    ...weekdayOptions.map((day) => ({
+                      value: String(day.value),
+                      label: day.label,
+                    })),
+                  ]}
+                  placeholder="Select weekday"
+                  searchPlaceholder="Filter weekdays (8 found)"
+                  emptyLabel="No weekday found."
+                  menuWidth="compact"
+                  onChange={setWeekdayOverride}
+                />
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
-        {weekdayOverride ? (
+        {effectiveWeekdayOverride ? (
           <p className="modal-note">
             All selected blockers will be moved to the same weekday.
           </p>
@@ -390,16 +430,6 @@ export function MultiGroupDurationEditModal({
   );
 }
 
-const weekdayOptions = [
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-  { value: 0, label: "Sunday" },
-];
-
 function buildDeltaMinutes(
   direction: Direction,
   days: string,
@@ -430,6 +460,15 @@ function buildUpdatedSchedule(
     let newEndIso = schedule.end;
 
     if (options.editMode === "delta") {
+      newEndIso = format(
+        addMinutes(parseISO(schedule.end), options.deltaMinutes),
+        "yyyy-MM-dd'T'HH:mm:ssxxx",
+      );
+    } else if (options.editMode === "shift") {
+      newStartIso = format(
+        addMinutes(parseISO(schedule.start), options.deltaMinutes),
+        "yyyy-MM-dd'T'HH:mm:ssxxx",
+      );
       newEndIso = format(
         addMinutes(parseISO(schedule.end), options.deltaMinutes),
         "yyyy-MM-dd'T'HH:mm:ssxxx",
