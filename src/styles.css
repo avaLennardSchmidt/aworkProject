@@ -651,8 +651,9 @@ select:disabled {
 .searchable-select-options {
   display: grid;
   gap: 4px;
-  max-height: 280px;
+  max-height: var(--searchable-select-options-max-height, 280px);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .searchable-select-options button {

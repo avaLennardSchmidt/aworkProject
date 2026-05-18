@@ -9,6 +9,7 @@ import {
   getTimeHHmm,
 } from "../services/scheduleTimeCalculator";
 import { isOwnSchedule } from "../services/scheduleMapper";
+import { SearchableSelect } from "./SearchableSelect";
 
 interface BulkEditModalProps {
   group: ScheduleGroup;
@@ -108,13 +109,19 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
         <div className="filter-grid">
           <div className="form-row">
             <label htmlFor="new-weekday">New weekday</label>
-            <select id="new-weekday" value={newWeekday} onChange={(event) => setNewWeekday(event.target.value)}>
-              {weekdayOptions.map((day) => (
-                <option key={day.value} value={day.value}>
-                  {day.label}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              buttonId="new-weekday"
+              value={newWeekday}
+              options={weekdayOptions.map((day) => ({
+                value: String(day.value),
+                label: day.label,
+              }))}
+              placeholder="Select weekday"
+              searchPlaceholder="Filter weekdays (7 found)"
+              emptyLabel="No weekday found."
+              menuWidth="compact"
+              onChange={setNewWeekday}
+            />
           </div>
           <div className="form-row">
             <label htmlFor="new-start">New start time</label>

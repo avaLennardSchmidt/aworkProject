@@ -1,4 +1,11 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+  type WheelEvent,
+} from "react";
 import { fuzzyMatches } from "../services/fuzzySearch";
 
 export interface SelectOption {
@@ -33,6 +40,11 @@ interface MultiSearchableSelectProps {
 
 type DropdownDirection = "down" | "up";
 
+interface DropdownLayout {
+  direction: DropdownDirection;
+  optionsMaxHeight?: number;
+}
+
 export function SearchableSelect({
   buttonId,
   value,
@@ -49,15 +61,20 @@ export function SearchableSelect({
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
   const selectedOption = options.find((option) => option.value === value);
   const filteredOptions = options.filter((option) =>
     fuzzyMatches(option.label, query),
   );
-  const menuDirection = useDropdownDirection(isOpen, containerRef, menuRef);
+  const layout = useDropdownLayout(isOpen, containerRef, menuRef, optionsRef);
 
   function close() {
     setIsOpen(false);
     setQuery("");
+  }
+
+  function handleMenuWheel(event: WheelEvent<HTMLDivElement>) {
+    containWheelScroll(event, optionsRef.current);
   }
 
   return (
@@ -91,7 +108,15 @@ export function SearchableSelect({
         <div
           ref={menuRef}
           className={`searchable-select-menu${menuWidth === "compact" ? " searchable-select-menu-compact" : ""}`}
-          data-direction={menuDirection}
+          data-direction={layout.direction}
+          onWheelCapture={handleMenuWheel}
+          style={
+            layout.optionsMaxHeight
+              ? ({
+                  "--searchable-select-options-max-height": `${layout.optionsMaxHeight}px`,
+                } as CSSProperties)
+              : undefined
+          }
         >
           <input
             type="search"
@@ -100,7 +125,11 @@ export function SearchableSelect({
             autoFocus
             onChange={(event) => setQuery(event.target.value)}
           />
-          <div className="searchable-select-options" role="listbox">
+          <div
+            ref={optionsRef}
+            className="searchable-select-options"
+            role="listbox"
+          >
             {filteredOptions.map((option) => (
               <button
                 key={option.value}
@@ -142,16 +171,21 @@ export function MultiSearchableSelect({
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
   const selectedValues = new Set(values);
   const filteredOptions = options.filter((option) =>
     fuzzyMatches(option.label, query),
   );
   const selectedCount = values.length;
-  const menuDirection = useDropdownDirection(isOpen, containerRef, menuRef);
+  const layout = useDropdownLayout(isOpen, containerRef, menuRef, optionsRef);
 
   function close() {
     setIsOpen(false);
     setQuery("");
+  }
+
+  function handleMenuWheel(event: WheelEvent<HTMLDivElement>) {
+    containWheelScroll(event, optionsRef.current);
   }
 
   function toggleOption(value: string) {
@@ -212,7 +246,15 @@ export function MultiSearchableSelect({
         <div
           ref={menuRef}
           className={`searchable-select-menu${menuWidth === "compact" ? " searchable-select-menu-compact" : ""}`}
-          data-direction={menuDirection}
+          data-direction={layout.direction}
+          onWheelCapture={handleMenuWheel}
+          style={
+            layout.optionsMaxHeight
+              ? ({
+                  "--searchable-select-options-max-height": `${layout.optionsMaxHeight}px`,
+                } as CSSProperties)
+              : undefined
+          }
         >
           <input
             type="search"
@@ -232,6 +274,7 @@ export function MultiSearchableSelect({
             </button>
           </div>
           <div
+            ref={optionsRef}
             className="searchable-select-options"
             role="listbox"
             aria-multiselectable="true"
@@ -263,45 +306,158 @@ export function formatSearchPlaceholder(label: string, count: number): string {
   return `${label} (${count} found)`;
 }
 
-function useDropdownDirection(
+function useDropdownLayout(
   isOpen: boolean,
   containerRef: RefObject<HTMLDivElement | null>,
   menuRef: RefObject<HTMLDivElement | null>,
-): DropdownDirection {
-  const [direction, setDirection] = useState<DropdownDirection>("down");
+  optionsRef: RefObject<HTMLDivElement | null>,
+): DropdownLayout {
+  const [layout, setLayout] = useState<DropdownLayout>({ direction: "down" });
 
   useLayoutEffect(() => {
     if (!isOpen) {
-      setDirection("down");
+      setLayout({ direction: "down" });
       return;
     }
 
-    function updateDirection() {
+    const boundaryParent = containerRef.current
+      ? findDropdownBoundaryParent(containerRef.current)
+      : null;
+    const scrollParent = containerRef.current
+      ? findScrollParent(containerRef.current)
+      : null;
+
+    function updateLayout() {
       const container = containerRef.current;
       const menu = menuRef.current;
-      if (!container || !menu) {
+      const options = optionsRef.current;
+      if (!container || !menu || !options) {
         return;
       }
 
+      const boundaryRect = getDropdownBoundaryRect(container, boundaryParent);
       const containerRect = container.getBoundingClientRect();
       const menuRect = menu.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - containerRect.bottom - 12;
-      const spaceAbove = containerRect.top - 12;
+      const optionsRect = options.getBoundingClientRect();
+      const spaceBelow = boundaryRect.bottom - containerRect.bottom - 12;
+      const spaceAbove = containerRect.top - boundaryRect.top - 12;
       const shouldOpenUp =
         spaceBelow < menuRect.height && spaceAbove > spaceBelow;
+      const menuChromeHeight = Math.max(0, menuRect.height - optionsRect.height);
+      const availableOptionsHeight = Math.max(
+        120,
+        (shouldOpenUp ? spaceAbove : spaceBelow) - menuChromeHeight,
+      );
 
-      setDirection(shouldOpenUp ? "up" : "down");
+      setLayout({
+        direction: shouldOpenUp ? "up" : "down",
+        optionsMaxHeight: Math.min(280, availableOptionsHeight),
+      });
     }
 
-    updateDirection();
-    window.addEventListener("resize", updateDirection);
-    document.addEventListener("scroll", updateDirection, true);
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    window.addEventListener("scroll", updateLayout, true);
+    scrollParent?.addEventListener("scroll", updateLayout);
 
     return () => {
-      window.removeEventListener("resize", updateDirection);
-      document.removeEventListener("scroll", updateDirection, true);
+      window.removeEventListener("resize", updateLayout);
+      window.removeEventListener("scroll", updateLayout, true);
+      scrollParent?.removeEventListener("scroll", updateLayout);
     };
-  }, [isOpen, containerRef, menuRef]);
+  }, [isOpen, containerRef, menuRef, optionsRef]);
 
-  return direction;
+  return layout;
+}
+
+function getDropdownBoundaryRect(
+  container: HTMLDivElement,
+  boundaryParent?: HTMLElement | null,
+): {
+  top: number;
+  bottom: number;
+} {
+  const boundaryElement =
+    boundaryParent ?? findDropdownBoundaryParent(container);
+  if (!boundaryElement) {
+    return { top: 0, bottom: window.innerHeight };
+  }
+
+  const rect = boundaryElement.getBoundingClientRect();
+  return {
+    top: Math.max(0, rect.top),
+    bottom: Math.min(window.innerHeight, rect.bottom),
+  };
+}
+
+function findDropdownBoundaryParent(element: HTMLElement): HTMLElement | null {
+  let current = element.parentElement;
+
+  while (current) {
+    const styles = window.getComputedStyle(current);
+    const overflowY = styles.overflowY;
+    const overflow = styles.overflow;
+    const createsBoundary =
+      overflowY === "auto" ||
+      overflowY === "scroll" ||
+      overflowY === "hidden" ||
+      overflowY === "overlay" ||
+      overflow === "hidden";
+
+    if (createsBoundary) {
+      return current;
+    }
+
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
+function findScrollParent(element: HTMLElement): HTMLElement | null {
+  let current = element.parentElement;
+
+  while (current) {
+    const styles = window.getComputedStyle(current);
+    const overflowY = styles.overflowY;
+    const isScrollable =
+      (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+      current.scrollHeight > current.clientHeight;
+
+    if (isScrollable) {
+      return current;
+    }
+
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
+function containWheelScroll(
+  event: WheelEvent<HTMLDivElement>,
+  scrollElement: HTMLDivElement | null,
+): void {
+  if (!scrollElement) {
+    event.stopPropagation();
+    return;
+  }
+
+  const { deltaY } = event;
+  if (deltaY === 0) {
+    event.stopPropagation();
+    return;
+  }
+
+  const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+  const atTop = scrollTop <= 0;
+  const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+  scrollElement.scrollTop += deltaY;
+  event.preventDefault();
+  event.stopPropagation();
+
+  if ((deltaY < 0 && atTop) || (deltaY > 0 && atBottom)) {
+    scrollElement.scrollTop = deltaY < 0 ? 0 : scrollHeight;
+  }
 }
