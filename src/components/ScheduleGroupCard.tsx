@@ -12,7 +12,7 @@ export function ScheduleGroupCard({ group, onChangeTimeWindow }: ScheduleGroupCa
       <div className="group-main">
         <div>
           <h3>{group.taskName}</h3>
-          <p>{group.projectName ?? "No project in schedule response"}</p>
+          <p>{group.projectName ?? "Kein Projekt im Blocker"}</p>
         </div>
         <div className="time-window">
           {group.weekdayLabel} {group.startTime}-{group.endTime}
@@ -21,25 +21,25 @@ export function ScheduleGroupCard({ group, onChangeTimeWindow }: ScheduleGroupCa
 
       <dl className="stats-grid">
         <div>
-          <dt>Blockers</dt>
+          <dt>Blocker</dt>
           <dd>{group.schedules.length}</dd>
         </div>
         <div>
-          <dt>Total</dt>
+          <dt>Gesamt</dt>
           <dd>{formatMinutesAsHours(group.totalMinutes)}</dd>
         </div>
         <div>
-          <dt>First</dt>
+          <dt>Erster</dt>
           <dd>{group.firstDate}</dd>
         </div>
         <div>
-          <dt>Last</dt>
+          <dt>Letzter</dt>
           <dd>{group.lastDate}</dd>
         </div>
       </dl>
 
       <button type="button" className="secondary-button" onClick={() => onChangeTimeWindow(group)}>
-        Change time window
+        Zeitfenster ändern
       </button>
     </article>
   );

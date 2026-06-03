@@ -25,7 +25,7 @@ export function BackendStatusIndicator({
   return (
     <div className="backend-startup-indicator">
       <div className="spinner"></div>
-      <p>Backend is starting up, please wait...</p>
+      <p>Backend startet, bitte warten...</p>
     </div>
   );
 }

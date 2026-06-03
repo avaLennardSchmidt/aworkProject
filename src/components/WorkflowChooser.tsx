@@ -11,14 +11,14 @@ export function WorkflowChooser({ value, disabled, onChange }: WorkflowChooserPr
     <section className="panel workflow-panel">
       <div>
         <p className="eyebrow">Workflow</p>
-        <h2>What do you want to do?</h2>
+        <h2>Was möchtest du tun?</h2>
       </div>
       <div className="workflow-toggle" role="tablist" aria-label="Planner workflow">
         <button type="button" className={value === "manage" ? "active" : ""} disabled={disabled} onClick={() => onChange("manage")}>
-          Manage existing groups
+          Bestehende Gruppen verwalten
         </button>
         <button type="button" className={value === "create" ? "active" : ""} disabled={disabled} onClick={() => onChange("create")}>
-          Create new group
+          Neue Gruppe anlegen
         </button>
       </div>
     </section>

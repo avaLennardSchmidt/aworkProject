@@ -14,9 +14,9 @@ export function ManualEditConfirmModal({ group, onBack, onCancel, onConfirm }: M
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="manual-confirm-title">
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Manual edit</p>
-            <h2 id="manual-confirm-title">Edit {group.schedules.length} blockers individually?</h2>
-            <p>{group.taskName} · {group.projectName ?? "Project not resolved"}</p>
+            <p className="eyebrow">Manuelle Bearbeitung</p>
+            <h2 id="manual-confirm-title">{group.schedules.length} Blocker einzeln bearbeiten?</h2>
+            <p>{group.taskName} · {group.projectName ?? "Projekt nicht aufgelöst"}</p>
           </div>
           <button type="button" className="icon-button" aria-label="Close" onClick={onCancel}>
             x
@@ -25,23 +25,23 @@ export function ManualEditConfirmModal({ group, onBack, onCancel, onConfirm }: M
 
         <div className="preview-summary">
           <span>{group.weekdayLabel} {group.startTime}-{group.endTime}</span>
-          <span>{group.schedules.length} blockers</span>
-          <span>{formatMinutesAsHours(group.totalMinutes)} before</span>
+          <span>{group.schedules.length} Blocker</span>
+          <span>{formatMinutesAsHours(group.totalMinutes)} vorher</span>
         </div>
 
         <div className="alert alert-warning">
-          You are switching from bulk editing to manual editing. Every blocker will be listed, but only rows where you change the time will be updated.
+          Du wechselst von der Gruppenbearbeitung zur manuellen Bearbeitung. Alle Blocker werden angezeigt, aber nur geänderte Zeilen werden aktualisiert.
         </div>
 
         <div className="modal-actions">
           <button type="button" className="ghost-button" onClick={onBack}>
-            Back
+            Zurück
           </button>
           <button type="button" className="ghost-button" onClick={onCancel}>
-            Cancel
+            Abbrechen
           </button>
           <button type="button" className="primary-button" onClick={onConfirm}>
-            Edit blockers manually
+            Blocker manuell bearbeiten
           </button>
         </div>
       </div>

@@ -35,8 +35,8 @@ export function FilterPanel({
   onLoad,
 }: FilterPanelProps) {
   const projectPlaceholder = hasLoadedSchedules
-    ? "No project data in schedules"
-    : "Load tasks first";
+    ? "Keine Projektdaten vorhanden"
+    : "Erst Aufgaben laden";
 
   function applyDatePreset(
     preset: "this-month" | "next-4-weeks" | "this-quarter" | "this-year",
@@ -77,13 +77,13 @@ export function FilterPanel({
   return (
     <section className="panel">
       <div>
-        <p className="eyebrow">Filters</p>
-        <h2>Load planned task blockers</h2>
+        <p className="eyebrow">Filter</p>
+        <h2>Geplante Blocker laden</h2>
       </div>
 
       <div className="filter-grid">
         <div className="form-row">
-          <label htmlFor="date-from">From</label>
+          <label htmlFor="date-from">Von</label>
           <input
             id="date-from"
             type="date"
@@ -95,7 +95,7 @@ export function FilterPanel({
           />
         </div>
         <div className="form-row">
-          <label htmlFor="date-to">To</label>
+          <label htmlFor="date-to">Bis</label>
           <input
             id="date-to"
             type="date"
@@ -107,7 +107,7 @@ export function FilterPanel({
           />
         </div>
         <div className="form-row project-filter-row">
-          <label htmlFor="project-filter">Project</label>
+          <label htmlFor="project-filter">Projekt</label>
           <select
             id="project-filter"
             value={filters.projectId}
@@ -117,7 +117,7 @@ export function FilterPanel({
             }
           >
             <option value="">
-              {projectOptions.length > 0 ? "All projects" : projectPlaceholder}
+              {projectOptions.length > 0 ? "Alle Projekte" : projectPlaceholder}
             </option>
             {projectOptions.map((project) => (
               <option key={project.id} value={project.id}>
@@ -135,7 +135,7 @@ export function FilterPanel({
           disabled={disabled}
           onClick={() => applyDatePreset("this-month")}
         >
-          This month
+          Diesen Monat
         </button>
         <button
           type="button"
@@ -143,7 +143,7 @@ export function FilterPanel({
           disabled={disabled}
           onClick={() => applyDatePreset("next-4-weeks")}
         >
-          Next 4 weeks
+          Nächste 4 Wochen
         </button>
         <button
           type="button"
@@ -151,7 +151,7 @@ export function FilterPanel({
           disabled={disabled}
           onClick={() => applyDatePreset("this-quarter")}
         >
-          This quarter
+          Dieses Quartal
         </button>
         <button
           type="button"
@@ -159,7 +159,7 @@ export function FilterPanel({
           disabled={disabled}
           onClick={() => applyDatePreset("this-year")}
         >
-          This year
+          Dieses Jahr
         </button>
       </div>
 
@@ -173,7 +173,18 @@ export function FilterPanel({
               onChange({ ...filters, hidePast: event.target.checked })
             }
           />
-          Hide past blockers
+          Vergangene Blocker ausblenden
+        </label>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={filters.onlyAssigned}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange({ ...filters, onlyAssigned: event.target.checked })
+            }
+          />
+          Nur mir zugewiesene Aufgaben
         </label>
         <button
           type="button"
@@ -181,7 +192,7 @@ export function FilterPanel({
           disabled={disabled || isLoading}
           onClick={onLoad}
         >
-          {isLoading ? "Loading..." : "Load planned tasks"}
+          {isLoading ? "Lädt..." : "Blocker laden"}
         </button>
       </div>
     </section>

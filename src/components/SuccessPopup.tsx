@@ -14,7 +14,7 @@ export function SuccessPopup({ title, message, detail, onClose }: SuccessPopupPr
         <p>{message}</p>
         {detail ? <span>{detail}</span> : null}
         <button type="button" className="primary-button" onClick={onClose}>
-          Nice
+          Super
         </button>
       </section>
     </div>

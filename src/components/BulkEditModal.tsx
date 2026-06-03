@@ -59,11 +59,11 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
 
   function validate(): string {
     if (group.schedules.length === 0) {
-      return "This group has no schedules to edit.";
+      return "Diese Gruppe hat keine Blocker.";
     }
 
     if (group.schedules.some((schedule) => !isOwnSchedule(schedule, currentUser))) {
-      return "Ownership could not be verified for every schedule in this group.";
+      return "Berechtigung konnte nicht für jeden Blocker geprüft werden.";
     }
 
     if (
@@ -71,16 +71,16 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
         (schedule) => getTimeHHmm(schedule.start) !== group.startTime || getTimeHHmm(schedule.end) !== group.endTime,
       )
     ) {
-      return "This group contains mixed original time windows and cannot be edited safely.";
+      return "Die Gruppe hat unterschiedliche Zeitfenster und kann nicht sicher bearbeitet werden.";
     }
 
     const sample = safeBuildWindow(() => buildUpdatedTimeWindowOnWeekday(group.schedules[0], newStartTime, newEndTime, Number(newWeekday)));
     if (!sample) {
-      return "Enter a valid weekday, start time, and end time.";
+      return "Gültige Werte für Wochentag, Start- und Endzeit eingeben.";
     }
 
     if (calculateDurationMinutes(sample.newStartIso, sample.newEndIso) <= 0) {
-      return "New start time must be before new end time.";
+      return "Die neue Startzeit muss vor der neuen Endzeit liegen.";
     }
 
     return "";
@@ -91,9 +91,9 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="bulk-edit-title">
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Bulk edit</p>
+            <p className="eyebrow">Gruppen-Bearbeitung</p>
             <h2 id="bulk-edit-title">{group.taskName}</h2>
-            <p>{group.projectName ?? "No project in schedule response"}</p>
+            <p>{group.projectName ?? "Kein Projekt im Blocker"}</p>
           </div>
           <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
             x
@@ -108,7 +108,7 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
 
         <div className="filter-grid">
           <div className="form-row">
-            <label htmlFor="new-weekday">New weekday</label>
+            <label htmlFor="new-weekday">Neuer Wochentag</label>
             <SearchableSelect
               buttonId="new-weekday"
               value={newWeekday}
@@ -116,38 +116,38 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
                 value: String(day.value),
                 label: day.label,
               }))}
-              placeholder="Select weekday"
-              searchPlaceholder="Filter weekdays (7 found)"
-              emptyLabel="No weekday found."
+              placeholder="Wochentag auswählen"
+              searchPlaceholder="Wochentage filtern (7 gefunden)"
+              emptyLabel="Kein Wochentag gefunden."
               menuWidth="compact"
               onChange={setNewWeekday}
             />
           </div>
           <div className="form-row">
-            <label htmlFor="new-start">New start time</label>
+            <label htmlFor="new-start">Neue Startzeit</label>
             <input id="new-start" type="time" value={newStartTime} onChange={(event) => setNewStartTime(event.target.value)} />
           </div>
           <div className="form-row">
-            <label htmlFor="new-end">New end time</label>
+            <label htmlFor="new-end">Neue Endzeit</label>
             <input id="new-end" type="time" value={newEndTime} onChange={(event) => setNewEndTime(event.target.value)} />
           </div>
         </div>
 
-        <div className="computed-window">New pattern: {computedWindow}</div>
+        <div className="computed-window">Neues Muster: {computedWindow}</div>
         {error ? <div className="alert alert-error">{error}</div> : null}
 
         <div className="modal-actions modal-actions-split">
           <div className="modal-actions-left">
             <button type="button" className="manual-edit-button" onClick={() => onManualEditRequest(group)}>
-              Manual edit
+              Manuelle Bearbeitung
             </button>
           </div>
           <div className="modal-actions-right">
             <button type="button" className="ghost-button" onClick={onClose}>
-              Cancel
+              Abbrechen
             </button>
             <button type="button" className="primary-button" onClick={handlePreview}>
-              Preview changes
+              Änderungen vorschauen
             </button>
           </div>
         </div>
@@ -157,13 +157,13 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
 }
 
 const weekdayOptions = [
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-  { value: 0, label: "Sunday" },
+  { value: 1, label: "Montag" },
+  { value: 2, label: "Dienstag" },
+  { value: 3, label: "Mittwoch" },
+  { value: 4, label: "Donnerstag" },
+  { value: 5, label: "Freitag" },
+  { value: 6, label: "Samstag" },
+  { value: 0, label: "Sonntag" },
 ];
 
 function safeBuildWindow(build: () => { newStartIso: string; newEndIso: string }) {

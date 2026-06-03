@@ -26,12 +26,12 @@ export function ConnectionPanel({
     <section className={`panel connection-panel ${isCollapsed ? "is-collapsed" : ""}`}>
       <div className="connection-heading">
         <div>
-          <p className="eyebrow">Connection</p>
-          <h2>{currentUser ? `Connected as ${displayName}` : "Connect your awork account"}</h2>
+          <p className="eyebrow">Verbindung</p>
+          <h2>{currentUser ? `Verbunden als ${displayName}` : "Mit awork verbinden"}</h2>
           {!isCollapsed ? (
             <p className="section-copy">
-              Sign in through awork OAuth. Tokens stay in the local backend, and the
-              browser only receives a local session cookie.
+              Anmeldung über awork OAuth. Tokens bleiben im lokalen Backend, der
+              Browser erhält nur ein lokales Session-Cookie.
             </p>
           ) : null}
         </div>
@@ -41,7 +41,7 @@ export function ConnectionPanel({
             className="ghost-button connection-toggle-button"
             onClick={() => setIsExpanded((expanded) => !expanded)}
           >
-            {isExpanded ? "Collapse" : "Show connection"}
+            {isExpanded ? "Einklappen" : "Verbindung anzeigen"}
           </button>
         ) : null}
       </div>
@@ -53,25 +53,25 @@ export function ConnectionPanel({
           disabled={isConnecting}
           onClick={onLogin}
         >
-          {isConnecting ? "Checking connection..." : "Sign in with awork"}
+          {isConnecting ? "Verbindung wird geprüft..." : "Mit awork anmelden"}
         </button>
       ) : null}
 
       {currentUser && !isCollapsed ? (
         <div className="connection-success">
           <div>
-            <strong>Connected as {displayName}</strong>
+            <strong>Verbunden als {displayName}</strong>
             {currentUser.email ? <span>{currentUser.email}</span> : null}
-            <span>User ID: {currentUser.id}</span>
+            <span>Nutzer-ID: {currentUser.id}</span>
           </div>
           <button type="button" className="ghost-button" onClick={onDisconnect}>
-            Disconnect
+            Trennen
           </button>
         </div>
       ) : null}
 
       {!isCollapsed ? <div className="alert alert-info">
-        Planner actions use the selected planner user. The OAuth session stays tied to the connected awork account.
+        Planner-Aktionen nutzen den ausgewählten Planner-Nutzer. Die OAuth-Session bleibt mit dem verbundenen awork-Account verknüpft.
       </div> : null}
     </section>
   );

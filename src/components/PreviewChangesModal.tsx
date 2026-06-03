@@ -28,8 +28,8 @@ export function PreviewChangesModal({
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="preview-title">
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Preview</p>
-            <h2 id="preview-title">{changes.length} blockers will be changed</h2>
+            <p className="eyebrow">Vorschau</p>
+            <h2 id="preview-title">{changes.length} Blocker werden geändert</h2>
           </div>
           <button type="button" className="icon-button" aria-label="Close" onClick={onCancel}>
             x
@@ -37,9 +37,9 @@ export function PreviewChangesModal({
         </div>
 
         <div className="preview-summary">
-          <span>Total before: {formatMinutesAsHours(totalBefore)}</span>
-          <span>Total after: {formatMinutesAsHours(totalAfter)}</span>
-          <span>Difference: {formatMinutesAsHours(totalAfter - totalBefore)}</span>
+          <span>Gesamt vorher: {formatMinutesAsHours(totalBefore)}</span>
+          <span>Gesamt nachher: {formatMinutesAsHours(totalAfter)}</span>
+          <span>Differenz: {formatMinutesAsHours(totalAfter - totalBefore)}</span>
         </div>
 
         <div className="preview-list">
@@ -47,7 +47,7 @@ export function PreviewChangesModal({
             <div key={change.schedule.id} className="preview-row">
               <span>{formatPreviewDate(change.dateLabel, change.newDateLabel)}</span>
               <strong>
-                {change.oldStart}-{change.oldEnd} to {change.newStart}-{change.newEnd}
+                {change.oldStart}-{change.oldEnd} auf {change.newStart}-{change.newEnd}
               </strong>
             </div>
           ))}
@@ -55,7 +55,7 @@ export function PreviewChangesModal({
 
         {updateResults ? (
           <div className={failureCount > 0 ? "alert alert-error" : "alert alert-success"}>
-            {successCount} updates succeeded. {failureCount} updates failed.
+            {successCount} Aktualisierungen erfolgreich. {failureCount} fehlgeschlagen.
           </div>
         ) : null}
 
@@ -74,13 +74,13 @@ export function PreviewChangesModal({
 
         <div className="modal-actions">
           <button type="button" className="ghost-button" disabled={isUpdating || Boolean(updateResults)} onClick={onBack}>
-            Back
+            Zurück
           </button>
           <button type="button" className="ghost-button" disabled={isUpdating} onClick={onCancel}>
-            Close
+            Schließen
           </button>
           <button type="button" className="primary-button" disabled={isUpdating || Boolean(updateResults)} onClick={onApply}>
-            {isUpdating ? "Applying..." : "Apply changes"}
+            {isUpdating ? "Übernehmen..." : "Änderungen übernehmen"}
           </button>
         </div>
       </div>
@@ -93,5 +93,5 @@ function formatPreviewDate(oldDateLabel: string, newDateLabel?: string): string 
     return oldDateLabel;
   }
 
-  return `${oldDateLabel} to ${newDateLabel}`;
+  return `${oldDateLabel} bis ${newDateLabel}`;
 }

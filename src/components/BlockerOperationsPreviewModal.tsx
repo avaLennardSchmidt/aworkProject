@@ -27,18 +27,18 @@ export function BlockerOperationsPreviewModal({ operations, isApplying, results,
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="operations-preview-title">
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Preview</p>
-            <h2 id="operations-preview-title">{operations.length} blocker operation{operations.length === 1 ? "" : "s"}</h2>
+            <p className="eyebrow">Vorschau</p>
+            <h2 id="operations-preview-title">{operations.length} Blocker-Operation{operations.length === 1 ? "" : "en"}</h2>
           </div>
           <button type="button" className="icon-button" aria-label="Close" onClick={onCancel}>x</button>
         </div>
 
         <div className="preview-summary">
-          <span>{updateCount} update</span>
-          <span>{createCount} add</span>
-          <span>{deleteCount} unplan</span>
-          <span>Before: {formatMinutesAsHours(beforeMinutes)}</span>
-          <span>After: {formatMinutesAsHours(afterMinutes)}</span>
+          <span>{updateCount} Aktualisierung{updateCount === 1 ? "" : "en"}</span>
+          <span>{createCount} Hinzufügung{createCount === 1 ? "" : "en"}</span>
+          <span>{deleteCount} Ausplanung{deleteCount === 1 ? "" : "en"}</span>
+          <span>Vorher: {formatMinutesAsHours(beforeMinutes)}</span>
+          <span>Nachher: {formatMinutesAsHours(afterMinutes)}</span>
         </div>
 
         <div className="preview-list">
@@ -50,7 +50,7 @@ export function BlockerOperationsPreviewModal({ operations, isApplying, results,
           ))}
         </div>
 
-        {results ? <div className={failureCount > 0 ? "alert alert-error" : "alert alert-success"}>{successCount} succeeded. {failureCount} failed.</div> : null}
+        {results ? <div className={failureCount > 0 ? "alert alert-error" : "alert alert-success"}>{successCount} erfolgreich. {failureCount} fehlgeschlagen.</div> : null}
         {results && failureCount > 0 ? (
           <ul className="failure-list">
             {results.filter((result) => !result.success).slice(0, 8).map((result) => <li key={result.operationId}>{result.kind}: {result.error}</li>)}
@@ -58,9 +58,9 @@ export function BlockerOperationsPreviewModal({ operations, isApplying, results,
         ) : null}
 
         <div className="modal-actions">
-          <button type="button" className="ghost-button" disabled={isApplying || Boolean(results)} onClick={onBack}>Back</button>
-          <button type="button" className="ghost-button" disabled={isApplying} onClick={onCancel}>Close</button>
-          <button type="button" className="primary-button" disabled={isApplying || Boolean(results)} onClick={onApply}>{isApplying ? "Applying..." : "Apply changes"}</button>
+          <button type="button" className="ghost-button" disabled={isApplying || Boolean(results)} onClick={onBack}>Zurück</button>
+          <button type="button" className="ghost-button" disabled={isApplying} onClick={onCancel}>Schließen</button>
+          <button type="button" className="primary-button" disabled={isApplying || Boolean(results)} onClick={onApply}>{isApplying ? "Übernehmen..." : "Änderungen übernehmen"}</button>
         </div>
       </div>
     </div>
@@ -68,9 +68,9 @@ export function BlockerOperationsPreviewModal({ operations, isApplying, results,
 }
 
 function formatOperation(operation: BlockerOperation): string {
-  if (operation.kind === "delete") return `Unplan ${operation.oldStart}-${operation.oldEnd}`;
-  if (operation.kind === "create") return `Add ${operation.newStart}-${operation.newEnd}`;
-  return `Update ${operation.oldStart}-${operation.oldEnd} to ${operation.newStart}-${operation.newEnd}`;
+  if (operation.kind === "delete") return `${operation.oldStart}-${operation.oldEnd} ausplanen`;
+  if (operation.kind === "create") return `${operation.newStart}-${operation.newEnd} hinzufügen`;
+  return `${operation.oldStart}-${operation.oldEnd} auf ${operation.newStart}-${operation.newEnd} ändern`;
 }
 
 function formatOperationDate(operation: BlockerOperation): string {
@@ -78,5 +78,5 @@ function formatOperationDate(operation: BlockerOperation): string {
     return operation.dateLabel;
   }
 
-  return `${operation.dateLabel} to ${operation.newDateLabel}`;
+  return `${operation.dateLabel} bis ${operation.newDateLabel}`;
 }

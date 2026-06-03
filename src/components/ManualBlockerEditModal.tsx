@@ -105,11 +105,11 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
 
   function handlePreview() {
     if (operationCount === 0) {
-      setError("Add, remove, or change at least one blocker before previewing.");
+      setError("Mindestens einen Blocker hinzufügen, entfernen oder ändern.");
       return;
     }
     if (invalidCount > 0) {
-      setError("Fix invalid blocker rows before previewing.");
+      setError("Ungültige Blocker-Zeilen vor der Vorschau korrigieren.");
       return;
     }
 
@@ -168,22 +168,22 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
       <div className="modal modal-wide manual-edit-modal" role="dialog" aria-modal="true" aria-labelledby="manual-edit-title">
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Manual edit</p>
+            <p className="eyebrow">Manuelle Bearbeitung</p>
             <h2 id="manual-edit-title">{group.taskName}</h2>
-            <p>{group.projectName ?? "Project not resolved"}</p>
+            <p>{group.projectName ?? "Projekt nicht aufgelöst"}</p>
           </div>
           <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>x</button>
         </div>
 
         <div className="preview-summary">
           <span>{group.weekdayLabel} {group.startTime}-{group.endTime}</span>
-          <span>{group.schedules.length} current blockers</span>
-          <span>{newRows.length} new</span>
-          <span>{existingRows.filter((row) => row.remove).length} to unplan</span>
+          <span>{group.schedules.length} aktuelle Blocker</span>
+          <span>{newRows.length} neu</span>
+          <span>{existingRows.filter((row) => row.remove).length} zum Ausplanen</span>
         </div>
 
         <div className="manual-edit-toolbar">
-          <button type="button" className="manual-edit-button" onClick={addNewRow}>Add blocker</button>
+          <button type="button" className="manual-edit-button" onClick={addNewRow}>Blocker hinzufügen</button>
         </div>
 
         <div className="manual-edit-list">
@@ -198,15 +198,15 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
                   <span>{getTimeHHmm(schedule.start)}-{getTimeHHmm(schedule.end)}</span>
                 </div>
                 <div className="manual-row-fields">
-                  <label>Date<input type="date" value={view.row.date} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { date: event.target.value })} /></label>
+                  <label>Datum<input type="date" value={view.row.date} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { date: event.target.value })} /></label>
                   <label>Start<input type="time" value={view.row.startTime} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { startTime: event.target.value })} /></label>
-                  <label>End<input type="time" value={view.row.endTime} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { endTime: event.target.value })} /></label>
-                  <button type="button" className="ghost-button manual-reset-button" disabled={!view.changed} onClick={() => resetExistingRow(schedule.id)}>Reset</button>
+                  <label>Ende<input type="time" value={view.row.endTime} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { endTime: event.target.value })} /></label>
+                  <button type="button" className="ghost-button manual-reset-button" disabled={!view.changed} onClick={() => resetExistingRow(schedule.id)}>Zurücksetzen</button>
                   <button
                     type="button"
                     className={`table-icon-button table-delete-button manual-remove-button ${view.row.remove ? "active" : ""}`}
-                    title={view.row.remove ? "Keep blocker" : "Unplan blocker"}
-                    aria-label={view.row.remove ? "Keep blocker" : "Unplan blocker"}
+                    title={view.row.remove ? "Blocker behalten" : "Blocker ausplanen"}
+                    aria-label={view.row.remove ? "Blocker behalten" : "Blocker ausplanen"}
                     aria-pressed={view.row.remove}
                     onClick={() => updateExistingRow(schedule.id, { remove: !view.row.remove })}
                   >
@@ -222,16 +222,16 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
             const rowError = validateNewRow(row);
             return (
               <div key={row.tempId} className={["manual-edit-row", "is-new", rowError ? "has-error" : ""].filter(Boolean).join(" ")}>
-                <div className="manual-row-date"><strong>New blocker</strong><span>{row.date}</span></div>
+                <div className="manual-row-date"><strong>Neuer Blocker</strong><span>{row.date}</span></div>
                 <div className="manual-row-fields">
-                  <label>Date<input type="date" value={row.date} onChange={(event) => updateNewRow(row.tempId, { date: event.target.value })} /></label>
+                  <label>Datum<input type="date" value={row.date} onChange={(event) => updateNewRow(row.tempId, { date: event.target.value })} /></label>
                   <label>Start<input type="time" value={row.startTime} onChange={(event) => updateNewRow(row.tempId, { startTime: event.target.value })} /></label>
-                  <label>End<input type="time" value={row.endTime} onChange={(event) => updateNewRow(row.tempId, { endTime: event.target.value })} /></label>
+                  <label>Ende<input type="time" value={row.endTime} onChange={(event) => updateNewRow(row.tempId, { endTime: event.target.value })} /></label>
                   <button
                     type="button"
                     className="table-icon-button table-delete-button manual-remove-button"
-                    title="Remove new blocker"
-                    aria-label="Remove new blocker"
+                    title="Neuen Blocker entfernen"
+                    aria-label="Neuen Blocker entfernen"
                     onClick={() => removeNewRow(row.tempId)}
                   >
                     <span aria-hidden="true">x</span>
@@ -246,9 +246,9 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
         {error ? <div className="alert alert-error">{error}</div> : null}
 
         <div className="modal-actions">
-          <button type="button" className="ghost-button" onClick={onBack}>Back</button>
-          <button type="button" className="ghost-button" onClick={onClose}>Cancel</button>
-          <button type="button" className="primary-button" onClick={handlePreview}>Preview {operationCount} change{operationCount === 1 ? "" : "s"}</button>
+          <button type="button" className="ghost-button" onClick={onBack}>Zurück</button>
+          <button type="button" className="ghost-button" onClick={onClose}>Abbrechen</button>
+          <button type="button" className="primary-button" onClick={handlePreview}>{operationCount} Änderung{operationCount === 1 ? "" : "en"} vorschauen</button>
         </div>
       </div>
     </div>
@@ -256,13 +256,13 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
 }
 
 function validateExistingRow(schedule: ScheduleGroup["schedules"][number], row: ExistingRowState, currentUser: AworkUser): string {
-  if (!isOwnSchedule(schedule, currentUser)) return "Ownership could not be verified.";
+  if (!isOwnSchedule(schedule, currentUser)) return "Berechtigung konnte nicht geprüft werden.";
   if (row.remove) return "";
   try {
     const updated = buildExistingWindow(row);
-    if (calculateDurationMinutes(updated.newStartIso, updated.newEndIso) <= 0) return "Start must be before end.";
+    if (calculateDurationMinutes(updated.newStartIso, updated.newEndIso) <= 0) return "Start muss vor Ende liegen.";
   } catch {
-    return "Enter valid date, start, and end.";
+    return "Gültiges Datum, Start und Ende eingeben.";
   }
   return "";
 }
@@ -277,12 +277,12 @@ function buildExistingWindow(row: ExistingRowState): { newStartIso: string; newE
 }
 
 function validateNewRow(row: NewRowState): string {
-  if (!row.date || !row.startTime || !row.endTime) return "Enter date, start, and end.";
+  if (!row.date || !row.startTime || !row.endTime) return "Datum, Start und Ende eingeben.";
   try {
     const payload = buildCreatePayload(row, "task", "user");
-    if (payload.plannedDuration <= 0) return "Start must be before end.";
+    if (payload.plannedDuration <= 0) return "Start muss vor Ende liegen.";
   } catch {
-    return "Enter valid date and times.";
+    return "Gültiges Datum und Zeiten eingeben.";
   }
   return "";
 }

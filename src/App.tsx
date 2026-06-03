@@ -136,7 +136,10 @@ function App() {
     to: format(endOfYear(new Date()), "yyyy-MM-dd"),
     hidePast: true,
     projectId: "",
+    onlyAssigned: false,
   }));
+  const [myAssignedTaskIds, setMyAssignedTaskIds] = useState<Set<string>>(new Set());
+  const [myAssignedProjectIds, setMyAssignedProjectIds] = useState<Set<string>>(new Set());
   const [isMultiEditAvailable] = useState(true);
   const isAnalysisRoute = isCapacityAnalysisRoute();
 
@@ -146,7 +149,7 @@ function App() {
 
     if (returnedFromLogin) {
       storeSessionTokenFromUrl();
-      setStatusMessage("awork login completed. Checking your session...");
+      setStatusMessage("awork Login abgeschlossen. Session wird geprüft...");
       params.delete("aworkLogin");
       const nextQuery = params.toString();
       const nextUrl = nextQuery
@@ -238,6 +241,8 @@ function App() {
       if (filters.hidePast && isBefore(scheduleEnd, today)) return false;
       if (filters.projectId && schedule.projectId !== filters.projectId)
         return false;
+      if (filters.onlyAssigned && myAssignedTaskIds.size > 0 && !myAssignedTaskIds.has(schedule.taskId))
+        return false;
       return true;
     });
   }, [
@@ -247,6 +252,8 @@ function App() {
     filters.to,
     filters.hidePast,
     filters.projectId,
+    filters.onlyAssigned,
+    myAssignedTaskIds,
   ]);
 
   const groups = useMemo(
@@ -269,12 +276,12 @@ function App() {
         setSelectedPlannerUserId("");
         setStatusMessage(
           returnedFromLogin
-            ? "awork login successful. Choose a workflow."
-            : "awork OAuth session restored.",
+            ? "awork Login erfolgreich. Workflow wählen."
+            : "awork-Session wiederhergestellt.",
         );
       } else if (returnedFromLogin) {
         setError(
-          "awork login returned to the app, but no backend session was found. Please restart the backend and try again.",
+          "awork Login erfolgreich, aber keine Backend-Session gefunden. Bitte Backend neu starten.",
         );
       }
     } catch (sessionError) {
@@ -282,7 +289,7 @@ function App() {
       setError(
         sessionError instanceof Error
           ? sessionError.message
-          : "Could not check backend auth session.",
+          : "Backend-Session konnte nicht geprüft werden.",
       );
     } finally {
       setIsConnecting(false);
@@ -299,6 +306,8 @@ function App() {
     setProjectTasksForCreate([]);
     setHasLoadedSchedules(false);
     setFilters((currentFilters) => ({ ...currentFilters, projectId: "" }));
+    setMyAssignedTaskIds(new Set());
+    setMyAssignedProjectIds(new Set());
     setSelectedGroup(undefined);
     setSelectedGroupIds(new Set());
     setMultiEditGroups(undefined);
@@ -341,13 +350,15 @@ function App() {
     setCreateSuccess(undefined);
     setUpdateSuccess(undefined);
     setDeleteSuccess(undefined);
-    setStatusMessage("Disconnected.");
+    setStatusMessage("Getrennt.");
     setError("");
+    setMyAssignedTaskIds(new Set());
+    setMyAssignedProjectIds(new Set());
   }
 
   async function loadSchedules(options: LoadSchedulesOptions = {}) {
     if (!plannerUser) {
-      setError("Connect to awork before loading planned tasks.");
+      setError("Bitte zuerst mit awork verbinden.");
       return;
     }
 
@@ -357,7 +368,7 @@ function App() {
     setStatusMessage("");
 
     try {
-      const [scheduleResponse, projectTaskResponse] = await Promise.all([
+      const [scheduleResponse, plannerUserTaskResponse, myAssignedTasksResponse] = await Promise.all([
         backendClient.getTaskSchedules({
           from: filters.from,
           to: filters.to,
@@ -366,12 +377,22 @@ function App() {
         !selectedPlannerUserId
           ? backendClient.getMyProjectTasks()
           : backendClient.getUserAssignedTasks(plannerUser.id),
+        currentUser
+          ? backendClient.getUserAssignedTasks(currentUser.id)
+          : Promise.resolve<unknown>(null),
       ]);
       const mapped = mapTaskSchedulesResponse(scheduleResponse);
       const projectTasks = await loadMissingProjectTasks(
-        mapProjectTasksResponse(projectTaskResponse),
+        mapProjectTasksResponse(plannerUserTaskResponse),
         mapped.schedules,
       );
+      const myTasksArray = mapProjectTasksResponse(myAssignedTasksResponse);
+      const myTaskIds = new Set(myTasksArray.map((t) => t.id));
+      const myProjectIds = new Set(
+        myTasksArray.map((t) => t.projectId).filter(Boolean),
+      );
+      setMyAssignedTaskIds(myTaskIds);
+      setMyAssignedProjectIds(myProjectIds);
       const scheduledTaskIds = new Set(
         mapped.schedules.map((schedule) => schedule.taskId),
       );
@@ -402,17 +423,17 @@ function App() {
       if (mapped.schedules.length === 0) {
         setStatusMessage(
           mapped.warnings.length > 0
-            ? "awork returned schedules, but the app could not read their task, start, or end fields."
+            ? "awork hat Blocker zurückgegeben, aber die Felder konnten nicht gelesen werden."
             : unscheduledAssignedTasks.length > 0
-              ? `${unscheduledAssignedTasks.length} active awork tasks were found, but none have schedule blocks in this range.`
-              : "No planned blockers found for this date range.",
+              ? `${unscheduledAssignedTasks.length} aktive Aufgaben gefunden, aber keine haben Blocker in diesem Zeitraum.`
+              : "Keine geplanten Blocker in diesem Zeitraum.",
         );
       }
     } catch (loadError) {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "Could not load task schedules.",
+          : "Aufgaben-Blocker konnten nicht geladen werden.",
       );
     } finally {
       setIsLoadingSchedules(false);
@@ -462,13 +483,21 @@ function App() {
     setError("");
 
     try {
-      const response = await backendClient.getProjects();
-      setAvailableProjects(mapProjectsResponse(response));
+      const [projectsResponse, myTasksResponse] = await Promise.all([
+        backendClient.getProjects(),
+        myAssignedTaskIds.size === 0 ? backendClient.getUserAssignedTasks(currentUser.id) : Promise.resolve<unknown>(null),
+      ]);
+      setAvailableProjects(mapProjectsResponse(projectsResponse));
+      if (myAssignedTaskIds.size === 0) {
+        const myTasksArray = mapProjectTasksResponse(myTasksResponse);
+        setMyAssignedTaskIds(new Set(myTasksArray.map((t) => t.id)));
+        setMyAssignedProjectIds(new Set(myTasksArray.map((t) => t.projectId).filter(Boolean)));
+      }
     } catch (projectError) {
       setError(
         projectError instanceof Error
           ? projectError.message
-          : "Could not load projects.",
+          : "Projekte konnten nicht geladen werden.",
       );
     } finally {
       setIsLoadingProjects(false);
@@ -488,7 +517,7 @@ function App() {
       setError(
         usersError instanceof Error
           ? usersError.message
-          : "Could not load awork users.",
+          : "awork-Nutzer konnten nicht geladen werden.",
       );
     } finally {
       setIsLoadingUsers(false);
@@ -506,7 +535,7 @@ function App() {
       setError(
         taskError instanceof Error
           ? taskError.message
-          : "Could not load project tasks.",
+          : "Projektaufgaben konnten nicht geladen werden.",
       );
     } finally {
       setIsLoadingProjectTasks(false);
@@ -518,7 +547,7 @@ function App() {
     options: CreateGroupOptions,
   ) {
     if (!plannerUser) {
-      setError("Select a planner user before creating blockers.");
+      setError("Bitte Planner-Nutzer auswählen.");
       return;
     }
 
@@ -548,7 +577,7 @@ function App() {
 
         if (!createdTask) {
           throw new Error(
-            "New awork task was created, but the response could not be mapped.",
+            "Neue Aufgabe angelegt, aber die Antwort konnte nicht verarbeitet werden.",
           );
         }
 
@@ -563,13 +592,13 @@ function App() {
       for (const payload of payloads) {
         if (payload.userId !== plannerUser?.id) {
           failures.push(
-            `${payload.startDate}: ownership check failed before create.`,
+            `${payload.startDate}: Berechtigung vor dem Anlegen konnte nicht geprüft werden.`,
           );
           continue;
         }
 
         if (!taskId) {
-          failures.push(`${payload.startDate}: task id is missing.`);
+          failures.push(`${payload.startDate}: Aufgaben-ID fehlt.`);
           continue;
         }
 
@@ -580,15 +609,15 @@ function App() {
           failures.push(
             createError instanceof Error
               ? createError.message
-              : "Create failed.",
+              : "Anlegen fehlgeschlagen.",
           );
         }
       }
 
       setStatusMessage(
         taskCreated
-          ? `Task "${taskCreated}" created. ${successCount} planned blockers created. ${failures.length} failed.`
-          : `${successCount} planned blockers created. ${failures.length} failed.`,
+          ? `Aufgabe "${taskCreated}" angelegt. ${successCount} Blocker angelegt. ${failures.length} fehlgeschlagen.`
+          : `${successCount} Blocker angelegt. ${failures.length} fehlgeschlagen.`,
       );
       if (successCount > 0 || taskCreated) {
         setCreateSuccess({
@@ -601,14 +630,14 @@ function App() {
       if (successCount > 0 && hasLoadedSchedules) {
         await loadSchedules({
           refreshNotice:
-            "Updating planned tasks after creating blockers. You can keep looking at the page; fresh awork data will appear in a moment.",
+            "Aufgaben-Blocker nach dem Anlegen werden aktualisiert. Du kannst weiterarbeiten, neue awork-Daten erscheinen gleich.",
         });
       }
     } catch (createError) {
       setError(
         createError instanceof Error
           ? createError.message
-          : "Could not create task or planned blockers.",
+          : "Aufgabe oder Blocker konnten nicht angelegt werden.",
       );
     } finally {
       setIsCreatingSchedules(false);
@@ -646,7 +675,7 @@ function App() {
       const successCount = results.filter((result) => result.success).length;
       const failureCount = results.length - successCount;
       setStatusMessage(
-        `${successCount} planned blockers unplanned. ${failureCount} failed.`,
+        `${successCount} Blocker ausgeplant. ${failureCount} fehlgeschlagen.`,
       );
       if (successCount > 0 && failureCount === 0) {
         closeModals();
@@ -655,14 +684,14 @@ function App() {
       if (successCount > 0) {
         await loadSchedules({
           refreshNotice:
-            "Updating planned tasks after unplanning blockers. You can keep looking at the page; fresh awork data will appear in a moment.",
+            "Geplante Aufgaben werden nach dem Ausplanen aktualisiert. Du kannst weiterarbeiten – neue awork-Daten erscheinen gleich.",
         });
       }
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : "Could not delete schedule group.",
+          : "Blocker konnten nicht ausgeplant werden.",
       );
     } finally {
       setIsDeleting(false);
@@ -685,7 +714,7 @@ function App() {
       const successCount = results.filter((result) => result.success).length;
       const failureCount = results.length - successCount;
       setStatusMessage(
-        `${successCount} blocker operations applied. ${failureCount} failed.`,
+        `${successCount} Blocker-Operationen angewendet. ${failureCount} fehlgeschlagen.`,
       );
       if (successCount > 0 && failureCount === 0) {
         closeModals();
@@ -694,20 +723,20 @@ function App() {
           failed: failureCount,
           title: "BÄM, Blocker angepasst.",
           detail:
-            "The selected blocker updates, additions, and unplans were applied. The awork task was not deleted.",
+            "Ausgewählte Blocker wurden aktualisiert, hinzugefügt oder ausgeplant. Die awork-Aufgabe wurde nicht gelöscht.",
         });
       }
       if (successCount > 0) {
         await loadSchedules({
           refreshNotice:
-            "Updating planned tasks after applying blocker changes. You can keep looking at the page; fresh awork data will appear in a moment.",
+            "Geplante Aufgaben werden nach den Blocker-Änderungen aktualisiert. Du kannst weiterarbeiten – neue awork-Daten erscheinen gleich.",
         });
       }
     } catch (operationError) {
       setError(
         operationError instanceof Error
           ? operationError.message
-          : "Could not apply blocker operations.",
+          : "Blocker-Operationen konnten nicht angewendet werden.",
       );
     } finally {
       setIsApplyingBlockerOperations(false);
@@ -730,7 +759,7 @@ function App() {
       const successCount = results.filter((result) => result.success).length;
       const failureCount = results.length - successCount;
       setStatusMessage(
-        `${successCount} planned blockers updated. ${failureCount} failed.`,
+        `${successCount} Blocker aktualisiert. ${failureCount} fehlgeschlagen.`,
       );
       if (successCount > 0 && failureCount === 0) {
         closeModals();
@@ -738,13 +767,13 @@ function App() {
       }
       await loadSchedules({
         refreshNotice:
-          "Updating planned tasks after editing blockers. You can keep looking at the page; fresh awork data will appear in a moment.",
+          "Geplante Aufgaben werden nach der Bearbeitung aktualisiert. Du kannst weiterarbeiten – neue awork-Daten erscheinen gleich.",
       });
     } catch (updateError) {
       setError(
         updateError instanceof Error
           ? updateError.message
-          : "Could not apply updates.",
+          : "Aktualisierungen konnten nicht angewendet werden.",
       );
     } finally {
       setIsUpdating(false);
@@ -790,7 +819,7 @@ function App() {
           <h1>Self-Service Bulk Planner</h1>
         </div>
         <p>
-          Bulk-edit recurring task blockers for the selected awork planner user.
+          Geplante Aufgaben-Blocker für den ausgewählten Planner-Nutzer bearbeiten.
         </p>
       </header>
 
@@ -837,13 +866,13 @@ function App() {
           />
 
           {isLoadingSchedules ? (
-            <LoadingState label="Loading planned tasks from awork..." />
+            <LoadingState label="Geplante Aufgaben werden geladen..." />
           ) : null}
           {scheduleRefreshNotice ? (
             <div className="refresh-notice" aria-live="polite">
               <span className="spinner" />
               <div>
-                <strong>Planned tasks are being updated</strong>
+                <strong>Geplante Aufgaben werden aktualisiert</strong>
                 <span>{scheduleRefreshNotice}</span>
               </div>
             </div>
@@ -870,6 +899,8 @@ function App() {
           isLoadingProjects={isLoadingProjects}
           isLoadingTasks={isLoadingProjectTasks}
           isCreating={isCreatingSchedules}
+          myAssignedTaskIds={myAssignedTaskIds}
+          myAssignedProjectIds={myAssignedProjectIds}
           onLoadProjects={loadProjects}
           onProjectChange={loadProjectTasks}
           onCreate={createTaskSchedules}
@@ -944,13 +975,13 @@ function App() {
       {createSuccess ? (
         <SuccessPopup
           title="BÄM, Aufgabe erledigt."
-          message={`${createSuccess.count} planned blocker${createSuccess.count === 1 ? "" : "s"} created successfully.`}
+          message={`${createSuccess.count} Blocker erfolgreich angelegt.`}
           detail={
             createSuccess.taskCreated
-              ? `Task created: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} blockers failed.` : "All blockers were planned for the selected planner user."}`
+              ? `Aufgabe angelegt: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} Blocker fehlgeschlagen.` : "Alle Blocker wurden für den Planner-Nutzer angelegt."}`
               : createSuccess.failed > 0
-                ? `${createSuccess.failed} failed and stayed untouched.`
-                : "Everything was created for the selected planner user."
+                ? `${createSuccess.failed} fehlgeschlagen und unverändert geblieben.`
+                : "Alle Blocker wurden für den ausgewählten Planner-Nutzer angelegt."
           }
           onClose={() => setCreateSuccess(undefined)}
         />
@@ -959,8 +990,8 @@ function App() {
       {deleteSuccess ? (
         <SuccessPopup
           title="BÄM, Gruppe ausgeplant."
-          message={`${deleteSuccess.count} planned blocker${deleteSuccess.count === 1 ? "" : "s"} unplanned successfully.`}
-          detail="All selected blockers were removed from your planner. The awork task was not deleted."
+          message={`${deleteSuccess.count} Blocker erfolgreich ausgeplant.`}
+          detail="Alle ausgewählten Blocker wurden aus dem Planner entfernt. Die awork-Aufgabe wurde nicht gelöscht."
           onClose={() => setDeleteSuccess(undefined)}
         />
       ) : null}
@@ -968,10 +999,10 @@ function App() {
       {updateSuccess ? (
         <SuccessPopup
           title={updateSuccess.title ?? "BÄM, Zeitfenster angepasst."}
-          message={`${updateSuccess.count} planned blocker${updateSuccess.count === 1 ? "" : "s"} updated successfully.`}
+          message={`${updateSuccess.count} Blocker erfolgreich aktualisiert.`}
           detail={
             updateSuccess.detail ??
-            "The new time window was applied to the selected blockers."
+            "Das neue Zeitfenster wurde auf die ausgewählten Blocker angewendet."
           }
           onClose={() => setUpdateSuccess(undefined)}
         />

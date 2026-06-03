@@ -21,6 +21,7 @@ export interface PlannerFilters {
   to: string;
   hidePast: boolean;
   projectId: string;
+  onlyAssigned: boolean;
 }
 
 

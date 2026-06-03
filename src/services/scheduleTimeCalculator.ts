@@ -9,6 +9,7 @@ import {
   parseISO,
   set,
 } from "date-fns";
+import { de } from "date-fns/locale";
 import type { AworkTaskSchedule } from "../types/awork";
 
 export function getTimeHHmm(iso: string): string {
@@ -92,7 +93,7 @@ export function buildUpdatedTimeWindowOnWeekday(
 
 export function formatScheduleDateLabel(iso: string): string {
   const date = parseISO(iso);
-  return `KW ${getISOWeek(date)} ${format(date, "EEEE, dd.MM.yyyy")}`;
+  return `KW ${getISOWeek(date)} ${format(date, "EEEE, dd.MM.yyyy", { locale: de })}`;
 }
 
 export function formatDate(iso: string): string {

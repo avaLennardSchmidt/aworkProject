@@ -109,10 +109,10 @@ export function ScheduleGroupsList({
   if (groups.length === 0) {
     return (
       <section className="panel empty-state">
-        <h2>No editable schedule groups found</h2>
+        <h2>Keine bearbeitbaren Gruppen gefunden</h2>
         <p>
-          No planned task blockers matched the current filters for the selected
-          planner user.
+          Keine geplanten Blocker für die aktuellen Filter und den ausgewählten
+          Planner-Nutzer.
         </p>
       </section>
     );
@@ -121,17 +121,17 @@ export function ScheduleGroupsList({
   return (
     <section className="groups-section">
       <div className="section-heading">
-        <p className="eyebrow">Schedule groups</p>
-        <h2>{filteredGroups.length} editable groups</h2>
+        <p className="eyebrow">Blocker-Gruppen</p>
+        <h2>{filteredGroups.length} bearbeitbare Gruppen</h2>
       </div>
 
       <div className="groups-search-row">
-        <label htmlFor="groups-search">Search groups</label>
+        <label htmlFor="groups-search">Gruppen suchen</label>
         <input
           id="groups-search"
           type="search"
           value={searchQuery}
-          placeholder="Search task, project, weekday, time..."
+          placeholder="Aufgabe, Projekt, Wochentag, Uhrzeit..."
           onChange={(event) => setSearchQuery(event.target.value)}
         />
       </div>
@@ -147,28 +147,28 @@ export function ScheduleGroupsList({
             disabled={visibleGroups.length === 0}
             onChange={(event) => toggleVisibleSelection(event.target.checked)}
           />
-          Select visible groups
+          Sichtbare Gruppen auswählen
         </label>
-        <span>{selectedGroupIds.size} selected</span>
+        <span>{selectedGroupIds.size} ausgewählt</span>
         <button
           type="button"
           className="primary-button"
           disabled={selectedGroupIds.size < 1 || !isMultiEditAvailable}
           title={
             !isMultiEditAvailable
-              ? "Multi-edit not available for this user"
+              ? "Gruppenbearbeitung nicht verfügbar"
               : ""
           }
           onClick={onMultiEdit}
         >
-          Edit selected Groups
+          Ausgewählte Gruppen bearbeiten
         </button>
       </div>
 
       {filteredGroups.length === 0 ? (
         <section className="panel empty-state groups-search-empty">
-          <h2>No groups match this search</h2>
-          <p>Try a task, project, weekday, or time window.</p>
+          <h2>Keine Gruppen gefunden</h2>
+          <p>Aufgabe, Projekt, Wochentag oder Zeitfenster probieren.</p>
         </section>
       ) : null}
 
@@ -177,14 +177,14 @@ export function ScheduleGroupsList({
           <table className="groups-table">
             <thead>
               <tr>
-                <th scope="col">Select</th>
-                <th scope="col">Task</th>
-                <th scope="col">Pattern</th>
-                <th scope="col">Blockers</th>
-                <th scope="col">Total</th>
-                <th scope="col">First</th>
-                <th scope="col">Last</th>
-                <th scope="col">Action</th>
+                <th scope="col">Auswahl</th>
+                <th scope="col">Aufgabe</th>
+                <th scope="col">Muster</th>
+                <th scope="col">Blocker</th>
+                <th scope="col">Gesamt</th>
+                <th scope="col">Erster</th>
+                <th scope="col">Letzter</th>
+                <th scope="col">Aktion</th>
               </tr>
             </thead>
             <tbody>
@@ -248,7 +248,7 @@ function ProjectRows({
           </span>
           <span>{section.projectName}</span>
           <small>
-            {section.groups.length} groups · {blockerCount} blockers ·{" "}
+            {section.groups.length} Gruppen · {blockerCount} Blocker ·{" "}
             {formatMinutesAsHours(projectTotalMinutes)}
           </small>
         </th>
@@ -261,7 +261,7 @@ function ProjectRows({
                 type="checkbox"
                 className="group-select-checkbox"
                 checked={selectedGroupIds.has(group.groupId)}
-                aria-label={`Select ${group.taskName}`}
+                aria-label={`${group.taskName} auswählen`}
                 onChange={(event) =>
                   onSelectionChange(group.groupId, event.target.checked)
                 }
@@ -287,8 +287,8 @@ function ProjectRows({
                 <button
                   type="button"
                   className="table-icon-button table-edit-button"
-                  title="Change time window"
-                  aria-label="Change time window"
+                  title="Zeitfenster ändern"
+                  aria-label="Zeitfenster ändern"
                   onClick={() => onChangeTimeWindow(group)}
                 >
                   <span aria-hidden="true">✎</span>
@@ -296,8 +296,8 @@ function ProjectRows({
                 <button
                   type="button"
                   className="table-icon-button table-delete-button"
-                  title="Unplan group"
-                  aria-label="Unplan group"
+                  title="Gruppe ausplanen"
+                  aria-label="Gruppe ausplanen"
                   onClick={() => onDeleteGroup(group)}
                 >
                   <span aria-hidden="true">x</span>
@@ -333,7 +333,7 @@ function buildProjectSections(groups: ScheduleGroup[]): ProjectSection[] {
 
   groups.forEach((group) => {
     const projectKey = group.projectId ?? "no-project";
-    const projectName = group.projectName ?? "Project not resolved";
+    const projectName = group.projectName ?? "Projekt nicht aufgelöst";
     const section = sections.get(projectKey) ?? {
       projectKey,
       projectName,

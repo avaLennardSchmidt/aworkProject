@@ -28,7 +28,7 @@ export function PlannerUserSelector({
   }, [isLoadingUsers, onLoadUsers, users.length]);
 
   const options = [
-    { value: "", label: `My own account (${formatUserName(currentUser)})` },
+    { value: "", label: `Eigener Account (${formatUserName(currentUser)})` },
     ...users
       .filter((user) => user.id !== currentUser.id)
       .map((user) => ({ value: user.id, label: formatUserName(user) })),
@@ -37,19 +37,19 @@ export function PlannerUserSelector({
   return (
     <section className="panel planner-user-panel">
       <div>
-        <p className="eyebrow">Planner user</p>
-        <h2>Whose schedule are you editing?</h2>
+        <p className="eyebrow">Planner-Nutzer</p>
+        <h2>Wessen Plan bearbeitest du?</h2>
       </div>
       <div className="planner-user-controls">
         <div className="form-row">
-          <label>Selected user</label>
+          <label>Ausgewählter Nutzer</label>
           <SearchableSelect
             value={selectedUserId}
             disabled={isLoadingUsers}
             options={options}
-            placeholder="My own account"
-            searchPlaceholder={formatSearchPlaceholder("Filter users", options.length)}
-            emptyLabel="No users found"
+            placeholder="Eigener Account"
+            searchPlaceholder={formatSearchPlaceholder("Nutzer filtern", options.length)}
+            emptyLabel="Keine Nutzer gefunden"
             onChange={onChange}
           />
         </div>
@@ -59,11 +59,11 @@ export function PlannerUserSelector({
           disabled={isLoadingUsers}
           onClick={() => void onLoadUsers()}
         >
-          {isLoadingUsers ? "Loading..." : "Reload users"}
+          {isLoadingUsers ? "Lädt..." : "Nutzer neu laden"}
         </button>
         {analysisHref ? (
           <a className="primary-link-button planner-analysis-link" href={analysisHref}>
-            Team capacity analysis
+            Team-Kapazitätsanalyse
           </a>
         ) : null}
       </div>

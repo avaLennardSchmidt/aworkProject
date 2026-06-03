@@ -1,4 +1,5 @@
 import { addDays, eachDayOfInterval, format, getDay, isAfter, parseISO, set } from "date-fns";
+import { de } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
 import type { AworkProject, AworkProjectTask, AworkUser, CreateTaskSchedulePayload } from "../types/awork";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
@@ -16,6 +17,8 @@ interface CreateScheduleGroupPanelProps {
   isLoadingProjects: boolean;
   isLoadingTasks: boolean;
   isCreating: boolean;
+  myAssignedTaskIds: Set<string>;
+  myAssignedProjectIds: Set<string>;
   onLoadProjects: () => Promise<void>;
   onProjectChange: (projectId: string) => Promise<void>;
   onCreate: (payloads: CreateTaskSchedulePayload[], options: CreateGroupOptions) => Promise<void>;
@@ -29,13 +32,13 @@ const PROJECT_FILTER_ALL = "__all_projects__";
 const TASK_FILTER_ALL = "__all_task_statuses__";
 
 const weekdays = [
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-  { value: 0, label: "Sunday" },
+  { value: 1, label: "Montag" },
+  { value: 2, label: "Dienstag" },
+  { value: 3, label: "Mittwoch" },
+  { value: 4, label: "Donnerstag" },
+  { value: 5, label: "Freitag" },
+  { value: 6, label: "Samstag" },
+  { value: 0, label: "Sonntag" },
 ];
 
 export function CreateScheduleGroupPanel({
@@ -45,6 +48,8 @@ export function CreateScheduleGroupPanel({
   isLoadingProjects,
   isLoadingTasks,
   isCreating,
+  myAssignedTaskIds,
+  myAssignedProjectIds,
   onLoadProjects,
   onProjectChange,
   onCreate,
@@ -60,6 +65,8 @@ export function CreateScheduleGroupPanel({
   const [endTime, setEndTime] = useState("10:00");
   const [projectStatusFilter, setProjectStatusFilter] = useState(PROJECT_FILTER_ACTIVE);
   const [taskStatusFilter, setTaskStatusFilter] = useState(TASK_FILTER_ALL);
+  const [onlyMyProjects, setOnlyMyProjects] = useState(false);
+  const [onlyMyAssignedTasks, setOnlyMyAssignedTasks] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -71,18 +78,18 @@ export function CreateScheduleGroupPanel({
   const selectedProject = projects.find((project) => project.id === projectId);
   const selectedTask = tasks.find((task) => task.id === taskId);
   const effectiveTaskId = taskMode === "existing" ? taskId : NEW_TASK_PLACEHOLDER_ID;
-  const effectiveTaskName = taskMode === "existing" ? selectedTask?.name ?? "No task selected" : newTaskName.trim() || "New task";
+  const effectiveTaskName = taskMode === "existing" ? selectedTask?.name ?? "Keine Aufgabe ausgewählt" : newTaskName.trim() || "Neue Aufgabe";
   const projectStatusOptions = useMemo(
     () => [
-      { value: PROJECT_FILTER_ACTIVE, label: "All active projects" },
-      { value: PROJECT_FILTER_ALL, label: "All project statuses" },
+      { value: PROJECT_FILTER_ACTIVE, label: "Alle aktiven Projekte" },
+      { value: PROJECT_FILTER_ALL, label: "Alle Projektstatus" },
       ...buildStatusOptions(projects),
     ],
     [projects],
   );
   const taskStatusOptions = useMemo(
     () => [
-      { value: TASK_FILTER_ALL, label: "All task statuses" },
+      { value: TASK_FILTER_ALL, label: "Alle Aufgabenstatus" },
       ...buildStatusOptions(tasks),
     ],
     [tasks],
@@ -90,18 +97,26 @@ export function CreateScheduleGroupPanel({
   const filteredProjects = useMemo(
     () =>
       includeSelected(
-        projects.filter((project) => matchesProjectStatus(project, projectStatusFilter)),
+        projects.filter(
+          (project) =>
+            matchesProjectStatus(project, projectStatusFilter) &&
+            (!onlyMyProjects || myAssignedProjectIds.has(project.id)),
+        ),
         selectedProject,
       ),
-    [projectStatusFilter, projects, selectedProject],
+    [projectStatusFilter, projects, selectedProject, onlyMyProjects, myAssignedProjectIds],
   );
   const filteredTasks = useMemo(
     () =>
       includeSelected(
-        tasks.filter((task) => matchesTaskStatus(task, taskStatusFilter)),
+        tasks.filter(
+          (task) =>
+            matchesTaskStatus(task, taskStatusFilter) &&
+            (!onlyMyAssignedTasks || myAssignedTaskIds.has(task.id)),
+        ),
         selectedTask,
       ),
-    [taskStatusFilter, tasks, selectedTask],
+    [taskStatusFilter, tasks, selectedTask, onlyMyAssignedTasks, myAssignedTaskIds],
   );
   const projectOptions = useMemo(
     () => filteredProjects.map((project) => ({ value: project.id, label: formatProjectOption(project) })),
@@ -128,6 +143,21 @@ export function CreateScheduleGroupPanel({
     }
   }
 
+  function handleOnlyMyProjectsChange(checked: boolean) {
+    setOnlyMyProjects(checked);
+    setProjectId("");
+    setTaskId("");
+    setTaskStatusFilter(TASK_FILTER_ALL);
+    setNewTaskName("");
+    setError("");
+  }
+
+  function handleOnlyMyAssignedTasksChange(checked: boolean) {
+    setOnlyMyAssignedTasks(checked);
+    setTaskId("");
+    setError("");
+  }
+
   function handleTaskModeChange(nextMode: TaskMode) {
     setTaskMode(nextMode);
     setTaskId("");
@@ -148,33 +178,33 @@ export function CreateScheduleGroupPanel({
   }
 
   function validate(): string {
-    if (!projectId) return "Select a project.";
-    if (taskMode === "existing" && !taskId) return "Select a task.";
-    if (taskMode === "new" && !newTaskName.trim()) return "Enter a task name.";
-    if (previewPayloads.length === 0) return "The selected period does not contain the selected weekday.";
-    if (!isAfter(parseISO(to), parseISO(from)) && to !== from) return "To date must be after from date.";
-    if (previewPayloads.some((payload) => payload.plannedDuration <= 0)) return "Start time must be before end time.";
+    if (!projectId) return "Bitte Projekt auswählen.";
+    if (taskMode === "existing" && !taskId) return "Bitte Aufgabe auswählen.";
+    if (taskMode === "new" && !newTaskName.trim()) return "Bitte Aufgabenname eingeben.";
+    if (previewPayloads.length === 0) return "Der ausgewählte Zeitraum enthält den Wochentag nicht.";
+    if (!isAfter(parseISO(to), parseISO(from)) && to !== from) return "Das Bis-Datum muss nach dem Von-Datum liegen.";
+    if (previewPayloads.some((payload) => payload.plannedDuration <= 0)) return "Die Startzeit muss vor der Endzeit liegen.";
     return "";
   }
 
   return (
     <section className="panel create-panel">
       <div>
-        <p className="eyebrow">Create group</p>
-        <h2>Create planned task blockers</h2>
-        <p className="section-copy">Select a project, choose an existing task or create a new one, then plan the weekly period.</p>
+        <p className="eyebrow">Gruppe anlegen</p>
+        <h2>Geplante Aufgaben-Blocker anlegen</h2>
+        <p className="section-copy">Projekt auswählen, bestehende Aufgabe wählen oder neue anlegen, dann Wochenzeitraum planen.</p>
       </div>
 
       <div className="create-grid project-selection-grid">
         <div className="form-row">
-          <label>Project status</label>
+          <label>Projektstatus</label>
           <SearchableSelect
             value={projectStatusFilter}
             disabled={isLoadingProjects}
             options={projectStatusOptions}
-            placeholder="Select project status"
-            searchPlaceholder={formatSearchPlaceholder("Filter statuses", projectStatusOptions.length)}
-            emptyLabel="No statuses found"
+            placeholder="Projektstatus auswählen"
+            searchPlaceholder={formatSearchPlaceholder("Status filtern", projectStatusOptions.length)}
+            emptyLabel="Keine Status gefunden"
             onChange={(value) => {
               setProjectStatusFilter(value);
               setProjectId("");
@@ -186,28 +216,40 @@ export function CreateScheduleGroupPanel({
         </div>
 
         <div className="form-row">
-          <label>Project</label>
+          <label>Projekt</label>
           <SearchableSelect
             value={projectId}
             disabled={isLoadingProjects}
             options={projectOptions}
-            placeholder={isLoadingProjects ? "Loading projects..." : "Select project"}
-            searchPlaceholder={formatSearchPlaceholder("Filter projects", projectOptions.length)}
-            emptyLabel="No projects found"
+            placeholder={isLoadingProjects ? "Projekte werden geladen..." : "Projekt auswählen"}
+            searchPlaceholder={formatSearchPlaceholder("Projekte filtern", projectOptions.length)}
+            emptyLabel="Keine Projekte gefunden"
             onChange={(value) => void handleProjectChange(value)}
           />
+        </div>
+        <div className="form-row form-row-col2">
+          <label htmlFor="create-only-my-projects" className="checkbox-row">
+            <input
+              id="create-only-my-projects"
+              type="checkbox"
+              checked={onlyMyProjects}
+              disabled={myAssignedProjectIds.size === 0}
+              onChange={(event) => handleOnlyMyProjectsChange(event.target.checked)}
+            />
+            Nur mir zugewiesene Projekte
+          </label>
         </div>
       </div>
 
       <div className="create-grid task-mode-grid">
         <div className="form-row task-mode-row">
-          <label>Task</label>
-          <div className="task-mode-toggle" role="tablist" aria-label="Task creation mode">
+          <label>Aufgabe</label>
+          <div className="task-mode-toggle" role="tablist" aria-label="Aufgabenmodus">
             <button type="button" className={taskMode === "existing" ? "active" : ""} disabled={!projectId} onClick={() => handleTaskModeChange("existing")}>
-              Existing task
+              Bestehende Aufgabe
             </button>
             <button type="button" className={taskMode === "new" ? "active" : ""} disabled={!projectId} onClick={() => handleTaskModeChange("new")}>
-              New task
+              Neue Aufgabe
             </button>
           </div>
         </div>
@@ -217,14 +259,14 @@ export function CreateScheduleGroupPanel({
         {taskMode === "existing" ? (
           <>
             <div className="form-row">
-              <label>Task status</label>
+              <label>Aufgabenstatus</label>
               <SearchableSelect
                 value={taskStatusFilter}
                 disabled={!projectId || isLoadingTasks}
                 options={taskStatusOptions}
-                placeholder="Select task status"
-                searchPlaceholder={formatSearchPlaceholder("Filter statuses", taskStatusOptions.length)}
-                emptyLabel="No statuses found"
+                placeholder="Aufgabenstatus auswählen"
+                searchPlaceholder={formatSearchPlaceholder("Status filtern", taskStatusOptions.length)}
+                emptyLabel="Keine Status gefunden"
                 onChange={(value) => {
                   setTaskStatusFilter(value);
                   setTaskId("");
@@ -233,27 +275,39 @@ export function CreateScheduleGroupPanel({
             </div>
 
             <div className="form-row">
-              <label>Existing task</label>
+              <label>Bestehende Aufgabe</label>
               <SearchableSelect
                 value={taskId}
                 disabled={!projectId || isLoadingTasks}
                 options={taskOptions}
-                placeholder={isLoadingTasks ? "Loading tasks..." : "Select task"}
-                searchPlaceholder={formatSearchPlaceholder("Filter tasks", taskOptions.length)}
-                emptyLabel="No tasks found"
+                placeholder={isLoadingTasks ? "Aufgaben werden geladen..." : "Aufgabe auswählen"}
+                searchPlaceholder={formatSearchPlaceholder("Aufgaben filtern", taskOptions.length)}
+                emptyLabel="Keine Aufgaben gefunden"
                 onChange={setTaskId}
               />
+            </div>
+            <div className="form-row form-row-col2">
+              <label htmlFor="create-only-my-assigned-tasks" className="checkbox-row">
+                <input
+                  id="create-only-my-assigned-tasks"
+                  type="checkbox"
+                  checked={onlyMyAssignedTasks}
+                  disabled={myAssignedTaskIds.size === 0 || !projectId}
+                  onChange={(event) => handleOnlyMyAssignedTasksChange(event.target.checked)}
+                />
+                Nur mir zugewiesene Aufgaben
+              </label>
             </div>
           </>
         ) : (
           <div className="form-row">
-            <label htmlFor="create-new-task-name">New task name</label>
+            <label htmlFor="create-new-task-name">Neuer Aufgabenname</label>
             <input
               id="create-new-task-name"
               type="text"
               value={newTaskName}
               disabled={!projectId}
-              placeholder="e.g. Implementation blocker"
+              placeholder="z.B. Implementierungs-Blocker"
               onChange={(event) => setNewTaskName(event.target.value)}
             />
           </div>
@@ -262,7 +316,7 @@ export function CreateScheduleGroupPanel({
 
       <div className="create-grid schedule-fields-grid">
         <div className="form-row">
-          <label htmlFor="create-weekday">Weekday</label>
+          <label htmlFor="create-weekday">Wochentag</label>
           <select id="create-weekday" value={weekday} onChange={(event) => setWeekday(Number(event.target.value))}>
             {weekdays.map((day) => (
               <option key={day.value} value={day.value}>{day.label}</option>
@@ -270,11 +324,11 @@ export function CreateScheduleGroupPanel({
           </select>
         </div>
         <div className="form-row">
-          <label htmlFor="create-from">From</label>
+          <label htmlFor="create-from">Von</label>
           <input id="create-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
         </div>
         <div className="form-row">
-          <label htmlFor="create-to">To</label>
+          <label htmlFor="create-to">Bis</label>
           <input id="create-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
         </div>
         <div className="form-row">
@@ -282,7 +336,7 @@ export function CreateScheduleGroupPanel({
           <input id="create-start" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
         </div>
         <div className="form-row">
-          <label htmlFor="create-end">End</label>
+          <label htmlFor="create-end">Ende</label>
           <input id="create-end" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
         </div>
       </div>
@@ -290,24 +344,24 @@ export function CreateScheduleGroupPanel({
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       <div className="create-preview">
-        <h3>Preview</h3>
+        <h3>Vorschau</h3>
         <p>
-          {selectedProject?.name ?? "No project selected"} · {effectiveTaskName}
+          {selectedProject?.name ?? "Kein Projekt ausgewählt"} · {effectiveTaskName}
         </p>
         <p>{previewPayloads.length} blockers · {formatMinutesAsHours(totalMinutes)}</p>
         <div className="preview-list create-preview-list">
           {previewPayloads.slice(0, 12).map((payload) => (
             <div key={payload.startDate} className="preview-row">
-              <span>{format(parseISO(payload.startDate), "EEEE, dd.MM.yyyy")}</span>
+              <span>{format(parseISO(payload.startDate), "EEEE, dd.MM.yyyy", { locale: de })}</span>
               <strong>{startTime}-{endTime}</strong>
             </div>
           ))}
-          {previewPayloads.length > 12 ? <div className="preview-row"><span>{previewPayloads.length - 12} more blockers</span></div> : null}
+          {previewPayloads.length > 12 ? <div className="preview-row"><span>{previewPayloads.length - 12} weitere Blocker</span></div> : null}
         </div>
       </div>
 
       <button type="button" className="primary-button" disabled={isCreating} onClick={() => void handleCreate()}>
-        {isCreating ? "Creating..." : taskMode === "new" ? "Create task and planned blockers" : "Create planned blockers"}
+        {isCreating ? "Wird angelegt..." : taskMode === "new" ? "Aufgabe und Blocker anlegen" : "Blocker anlegen"}
       </button>
     </section>
   );

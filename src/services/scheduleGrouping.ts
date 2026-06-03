@@ -1,4 +1,5 @@
 import { format, getDay, parseISO } from "date-fns";
+import { de } from "date-fns/locale";
 import type { AworkTaskSchedule } from "../types/awork";
 import type { ScheduleGroup } from "../types/planner";
 import {
@@ -42,11 +43,11 @@ export function groupSchedules(schedules: AworkTaskSchedule[]): ScheduleGroup[] 
       return {
         groupId,
         taskId: first.taskId,
-        taskName: first.taskName ?? "Untitled task",
+        taskName: first.taskName ?? "Aufgabe ohne Namen",
         projectId: first.projectId,
         projectName: first.projectName,
         weekday,
-        weekdayLabel: format(parseISO(first.start), "EEEE"),
+        weekdayLabel: format(parseISO(first.start), "EEEE", { locale: de }),
         startTime,
         endTime,
         schedules: sorted,

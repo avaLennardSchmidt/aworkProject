@@ -237,7 +237,7 @@ export function MultiSearchableSelect({
       >
         <span>
           {selectedCount > 0
-            ? `${selectedCount} team${selectedCount === 1 ? "" : "s"} selected`
+            ? `${selectedCount} Team${selectedCount === 1 ? "" : "s"} ausgewählt`
             : placeholder}
         </span>
       </button>
@@ -270,7 +270,7 @@ export function MultiSearchableSelect({
               onMouseDown={(event) => event.preventDefault()}
               onClick={toggleFilteredSelection}
             >
-              {allFilteredSelected ? "Clear filtered" : "Select filtered"}
+              {allFilteredSelected ? "Auswahl aufheben" : "Auswahl übernehmen"}
             </button>
           </div>
           <div
@@ -303,7 +303,7 @@ export function MultiSearchableSelect({
 }
 
 export function formatSearchPlaceholder(label: string, count: number): string {
-  return `${label} (${count} found)`;
+  return `${label} (${count} gefunden)`;
 }
 
 function useDropdownLayout(

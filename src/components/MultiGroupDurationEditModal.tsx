@@ -29,29 +29,29 @@ type Direction = "add" | "remove";
 type EditMode = "delta" | "shift" | "set-window";
 
 const editModeOptions = [
-  { value: "delta", label: "Add or remove time" },
-  { value: "shift", label: "Move blockers" },
-  { value: "set-window", label: "Set time frame" },
+  { value: "delta", label: "Zeit hinzufügen oder entfernen" },
+  { value: "shift", label: "Blocker verschieben" },
+  { value: "set-window", label: "Zeitfenster setzen" },
 ] as const;
 
 const durationDirectionOptions = [
-  { value: "add", label: "Add time" },
-  { value: "remove", label: "Remove time" },
+  { value: "add", label: "Zeit hinzufügen" },
+  { value: "remove", label: "Zeit entfernen" },
 ] as const;
 
 const moveDirectionOptions = [
-  { value: "add", label: "Move up" },
-  { value: "remove", label: "Move down" },
+  { value: "add", label: "Vorziehen" },
+  { value: "remove", label: "Nach hinten verschieben" },
 ] as const;
 
 const weekdayOptions = [
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
-  { value: 0, label: "Sunday" },
+  { value: 1, label: "Montag" },
+  { value: 2, label: "Dienstag" },
+  { value: 3, label: "Mittwoch" },
+  { value: 4, label: "Donnerstag" },
+  { value: 5, label: "Freitag" },
+  { value: 6, label: "Samstag" },
+  { value: 0, label: "Sonntag" },
 ];
 
 export function MultiGroupDurationEditModal({
@@ -120,7 +120,7 @@ export function MultiGroupDurationEditModal({
         weekdayOverride: effectiveWeekdayOverride,
       });
       if (!updated) {
-        throw new Error("Invalid updated schedule values.");
+        throw new Error("Ungültige aktualisierte Blocker-Werte.");
       }
 
       const { newStartIso, newEndIso } = updated;
@@ -163,16 +163,16 @@ export function MultiGroupDurationEditModal({
   }
 
   function validate(): string {
-    if (groups.length === 0) return "Select at least one group.";
-    if (schedules.length === 0) return "The selected groups have no blockers.";
+    if (groups.length === 0) return "Mindestens eine Gruppe auswählen.";
+    if (schedules.length === 0) return "Die ausgewählten Gruppen haben keine Blocker.";
     if (schedules.some((schedule) => !isOwnSchedule(schedule, currentUser))) {
-      return "Ownership could not be verified for every selected blocker.";
+      return "Berechtigung konnte nicht für jeden Blocker geprüft werden.";
     }
 
     if (isDurationEditMode && deltaMinutes === 0 && !effectiveWeekdayOverride) {
       return editMode === "shift"
-        ? "Enter a time offset to move blockers."
-        : "Enter a duration to add/remove or choose a new weekday.";
+        ? "Einen Zeitversatz zum Verschieben eingeben."
+        : "Eine Dauer zum Hinzufügen/Entfernen eingeben oder einen neuen Wochentag wählen.";
     }
 
     if (
@@ -184,7 +184,7 @@ export function MultiGroupDurationEditModal({
           getTimeHHmm(schedule.end) === windowEndTime,
       )
     ) {
-      return "The selected blockers already use this time frame.";
+      return "Die ausgewählten Blocker verwenden bereits dieses Zeitfenster.";
     }
 
     if (
@@ -206,22 +206,22 @@ export function MultiGroupDurationEditModal({
       })
     ) {
       if (editMode === "set-window") {
-        return "New start time must be before new end time.";
+        return "Die neue Startzeit muss vor der neuen Endzeit liegen.";
       }
 
       return editMode === "shift"
-        ? "Moving these blockers produced an invalid time range."
-        : "Removing that much time would make at least one blocker end before it starts.";
+        ? "Das Verschieben führte zu einem ungültigen Zeitbereich."
+        : "Das Entfernen dieser Zeit würde mindestens einen Blocker ungültig machen.";
     }
 
     return "";
   }
 
   function validateUnplan(): string {
-    if (groups.length === 0) return "Select at least one group.";
-    if (schedules.length === 0) return "The selected groups have no blockers.";
+    if (groups.length === 0) return "Mindestens eine Gruppe auswählen.";
+    if (schedules.length === 0) return "Die ausgewählten Gruppen haben keine Blocker.";
     if (schedules.some((schedule) => !isOwnSchedule(schedule, currentUser))) {
-      return "Ownership could not be verified for every selected blocker.";
+      return "Berechtigung konnte nicht für jeden Blocker geprüft werden.";
     }
     return "";
   }
@@ -236,10 +236,10 @@ export function MultiGroupDurationEditModal({
       >
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Multi edit</p>
-            <h2 id="multi-duration-title">Adjust selected groups</h2>
+            <p className="eyebrow">Mehrfach-Bearbeitung</p>
+            <h2 id="multi-duration-title">Ausgewählte Gruppen anpassen</h2>
             <p>
-              {groups.length} groups · {schedules.length} blockers
+              {groups.length} Gruppen · {schedules.length} Blocker
             </p>
           </div>
           <button
@@ -253,36 +253,36 @@ export function MultiGroupDurationEditModal({
         </div>
 
         <div className="summary-strip">
-          <span>{formatMinutesAsHours(totalBeforeMinutes)} before</span>
+          <span>{formatMinutesAsHours(totalBeforeMinutes)} vorher</span>
           {editMode === "delta" ? (
             <span>
               {deltaMinutes >= 0 ? "+" : ""}
-              {formatMinutesAsHours(deltaMinutes)} per blocker
+              {formatMinutesAsHours(deltaMinutes)} pro Blocker
             </span>
           ) : editMode === "shift" ? (
             <span>
-              {direction === "add" ? "Move up" : "Move down"}{" "}
-              {formatMinutesAsHours(Math.abs(deltaMinutes))} per blocker
+              {direction === "add" ? "Vorziehen" : "Nach hinten verschieben"}{" "}
+              {formatMinutesAsHours(Math.abs(deltaMinutes))} pro Blocker
             </span>
           ) : (
             <span>
-              {windowStartTime}-{windowEndTime} per blocker
+              {windowStartTime}-{windowEndTime} pro Blocker
             </span>
           )}
-          <span>{formatMinutesAsHours(totalAfterMinutes)} after</span>
+          <span>{formatMinutesAsHours(totalAfterMinutes)} nachher</span>
         </div>
 
         <div className="multi-edit-grid">
           <div className="multi-edit-row multi-edit-row-top">
             <div className="form-row">
-              <label htmlFor="multi-mode">Mode</label>
+              <label htmlFor="multi-mode">Modus</label>
               <SearchableSelect
                 buttonId="multi-mode"
                 value={editMode}
                 options={[...editModeOptions]}
-                placeholder="Select mode"
-                searchPlaceholder="Filter modes (3 found)"
-                emptyLabel="No mode found."
+                placeholder="Modus auswählen"
+                searchPlaceholder="Modus filtern (3 gefunden)"
+                emptyLabel="Kein Modus gefunden."
                 menuWidth="compact"
                 onChange={(value) => setEditMode(value as EditMode)}
               />
@@ -313,7 +313,7 @@ export function MultiGroupDurationEditModal({
             ) : (
               <>
                 <div className="form-row">
-                  <label htmlFor="multi-window-start">Start time</label>
+                  <label htmlFor="multi-window-start">Startzeit</label>
                   <input
                     id="multi-window-start"
                     type="time"
@@ -322,7 +322,7 @@ export function MultiGroupDurationEditModal({
                   />
                 </div>
                 <div className="form-row">
-                  <label htmlFor="multi-window-end">End time</label>
+                  <label htmlFor="multi-window-end">Endzeit</label>
                   <input
                     id="multi-window-end"
                     type="time"
@@ -337,7 +337,7 @@ export function MultiGroupDurationEditModal({
           {isDurationEditMode ? (
             <div className="multi-edit-row multi-edit-row-duration">
               <div className="form-row">
-                <label htmlFor="multi-days">Days</label>
+                <label htmlFor="multi-days">Tage</label>
                 <input
                   id="multi-days"
                   type="number"
@@ -348,7 +348,7 @@ export function MultiGroupDurationEditModal({
                 />
               </div>
               <div className="form-row">
-                <label htmlFor="multi-hours">Hours</label>
+                <label htmlFor="multi-hours">Stunden</label>
                 <input
                   id="multi-hours"
                   type="number"
@@ -359,7 +359,7 @@ export function MultiGroupDurationEditModal({
                 />
               </div>
               <div className="form-row">
-                <label htmlFor="multi-minutes">Minutes</label>
+                <label htmlFor="multi-minutes">Minuten</label>
                 <input
                   id="multi-minutes"
                   type="number"
@@ -400,7 +400,7 @@ export function MultiGroupDurationEditModal({
 
         {effectiveWeekdayOverride ? (
           <p className="modal-note">
-            All selected blockers will be moved to the same weekday.
+            Alle ausgewählten Blocker werden auf denselben Wochentag verschoben.
           </p>
         ) : null}
 
@@ -412,17 +412,17 @@ export function MultiGroupDurationEditModal({
             className="danger-button unplan-selected-button"
             onClick={handleUnplanPreview}
           >
-            Preview unplan selected
+            Ausplanung vorschauen
           </button>
           <button type="button" className="ghost-button" onClick={onClose}>
-            Cancel
+            Abbrechen
           </button>
           <button
             type="button"
             className="primary-button"
             onClick={handlePreview}
           >
-            Preview changes
+            Änderungen vorschauen
           </button>
         </div>
       </div>

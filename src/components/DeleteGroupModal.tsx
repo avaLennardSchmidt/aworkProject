@@ -18,10 +18,10 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
       <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="delete-group-title">
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Unplan group</p>
-            <h2 id="delete-group-title">Unplan {group.schedules.length} planned blockers?</h2>
+            <p className="eyebrow">Gruppe ausplanen</p>
+            <h2 id="delete-group-title">Geplante Blocker ausplanen ({group.schedules.length})?</h2>
             <p>
-              {group.taskName} · {group.projectName ?? "Project not resolved"} · {group.weekdayLabel} {group.startTime}-{group.endTime}
+              {group.taskName} · {group.projectName ?? "Projekt nicht aufgelöst"} · {group.weekdayLabel} {group.startTime}-{group.endTime}
             </p>
           </div>
           <button type="button" className="icon-button" aria-label="Close" disabled={isDeleting} onClick={onCancel}>
@@ -30,13 +30,13 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
         </div>
 
         <div className="alert alert-warning">
-          This removes the selected planner blockers from the selected user's awork calendar. It does not delete the task or project.
+          Die ausgewählten Planner-Blocker werden aus dem awork-Kalender des Nutzers entfernt. Aufgabe und Projekt bleiben erhalten.
         </div>
 
         <div className="preview-summary">
-          <span>Blockers: {group.schedules.length}</span>
-          <span>Total planned: {formatMinutesAsHours(group.totalMinutes)}</span>
-          <span>Range: {group.firstDate} to {group.lastDate}</span>
+          <span>Blocker: {group.schedules.length}</span>
+          <span>Gesamt geplant: {formatMinutesAsHours(group.totalMinutes)}</span>
+          <span>Zeitraum: {group.firstDate} bis {group.lastDate}</span>
         </div>
 
         <div className="preview-list">
@@ -52,7 +52,7 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
 
         {deleteResults ? (
           <div className={failureCount > 0 ? "alert alert-error" : "alert alert-success"}>
-            {successCount} blockers unplanned. {failureCount} failed.
+            {successCount} Blocker ausgeplant. {failureCount} fehlgeschlagen.
           </div>
         ) : null}
 
@@ -71,10 +71,10 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
 
         <div className="modal-actions">
           <button type="button" className="ghost-button" disabled={isDeleting} onClick={onCancel}>
-            Close
+            Schließen
           </button>
           <button type="button" className="danger-button" disabled={isDeleting || Boolean(deleteResults)} onClick={onDelete}>
-            {isDeleting ? "Unplanning..." : "Unplan blockers"}
+            {isDeleting ? "Wird ausgeplant..." : "Blocker ausplanen"}
           </button>
         </div>
       </div>
