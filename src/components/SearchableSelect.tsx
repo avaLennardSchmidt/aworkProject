@@ -333,7 +333,10 @@ function useDropdownLayout(
       const spaceAbove = containerRect.top - boundaryRect.top - 12;
       const shouldOpenUp =
         spaceBelow < menuRect.height && spaceAbove > spaceBelow;
-      const menuChromeHeight = Math.max(0, menuRect.height - optionsRect.height);
+      const menuChromeHeight = Math.max(
+        0,
+        menuRect.height - optionsRect.height,
+      );
       const availableOptionsHeight = Math.max(
         120,
         (shouldOpenUp ? spaceAbove : spaceBelow) - menuChromeHeight,
@@ -411,7 +414,9 @@ function findScrollParent(element: HTMLElement): HTMLElement | null {
     const styles = window.getComputedStyle(current);
     const overflowY = styles.overflowY;
     const isScrollable =
-      (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+      (overflowY === "auto" ||
+        overflowY === "scroll" ||
+        overflowY === "overlay") &&
       current.scrollHeight > current.clientHeight;
 
     if (isScrollable) {

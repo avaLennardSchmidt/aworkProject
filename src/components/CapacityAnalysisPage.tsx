@@ -201,9 +201,9 @@ export function CapacityAnalysisPage({
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [isAbsenceNoticeDismissed, setIsAbsenceNoticeDismissed] =
-    useState(false);
-  const [absencesByUser, setAbsencesByUser] = useState<Record<string, AworkAbsence[]>>({});
+  const [absencesByUser, setAbsencesByUser] = useState<
+    Record<string, AworkAbsence[]>
+  >({});
   const [absenceLoadFailed, setAbsenceLoadFailed] = useState(false);
   const [error, setError] = useState("");
 
@@ -304,7 +304,12 @@ export function CapacityAnalysisPage({
           totals: summarizeWeekRows(weekRows),
         };
       }),
-    [absencesByUser, capacityWeeks, selectedRows, unresolvedProjectHintsByTaskId],
+    [
+      absencesByUser,
+      capacityWeeks,
+      selectedRows,
+      unresolvedProjectHintsByTaskId,
+    ],
   );
 
   const visibleSelectedRowSummaries = useMemo(
@@ -374,13 +379,17 @@ export function CapacityAnalysisPage({
     try {
       const usersToAnalyze = usersSelectedForAnalysis;
       if (usersToAnalyze.length === 0) {
-        throw new Error(
-          "Mindestens einen Nutzer oder ein Team auswählen.",
-        );
+        throw new Error("Mindestens einen Nutzer oder ein Team auswählen.");
       }
 
       const [schedulesResult] = await Promise.all([
-        loadSchedulesForUsers(backendClient, usersToAnalyze, currentUser, from, to),
+        loadSchedulesForUsers(
+          backendClient,
+          usersToAnalyze,
+          currentUser,
+          from,
+          to,
+        ),
       ]);
 
       let absenceLoadSucceeded = false;
@@ -396,10 +405,12 @@ export function CapacityAnalysisPage({
 
       setUsers(usersToAnalyze);
       setSchedulesByUser(schedulesResult.schedulesByUser);
-      setUnresolvedProjectHintsByTaskId(schedulesResult.unresolvedHintsByTaskId);
+      setUnresolvedProjectHintsByTaskId(
+        schedulesResult.unresolvedHintsByTaskId,
+      );
       setAbsencesByUser(newAbsencesByUser);
       setAbsenceLoadFailed(!absenceLoadSucceeded);
-      if (absenceLoadSucceeded) setIsAbsenceNoticeDismissed(true);
+
       setSelectedUserIds(new Set(usersToAnalyze.map((user) => user.id)));
       setExpandedUserIds(new Set());
       setHasLoaded(true);
@@ -673,7 +684,8 @@ export function CapacityAnalysisPage({
               </button>
             </div>
             <p className="analysis-range-note">
-              {usersSelectedForAnalysis.length} von {availableUsers.length} Nutzern für die Analyse ausgewählt.
+              {usersSelectedForAnalysis.length} von {availableUsers.length}{" "}
+              Nutzern für die Analyse ausgewählt.
             </p>
             <div className="analysis-selection-tools">
               <div className="form-row analysis-team-filter-row">
@@ -706,7 +718,9 @@ export function CapacityAnalysisPage({
                   disabled={isLoading || isLoadingUsers}
                   onClick={() => void loadAvailableUsers()}
                 >
-                  {isLoadingUsers ? "Nutzer werden geladen..." : "Nutzer neu laden"}
+                  {isLoadingUsers
+                    ? "Nutzer werden geladen..."
+                    : "Nutzer neu laden"}
                 </button>
                 <button
                   type="button"
@@ -723,7 +737,9 @@ export function CapacityAnalysisPage({
                     );
                   }}
                 >
-                  {areAllAvailableUsersSelected ? "Alle abwählen" : "Alle auswählen"}
+                  {areAllAvailableUsersSelected
+                    ? "Alle abwählen"
+                    : "Alle auswählen"}
                 </button>
               </div>
             </div>
@@ -747,28 +763,14 @@ export function CapacityAnalysisPage({
             </div>
           </section>
 
-          {!isAbsenceNoticeDismissed ? (
-            <section className="analysis-absence-warning" role="note">
-              <div>
-                <strong>Abwesenheiten werden nicht berücksichtigt.</strong>
-                <span>
-                  Diese Analyse berücksichtigt keine Urlaube, Krankentage,
-                  Feiertage oder andere Abwesenheitseinträge.
-                </span>
-              </div>
-              <button
-                type="button"
-                className="ghost-button analysis-absence-dismiss"
-                onClick={() => setIsAbsenceNoticeDismissed(true)}
-              >
-                OK, verstanden
-              </button>
-            </section>
-          ) : absenceLoadFailed && hasLoaded ? (
+          {absenceLoadFailed && hasLoaded ? (
             <section className="analysis-absence-warning" role="alert">
               <div>
                 <strong>Abwesenheiten konnten nicht geladen werden.</strong>
-                <span>Kapazitätsberechnung ohne Urlaubskorrektur. Analyse erneut starten, um es nochmal zu versuchen.</span>
+                <span>
+                  Kapazitätsberechnung ohne Urlaubskorrektur. Analyse erneut
+                  starten, um es nochmal zu versuchen.
+                </span>
               </div>
               <button
                 type="button"
@@ -780,13 +782,16 @@ export function CapacityAnalysisPage({
             </section>
           ) : null}
 
-          {isLoading ? <LoadingState label="Team-Kapazität wird geladen..." /> : null}
+          {isLoading ? (
+            <LoadingState label="Team-Kapazität wird geladen..." />
+          ) : null}
 
           {!hasLoaded && !isLoading ? (
             <section className="panel">
               <div className="empty-state">
                 <p>
-                  Zeitraum auswählen und Analyse starten, um die Team-Kapazität zu laden.
+                  Zeitraum auswählen und Analyse starten, um die Team-Kapazität
+                  zu laden.
                 </p>
               </div>
             </section>
@@ -952,7 +957,9 @@ export function CapacityAnalysisPage({
                       type="search"
                       value={chartUserSearch}
                       placeholder="Nutzer filtern..."
-                      onChange={(event) => setChartUserSearch(event.target.value)}
+                      onChange={(event) =>
+                        setChartUserSearch(event.target.value)
+                      }
                     />
                   </div>
                 </div>
@@ -1182,7 +1189,8 @@ function CapacityChartRow({
           </span>
           <span className="capacity-user-capacity">
             {formatHours(totals.effectiveCapacityHours)} verfügbar
-            {" · "}{formatHours(totals.targetHours)} Kunden-Ziel
+            {" · "}
+            {formatHours(totals.targetHours)} Kunden-Ziel
           </span>
         </div>
         <button
@@ -1271,7 +1279,9 @@ function CapacityChartRow({
               </span>
             ))}
             {totals.absentHours > 0 && (
-              <span title={`${formatHours(totals.absentHours)} durch Abwesenheit nicht verfügbar`}>
+              <span
+                title={`${formatHours(totals.absentHours)} durch Abwesenheit nicht verfügbar`}
+              >
                 <i className="capacity-legend-absent-swatch" />
                 Abwesenheit ({formatHours(totals.absentHours)})
               </span>
@@ -1344,7 +1354,10 @@ function CapacityCombinedBar({
           {hasAbsent && (
             <div
               className={`capacity-absent-zone${availableZonePercent <= 0 ? " capacity-absent-zone--isolated" : ""}`}
-              style={{ left: `${availableZonePercent}%`, width: `${absentZonePercent}%` }}
+              style={{
+                left: `${availableZonePercent}%`,
+                width: `${absentZonePercent}%`,
+              }}
               aria-label={absentTooltip}
               onMouseEnter={(event) => onTooltip(absentTooltip, event)}
               onMouseMove={(event) => onTooltip(absentTooltip, event)}
@@ -1422,7 +1435,10 @@ function CapacityWeekBar({
   const customerMarkerPercent = pct(weekRow.targetHours);
   const hasAbsent = absentZonePercent > 0;
   const isOverbooked = weekRow.customerTargetPercent > 100;
-  const weekWorkingDays = countWorkingDaysInRange(weekRow.week.from, weekRow.week.to);
+  const weekWorkingDays = countWorkingDaysInRange(
+    weekRow.week.from,
+    weekRow.week.to,
+  );
   const isPartialWeek = weekWorkingDays < 5;
   const customerTargetTooltip = `Erwartete Projektkapazät | ${formatHours(weekRow.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der Wochenstunden`;
   const absentTooltip = `Abwesenheit\n${formatAbsentDays(weekRow.absentDays)} · ${formatHours(weekRow.absentHours)} weniger Kap.`;
@@ -1436,7 +1452,10 @@ function CapacityWeekBar({
         <strong>{weekRow.week.label}</strong>
         <div className="capacity-week-label-right">
           {isPartialWeek && (
-            <span className="capacity-week-partial-note" title={`Nur ${weekWorkingDays} von 5 Arbeitstagen im gewählten Zeitraum`}>
+            <span
+              className="capacity-week-partial-note"
+              title={`Nur ${weekWorkingDays} von 5 Arbeitstagen im gewählten Zeitraum`}
+            >
               {weekWorkingDays} Tage
             </span>
           )}
@@ -1461,7 +1480,10 @@ function CapacityWeekBar({
           {hasAbsent && (
             <div
               className={`capacity-absent-zone${availableZonePercent <= 0 ? " capacity-absent-zone--isolated" : ""}`}
-              style={{ left: `${availableZonePercent}%`, width: `${absentZonePercent}%` }}
+              style={{
+                left: `${availableZonePercent}%`,
+                width: `${absentZonePercent}%`,
+              }}
               aria-label={absentTooltip}
               onMouseEnter={(event) => onTooltip(absentTooltip, event)}
               onMouseMove={(event) => onTooltip(absentTooltip, event)}
@@ -1514,9 +1536,14 @@ function CapacityWeekBar({
       <div className="capacity-week-stats">
         <span>
           {formatHours(weekRow.plannedMinutes / 60)}
-          <span className="capacity-week-cap"> / {formatHours(weekRow.effectiveCapacityHours)}</span>
+          <span className="capacity-week-cap">
+            {" "}
+            / {formatHours(weekRow.effectiveCapacityHours)}
+          </span>
         </span>
-        <span style={{ color: getWorkloadColor(weekRow.customerTargetPercent) }}>
+        <span
+          style={{ color: getWorkloadColor(weekRow.customerTargetPercent) }}
+        >
           {formatDecimal(weekRow.customerTargetPercent)}%
         </span>
       </div>
@@ -1526,7 +1553,9 @@ function CapacityWeekBar({
 
 function mapCapacityUsers(response: unknown): AworkUser[] {
   if (!isCapacityResponse(response)) {
-    throw new Error("Kapazitätsanalyse-Antwort konnte nicht verarbeitet werden.");
+    throw new Error(
+      "Kapazitätsanalyse-Antwort konnte nicht verarbeitet werden.",
+    );
   }
 
   return response.users
@@ -1781,12 +1810,14 @@ async function loadMissingProjectTasks(
     }
 
     if (!task.projectId) {
-      unresolvedHintsByTaskId[schedule.taskId] = "Aufgabe hat keine Projekt-ID.";
+      unresolvedHintsByTaskId[schedule.taskId] =
+        "Aufgabe hat keine Projekt-ID.";
       return;
     }
 
     if (!task.projectName) {
-      unresolvedHintsByTaskId[schedule.taskId] = "Aufgabe hat keinen Projektnamen.";
+      unresolvedHintsByTaskId[schedule.taskId] =
+        "Aufgabe hat keinen Projektnamen.";
     }
   });
 
@@ -1864,8 +1895,12 @@ function buildUserCapacityWeeks(
       totalCapacityHours,
       absentDays * (row.inputs.weeklyHours / 5),
     );
-    const effectiveCapacityHours = Math.max(0, totalCapacityHours - absentHours);
-    const targetHours = effectiveCapacityHours * (row.inputs.customerPercent / 100);
+    const effectiveCapacityHours = Math.max(
+      0,
+      totalCapacityHours - absentHours,
+    );
+    const targetHours =
+      effectiveCapacityHours * (row.inputs.customerPercent / 100);
     const plannedHours = plannedMinutes / 60;
     const utilizationPercent =
       effectiveCapacityHours > 0
@@ -1907,14 +1942,8 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
     (sum, week) => sum + week.totalCapacityHours,
     0,
   );
-  const absentHours = weekRows.reduce(
-    (sum, week) => sum + week.absentHours,
-    0,
-  );
-  const absentDays = weekRows.reduce(
-    (sum, week) => sum + week.absentDays,
-    0,
-  );
+  const absentHours = weekRows.reduce((sum, week) => sum + week.absentHours, 0);
+  const absentDays = weekRows.reduce((sum, week) => sum + week.absentDays, 0);
   const effectiveCapacityHours = Math.max(0, totalCapacityHours - absentHours);
   const targetHours = weekRows.reduce((sum, week) => sum + week.targetHours, 0);
   const blockerCount = weekRows.reduce(
@@ -1935,14 +1964,15 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
     effectiveCapacityHours,
     targetHours,
     workloadPercent:
-      effectiveCapacityHours > 0 ? (plannedHours / effectiveCapacityHours) * 100 : 0,
+      effectiveCapacityHours > 0
+        ? (plannedHours / effectiveCapacityHours) * 100
+        : 0,
     customerTargetPercent:
       targetHours > 0 ? (plannedHours / targetHours) * 100 : 0,
     blockerCount,
     isOverloaded: targetHours > 0 && plannedHours > targetHours,
   };
 }
-
 
 function summarizeWeekProjectTotals(
   weekRows: UserCapacityWeek[],
