@@ -122,6 +122,10 @@ export class BackendClient {
     return this.request<unknown>(`/api/analysis/capacity?${params.toString()}`);
   }
 
+  async getAbsences(): Promise<unknown> {
+    return this.request<unknown>("/api/absences");
+  }
+
   async getMyProjectTasks(): Promise<unknown> {
     return this.request<unknown>("/api/me/projecttasks?pageSize=1000");
   }

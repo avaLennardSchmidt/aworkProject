@@ -53,7 +53,6 @@ import { ErrorAlert } from "./components/ErrorAlert";
 import { FilterPanel } from "./components/FilterPanel";
 import { LoadingState } from "./components/LoadingState";
 import { ManualBlockerEditModal } from "./components/ManualBlockerEditModal";
-import { ManualEditConfirmModal } from "./components/ManualEditConfirmModal";
 import { MultiGroupDurationEditModal } from "./components/MultiGroupDurationEditModal";
 import { PlannerUserSelector } from "./components/PlannerUserSelector";
 import { PreviewChangesModal } from "./components/PreviewChangesModal";
@@ -121,7 +120,6 @@ function App() {
     new Set(),
   );
   const [multiEditGroups, setMultiEditGroups] = useState<ScheduleGroup[]>();
-  const [manualConfirmGroup, setManualConfirmGroup] = useState<ScheduleGroup>();
   const [manualEditGroup, setManualEditGroup] = useState<ScheduleGroup>();
   const [deleteGroup, setDeleteGroup] = useState<ScheduleGroup>();
   const [previewChanges, setPreviewChanges] = useState<PreviewChange[]>();
@@ -311,7 +309,6 @@ function App() {
     setSelectedGroup(undefined);
     setSelectedGroupIds(new Set());
     setMultiEditGroups(undefined);
-    setManualConfirmGroup(undefined);
     setManualEditGroup(undefined);
     setDeleteGroup(undefined);
     setPreviewChanges(undefined);
@@ -339,7 +336,6 @@ function App() {
     setSelectedGroup(undefined);
     setSelectedGroupIds(new Set());
     setMultiEditGroups(undefined);
-    setManualConfirmGroup(undefined);
     setManualEditGroup(undefined);
     setDeleteGroup(undefined);
     setPreviewChanges(undefined);
@@ -656,7 +652,7 @@ function App() {
 
   function handleManualEditRequest(group: ScheduleGroup) {
     setSelectedGroup(undefined);
-    setManualConfirmGroup(group);
+    setManualEditGroup(group);
   }
 
   async function handleDeleteGroup() {
@@ -783,7 +779,6 @@ function App() {
   function closeModals() {
     setSelectedGroup(undefined);
     setMultiEditGroups(undefined);
-    setManualConfirmGroup(undefined);
     setManualEditGroup(undefined);
     setDeleteGroup(undefined);
     setPreviewChanges(undefined);
@@ -847,12 +842,6 @@ function App() {
         />
       ) : null}
 
-      <WorkflowChooser
-        value={workflow}
-        disabled={!currentUser}
-        onChange={setWorkflow}
-      />
-
       {workflow === "manage" ? (
         <>
           <FilterPanel
@@ -861,6 +850,7 @@ function App() {
             hasLoadedSchedules={hasLoadedSchedules}
             disabled={!plannerUser}
             isLoading={isLoadingSchedules}
+            workflowToggle={<WorkflowChooser value={workflow} disabled={!currentUser} onChange={setWorkflow} />}
             onChange={setFilters}
             onLoad={loadSchedules}
           />
@@ -901,10 +891,21 @@ function App() {
           isCreating={isCreatingSchedules}
           myAssignedTaskIds={myAssignedTaskIds}
           myAssignedProjectIds={myAssignedProjectIds}
+          workflowToggle={<WorkflowChooser value={workflow} disabled={!currentUser} onChange={setWorkflow} />}
           onLoadProjects={loadProjects}
           onProjectChange={loadProjectTasks}
           onCreate={createTaskSchedules}
         />
+      ) : workflow === "create" ? (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Workflow</p>
+              <h2>Blocker anlegen</h2>
+            </div>
+            <WorkflowChooser value={workflow} disabled={!currentUser} onChange={setWorkflow} />
+          </div>
+        </section>
       ) : null}
 
       {selectedGroup && plannerUser && !previewChanges ? (
@@ -934,27 +935,12 @@ function App() {
         />
       ) : null}
 
-      {manualConfirmGroup ? (
-        <ManualEditConfirmModal
-          group={manualConfirmGroup}
-          onBack={() => {
-            setSelectedGroup(manualConfirmGroup);
-            setManualConfirmGroup(undefined);
-          }}
-          onCancel={closeModals}
-          onConfirm={() => {
-            setManualEditGroup(manualConfirmGroup);
-            setManualConfirmGroup(undefined);
-          }}
-        />
-      ) : null}
-
       {manualEditGroup && plannerUser ? (
         <ManualBlockerEditModal
           group={manualEditGroup}
           currentUser={plannerUser}
           onBack={() => {
-            setManualConfirmGroup(manualEditGroup);
+            setSelectedGroup(manualEditGroup);
             setManualEditGroup(undefined);
           }}
           onClose={closeModals}

@@ -161,7 +161,7 @@ export function ScheduleGroupsList({
           }
           onClick={onMultiEdit}
         >
-          Ausgewählte Gruppen bearbeiten
+          Gruppen bearbeiten
         </button>
       </div>
 

@@ -8,6 +8,7 @@ import {
   startOfQuarter,
   startOfYear,
 } from "date-fns";
+import type { ReactNode } from "react";
 import type { PlannerFilters } from "../types/planner";
 
 interface ProjectOption {
@@ -21,6 +22,7 @@ interface FilterPanelProps {
   disabled: boolean;
   hasLoadedSchedules: boolean;
   isLoading: boolean;
+  workflowToggle?: ReactNode;
   onChange: (filters: PlannerFilters) => void;
   onLoad: () => void;
 }
@@ -31,6 +33,7 @@ export function FilterPanel({
   disabled,
   hasLoadedSchedules,
   isLoading,
+  workflowToggle,
   onChange,
   onLoad,
 }: FilterPanelProps) {
@@ -76,9 +79,12 @@ export function FilterPanel({
 
   return (
     <section className="panel">
-      <div>
-        <p className="eyebrow">Filter</p>
-        <h2>Geplante Blocker laden</h2>
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Workflow</p>
+          <h2>Blocker</h2>
+        </div>
+        {workflowToggle}
       </div>
 
       <div className="filter-grid">
@@ -188,11 +194,22 @@ export function FilterPanel({
         </label>
         <button
           type="button"
-          className="primary-button"
+          className="primary-button icon-button"
           disabled={disabled || isLoading}
+          title={isLoading ? "Lädt..." : "Blocker laden"}
+          aria-label={isLoading ? "Lädt..." : "Blocker laden"}
           onClick={onLoad}
         >
-          {isLoading ? "Lädt..." : "Blocker laden"}
+          {isLoading ? (
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className="spin">
+              <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="2" strokeDasharray="28 16" strokeLinecap="round"/>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <path d="M9 2v9m0 0-3-3m3 3 3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 13h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          )}
         </button>
       </div>
     </section>

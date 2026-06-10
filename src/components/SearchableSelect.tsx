@@ -263,16 +263,6 @@ export function MultiSearchableSelect({
             autoFocus
             onChange={(event) => setQuery(event.target.value)}
           />
-          <div className="searchable-select-multi-actions">
-            <button
-              type="button"
-              className="ghost-button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={toggleFilteredSelection}
-            >
-              {allFilteredSelected ? "Auswahl aufheben" : "Auswahl übernehmen"}
-            </button>
-          </div>
           <div
             ref={optionsRef}
             className="searchable-select-options"

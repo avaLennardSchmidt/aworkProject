@@ -14,6 +14,12 @@ import {
   startOfYear,
   startOfWeek,
 } from "date-fns";
+import {
+  calculateAbsentWorkingDays,
+  countWorkingDaysInRange,
+  groupAbsencesByUserId,
+  mapAbsencesResponse,
+} from "../services/absenceMapper";
 import { BackendClient, mapUser } from "../services/backendClient";
 import { fuzzyMatches } from "../services/fuzzySearch";
 import {
@@ -27,6 +33,7 @@ import {
 } from "../services/scheduleMapper";
 import { calculateDurationMinutes } from "../services/scheduleTimeCalculator";
 import type {
+  AworkAbsence,
   AworkProjectTask,
   AworkTaskSchedule,
   AworkUser,
@@ -83,7 +90,10 @@ interface WeekProjectTotal extends ProjectTotal {}
 
 interface UserCapacityWeek {
   week: CapacityWeek;
-  capacityHours: number;
+  totalCapacityHours: number;
+  absentHours: number;
+  absentDays: number;
+  effectiveCapacityHours: number;
   targetHours: number;
   plannedMinutes: number;
   utilizationPercent: number;
@@ -193,6 +203,8 @@ export function CapacityAnalysisPage({
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isAbsenceNoticeDismissed, setIsAbsenceNoticeDismissed] =
     useState(false);
+  const [absencesByUser, setAbsencesByUser] = useState<Record<string, AworkAbsence[]>>({});
+  const [absenceLoadFailed, setAbsenceLoadFailed] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -282,6 +294,7 @@ export function CapacityAnalysisPage({
         const weekRows = buildUserCapacityWeeks(
           row,
           capacityWeeks,
+          absencesByUser[row.user.id] ?? [],
           unresolvedProjectHintsByTaskId,
         );
         return {
@@ -291,7 +304,7 @@ export function CapacityAnalysisPage({
           totals: summarizeWeekRows(weekRows),
         };
       }),
-    [capacityWeeks, selectedRows, unresolvedProjectHintsByTaskId],
+    [absencesByUser, capacityWeeks, selectedRows, unresolvedProjectHintsByTaskId],
   );
 
   const visibleSelectedRowSummaries = useMemo(
@@ -331,11 +344,11 @@ export function CapacityAnalysisPage({
       0,
     );
     const totalCapacityHours = selectedRowSummaries.reduce(
-      (sum, entry) => sum + entry.totals.capacityHours,
+      (sum, entry) => sum + entry.totals.effectiveCapacityHours,
       0,
     );
-    const totalBlockers = selectedRowSummaries.reduce(
-      (sum, entry) => sum + entry.totals.blockerCount,
+    const totalAbsentHours = selectedRowSummaries.reduce(
+      (sum, entry) => sum + entry.totals.absentHours,
       0,
     );
     const overloadedUsers = selectedRowSummaries.filter(
@@ -345,7 +358,7 @@ export function CapacityAnalysisPage({
     return {
       totalPlannedHours,
       totalCapacityHours,
-      totalBlockers,
+      totalAbsentHours,
       overloadedUsers,
       averageWorkload:
         selectedRowSummaries.length > 0 && totalCapacityHours > 0
@@ -366,18 +379,27 @@ export function CapacityAnalysisPage({
         );
       }
 
-      const schedulesResult = await loadSchedulesForUsers(
-        backendClient,
-        usersToAnalyze,
-        currentUser,
-        from,
-        to,
-      );
+      const [schedulesResult] = await Promise.all([
+        loadSchedulesForUsers(backendClient, usersToAnalyze, currentUser, from, to),
+      ]);
+
+      let absenceLoadSucceeded = false;
+      let newAbsencesByUser: Record<string, AworkAbsence[]> = {};
+      try {
+        const absencesRaw = await backendClient.getAbsences();
+        const allAbsences = mapAbsencesResponse(absencesRaw);
+        newAbsencesByUser = groupAbsencesByUserId(allAbsences);
+        absenceLoadSucceeded = true;
+      } catch {
+        // Absence data unavailable — analysis continues without holiday correction
+      }
+
       setUsers(usersToAnalyze);
       setSchedulesByUser(schedulesResult.schedulesByUser);
-      setUnresolvedProjectHintsByTaskId(
-        schedulesResult.unresolvedHintsByTaskId,
-      );
+      setUnresolvedProjectHintsByTaskId(schedulesResult.unresolvedHintsByTaskId);
+      setAbsencesByUser(newAbsencesByUser);
+      setAbsenceLoadFailed(!absenceLoadSucceeded);
+      if (absenceLoadSucceeded) setIsAbsenceNoticeDismissed(true);
       setSelectedUserIds(new Set(usersToAnalyze.map((user) => user.id)));
       setExpandedUserIds(new Set());
       setHasLoaded(true);
@@ -550,7 +572,7 @@ export function CapacityAnalysisPage({
       <header className="app-header analysis-header">
         <div>
           <p className="eyebrow">awork planner utility</p>
-          <h1>Team-Kapazitätsanalyse</h1>
+          <h1>Kapazitätsanalyse</h1>
         </div>
         <div className="analysis-header-actions">
           <p>
@@ -581,7 +603,7 @@ export function CapacityAnalysisPage({
               <h2>Kapazitätsübersicht</h2>
             </div>
             <div className="analysis-control-grid">
-              <div className="analysis-date-controls">
+              <div className="analysis-date-inputs">
                 <div className="form-row">
                   <label htmlFor="analysis-from">Von</label>
                   <input
@@ -602,64 +624,60 @@ export function CapacityAnalysisPage({
                     onChange={(event) => setTo(event.target.value)}
                   />
                 </div>
-                <div className="analysis-presets">
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    disabled={isLoading}
-                    onClick={() => applyDatePreset("this-month")}
-                  >
-                    Dieser Monat
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    disabled={isLoading}
-                    onClick={() => applyDatePreset("next-4-weeks")}
-                  >
-                    Nächste 4 Wochen
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    disabled={isLoading}
-                    onClick={() => applyDatePreset("this-quarter")}
-                  >
-                    Dieses Quartal
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    disabled={isLoading}
-                    onClick={() => applyDatePreset("this-year")}
-                  >
-                    Dieses Jahr
-                  </button>
-                </div>
               </div>
-              <div className="analysis-control-actions">
+              <div className="analysis-presets">
                 <button
                   type="button"
-                  className="primary-button"
-                  disabled={
-                    isLoading ||
-                    isLoadingUsers ||
-                    usersSelectedForAnalysis.length === 0
-                  }
-                  onClick={() => void loadAnalysis()}
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-month")}
                 >
-                  {isLoading ? "Lädt..." : "Analyse starten"}
+                  Dieser Monat
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("next-4-weeks")}
+                >
+                  Nächste 4 Wochen
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-quarter")}
+                >
+                  Dieses Quartal
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-year")}
+                >
+                  Dieses Jahr
                 </button>
               </div>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={
+                  isLoading ||
+                  isLoadingUsers ||
+                  usersSelectedForAnalysis.length === 0
+                }
+                onClick={() => void loadAnalysis()}
+              >
+                {isLoading ? "Lädt..." : "Analyse starten"}
+              </button>
             </div>
             <p className="analysis-range-note">
               {usersSelectedForAnalysis.length} von {availableUsers.length} Nutzern für die Analyse ausgewählt.
             </p>
             <div className="analysis-selection-tools">
               <div className="form-row analysis-team-filter-row">
-                <label htmlFor="analysis-team-filter">
-                  Teams (Nutzer automatisch auswählen)
-                </label>
+                <label htmlFor="analysis-team-filter">Teams</label>
                 <MultiSearchableSelect
                   buttonId="analysis-team-filter"
                   values={Array.from(selectedTeamNames)}
@@ -746,6 +764,20 @@ export function CapacityAnalysisPage({
                 OK, verstanden
               </button>
             </section>
+          ) : absenceLoadFailed && hasLoaded ? (
+            <section className="analysis-absence-warning" role="alert">
+              <div>
+                <strong>Abwesenheiten konnten nicht geladen werden.</strong>
+                <span>Kapazitätsberechnung ohne Urlaubskorrektur. Analyse erneut starten, um es nochmal zu versuchen.</span>
+              </div>
+              <button
+                type="button"
+                className="ghost-button analysis-absence-dismiss"
+                onClick={() => setAbsenceLoadFailed(false)}
+              >
+                Schließen
+              </button>
+            </section>
           ) : null}
 
           {isLoading ? <LoadingState label="Team-Kapazität wird geladen..." /> : null}
@@ -763,12 +795,10 @@ export function CapacityAnalysisPage({
           {hasLoaded ? (
             <>
               <SummaryCards
-                selectedCount={selectedRows.length}
-                totalUsers={users.length}
                 totalPlannedHours={summary.totalPlannedHours}
                 totalCapacityHours={summary.totalCapacityHours}
+                totalAbsentHours={summary.totalAbsentHours}
                 averageWorkload={summary.averageWorkload}
-                totalBlockers={summary.totalBlockers}
                 overloadedUsers={summary.overloadedUsers}
               />
 
@@ -778,52 +808,74 @@ export function CapacityAnalysisPage({
                     <p className="eyebrow">Projekte und Kapazität</p>
                     <h2>Geplante Zeit pro Nutzer</h2>
                   </div>
-                  <div className="analysis-chart-search">
-                    <input
-                      id="analysis-user-search"
-                      aria-label="Search users"
-                      type="search"
-                      value={chartUserSearch}
-                      placeholder="Nutzer filtern..."
-                      onChange={(event) =>
-                        setChartUserSearch(event.target.value)
-                      }
-                    />
-                    <div className="analysis-workload-filter">
-                      <select
-                        id="analysis-workload-filter-mode"
-                        aria-label="Auslastungsvergleich"
-                        value={workloadFilterMode}
-                        onChange={(event) =>
-                          setWorkloadFilterMode(
-                            event.target.value as WorkloadFilterMode,
-                          )
+                  <div className="analysis-chart-controls">
+                    <div className="analysis-chart-toolbar">
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() =>
+                          setShowCollapsedRangeBars((current) => !current)
                         }
                       >
-                        <option value="all">Alle</option>
-                        <option value="gt">Größer als</option>
-                        <option value="lt">Kleiner als</option>
-                      </select>
-                      <div className="analysis-workload-threshold">
-                        <input
-                          type="number"
-                          min="0"
-                          max="300"
-                          step="1"
-                          disabled={workloadFilterMode === "all"}
-                          value={workloadFilterValue}
+                        {showCollapsedRangeBars
+                          ? "Gesamtbalken ausblenden"
+                          : "Gesamtbalken einblenden"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        disabled={visibleSelectedRowSummaries.length === 0}
+                        onClick={() => {
+                          setExpandedUserIds(
+                            areAllSelectedUsersExpanded
+                              ? new Set()
+                              : new Set(
+                                  visibleSelectedRowSummaries.map(
+                                    (entry) => entry.row.user.id,
+                                  ),
+                                ),
+                          );
+                        }}
+                      >
+                        {areAllSelectedUsersExpanded
+                          ? "Alle Nutzer einklappen"
+                          : "Alle Nutzer ausklappen"}
+                      </button>
+                      <div className="analysis-toolbar-divider" />
+                      <div className="analysis-workload-filter">
+                        <select
+                          id="analysis-workload-filter-mode"
+                          aria-label="Auslastungsvergleich"
+                          value={workloadFilterMode}
                           onChange={(event) =>
-                            setWorkloadFilterValue(
-                              Math.max(0, Number(event.target.value) || 0),
+                            setWorkloadFilterMode(
+                              event.target.value as WorkloadFilterMode,
                             )
                           }
-                          aria-label="Auslastungsschwellenwert Prozent"
-                        />
-                        <span>%</span>
+                        >
+                          <option value="all">Alle</option>
+                          <option value="gt">Größer als</option>
+                          <option value="lt">Kleiner als</option>
+                        </select>
+                        <div className="analysis-workload-threshold">
+                          <input
+                            type="number"
+                            min="0"
+                            max="300"
+                            step="1"
+                            disabled={workloadFilterMode === "all"}
+                            value={workloadFilterValue}
+                            onChange={(event) =>
+                              setWorkloadFilterValue(
+                                Math.max(0, Number(event.target.value) || 0),
+                              )
+                            }
+                            aria-label="Auslastungsschwellenwert Prozent"
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="capacity-heading-meta">
                     <div className="capacity-bulk-inputs">
                       <label>
                         <span>Wochenstunden</span>
@@ -893,43 +945,19 @@ export function CapacityAnalysisPage({
                         Auf Auswahl anwenden
                       </button>
                     </div>
-                    <div className="analysis-inline-actions analysis-inline-actions-end">
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() =>
-                          setShowCollapsedRangeBars((current) => !current)
-                        }
-                      >
-                        {showCollapsedRangeBars
-                          ? "Gesamtbalken ausblenden"
-                          : "Gesamtbalken einblenden"}
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        disabled={visibleSelectedRowSummaries.length === 0}
-                        onClick={() => {
-                          setExpandedUserIds(
-                            areAllSelectedUsersExpanded
-                              ? new Set()
-                              : new Set(
-                                  visibleSelectedRowSummaries.map(
-                                    (entry) => entry.row.user.id,
-                                  ),
-                                ),
-                          );
-                        }}
-                      >
-                        {areAllSelectedUsersExpanded
-                          ? "Alle Nutzer einklappen"
-                          : "Alle Nutzer ausklappen"}
-                      </button>
-                    </div>
+                    <input
+                      id="analysis-user-search"
+                      className="analysis-user-search"
+                      aria-label="Nutzer suchen"
+                      type="search"
+                      value={chartUserSearch}
+                      placeholder="Nutzer filtern..."
+                      onChange={(event) => setChartUserSearch(event.target.value)}
+                    />
                   </div>
                 </div>
                 <p className="capacity-chart-note">
-                  Gesamtbalken zeigen 100 % der Wochenstunden für die jeweilige KW. Der gelbe Marker zeigt die erwartete Projektkapazität basierend auf dem Kunden %.
+                  Balken = Wochenstunden · Gelber Marker = Kunden-Ziel
                 </p>
                 {visibleSelectedRowSummaries.length > 0 ? (
                   <div className="capacity-chart">
@@ -1032,38 +1060,24 @@ export function CapacityAnalysisPage({
 }
 
 function SummaryCards({
-  selectedCount,
-  totalUsers,
   totalPlannedHours,
   totalCapacityHours,
+  totalAbsentHours,
   averageWorkload,
-  totalBlockers,
   overloadedUsers,
 }: {
-  selectedCount: number;
-  totalUsers: number;
   totalPlannedHours: number;
   totalCapacityHours: number;
+  totalAbsentHours: number;
   averageWorkload: number;
-  totalBlockers: number;
   overloadedUsers: number;
 }) {
   return (
     <section className="analysis-summary-grid">
       <SummaryCard
-        label="Ausgewählte Nutzer"
-        value={`${selectedCount}/${totalUsers}`}
-        title="Nutzer, die aktuell in der Kapazitätsberechnung enthalten sind."
-      />
-      <SummaryCard
-        label="Geplante Stunden"
-        value={formatHours(totalPlannedHours)}
-        title="Summe aller geplanten Blocker-Dauern für die ausgewählten Nutzer im gewählten Zeitraum."
-      />
-      <SummaryCard
-        label="Zeitraum-Kapazität"
-        value={formatHours(totalCapacityHours)}
-        title="Gesamtkapazität für den Zeitraum: Wochenstunden mal Anzahl Wochen."
+        label="Stunden"
+        value={`${formatHours(totalPlannedHours)} / ${formatHours(totalCapacityHours)}`}
+        title="Geplante Stunden geteilt durch die verfügbare Kapazität (nach Abwesenheiten) aller ausgewählten Nutzer im Zeitraum."
       />
       <SummaryCard
         label="Durchschnittliche Auslastung"
@@ -1071,9 +1085,9 @@ function SummaryCards({
         title="Geplante Stunden geteilt durch Gesamtkapazität der ausgewählten Nutzer."
       />
       <SummaryCard
-        label="Geplante Blocker"
-        value={String(totalBlockers)}
-        title="Anzahl geplanter Blocker im gewählten Zeitraum."
+        label="Urlaub"
+        value={formatHours(totalAbsentHours)}
+        title="Summe aller Abwesenheitsstunden (Urlaub, Feiertage) aller ausgewählten Nutzer im Zeitraum."
       />
       <SummaryCard
         label="Überlastete Nutzer"
@@ -1150,6 +1164,14 @@ function CapacityChartRow({
             {totals.customerTargetPercent > 100 && (
               <span className="overbooked-label">Überplant</span>
             )}
+            {totals.absentDays > 0 && (
+              <span
+                className="capacity-absent-badge"
+                title={`${formatHours(totals.absentHours)} Kapazität durch Abwesenheit reduziert`}
+              >
+                {formatAbsentDays(totals.absentDays)} Urlaub
+              </span>
+            )}
           </div>
           <span
             style={{ color: workloadColor }}
@@ -1157,6 +1179,10 @@ function CapacityChartRow({
           >
             {formatHours(totals.plannedHours)} geplant –{" "}
             {formatDecimal(totals.customerTargetPercent)}%
+          </span>
+          <span className="capacity-user-capacity">
+            {formatHours(totals.effectiveCapacityHours)} verfügbar
+            {" · "}{formatHours(totals.targetHours)} Kunden-Ziel
           </span>
         </div>
         <button
@@ -1244,6 +1270,12 @@ function CapacityChartRow({
                 {project.name}
               </span>
             ))}
+            {totals.absentHours > 0 && (
+              <span title={`${formatHours(totals.absentHours)} durch Abwesenheit nicht verfügbar`}>
+                <i className="capacity-legend-absent-swatch" />
+                Abwesenheit ({formatHours(totals.absentHours)})
+              </span>
+            )}
           </div>
         </div>
       ) : null}
@@ -1276,11 +1308,17 @@ function CapacityCombinedBar({
   onTooltipClear: () => void;
 }) {
   const displayPercent = Math.max(100, totals.workloadPercent);
-  const stackWidthPercent =
-    displayPercent > 0 ? (totals.workloadPercent / displayPercent) * 100 : 0;
-  const capacityZonePercent = (100 / displayPercent) * 100;
-  const customerMarkerPercent = (customerPercent / displayPercent) * 100;
-  const customerTargetTooltip = `Erwartete Projektkapazität | ${formatHours(totals.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der Zeitraum-Kapazität`;
+  const pct = (h: number) =>
+    totals.totalCapacityHours > 0
+      ? (h / totals.totalCapacityHours) * (10000 / displayPercent)
+      : 0;
+  const availableZonePercent = pct(totals.effectiveCapacityHours);
+  const absentZonePercent = pct(totals.absentHours);
+  const stackWidthPercent = pct(totals.plannedHours);
+  const customerMarkerPercent = pct(totals.targetHours);
+  const hasAbsent = absentZonePercent > 0;
+  const customerTargetTooltip = `Erwartete Projektkapazität | ${formatHours(totals.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der verfügbaren Kapazität`;
+  const absentTooltip = `Abwesenheit\n${formatAbsentDays(totals.absentDays)} · ${formatHours(totals.absentHours)} weniger Kapazität`;
 
   return (
     <div className="capacity-range-overview">
@@ -1293,16 +1331,26 @@ function CapacityCombinedBar({
       </div>
       <div
         className="capacity-range-track"
-        aria-label={`Gewählter Zeitraum: ${formatHours(totals.plannedHours)} geplant von ${formatHours(totals.capacityHours)} Kapazität.`}
+        aria-label={`Gewählter Zeitraum: ${formatHours(totals.plannedHours)} geplant von ${formatHours(totals.effectiveCapacityHours)} verfügbarer Kapazität.`}
       >
         <div
           className="capacity-range-inner"
           style={{ width: `${displayPercent}%` }}
         >
           <div
-            className="capacity-zone"
-            style={{ width: `${capacityZonePercent}%` }}
+            className={`capacity-zone${hasAbsent ? " capacity-zone--partial" : ""}`}
+            style={{ width: `${availableZonePercent}%` }}
           />
+          {hasAbsent && (
+            <div
+              className={`capacity-absent-zone${availableZonePercent <= 0 ? " capacity-absent-zone--isolated" : ""}`}
+              style={{ left: `${availableZonePercent}%`, width: `${absentZonePercent}%` }}
+              aria-label={absentTooltip}
+              onMouseEnter={(event) => onTooltip(absentTooltip, event)}
+              onMouseMove={(event) => onTooltip(absentTooltip, event)}
+              onMouseLeave={onTooltipClear}
+            />
+          )}
           <div
             className="capacity-stacked-bar"
             style={{ width: `${stackWidthPercent}%` }}
@@ -1364,14 +1412,20 @@ function CapacityWeekBar({
   onTooltipClear: () => void;
 }) {
   const displayPercent = Math.max(100, weekRow.utilizationPercent);
-  const stackWidthPercent =
-    displayPercent > 0
-      ? (weekRow.utilizationPercent / displayPercent) * 100
+  const pct = (h: number) =>
+    weekRow.totalCapacityHours > 0
+      ? (h / weekRow.totalCapacityHours) * (10000 / displayPercent)
       : 0;
-  const capacityZonePercent = (100 / displayPercent) * 100;
-  const customerMarkerPercent = (customerPercent / displayPercent) * 100;
+  const availableZonePercent = pct(weekRow.effectiveCapacityHours);
+  const absentZonePercent = pct(weekRow.absentHours);
+  const stackWidthPercent = pct(weekRow.plannedMinutes / 60);
+  const customerMarkerPercent = pct(weekRow.targetHours);
+  const hasAbsent = absentZonePercent > 0;
   const isOverbooked = weekRow.customerTargetPercent > 100;
-  const customerTargetTooltip = `Erwartete Projektkapazität | ${formatHours(weekRow.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der Wochenstunden`;
+  const weekWorkingDays = countWorkingDaysInRange(weekRow.week.from, weekRow.week.to);
+  const isPartialWeek = weekWorkingDays < 5;
+  const customerTargetTooltip = `Erwartete Projektkapazät | ${formatHours(weekRow.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der Wochenstunden`;
+  const absentTooltip = `Abwesenheit\n${formatAbsentDays(weekRow.absentDays)} · ${formatHours(weekRow.absentHours)} weniger Kap.`;
 
   return (
     <div className={`capacity-week ${isOverbooked ? "is-overbooked" : ""}`}>
@@ -1380,23 +1434,40 @@ function CapacityWeekBar({
         title={`${weekRow.week.label}: ${format(weekRow.week.from, "dd.MM.yyyy")} - ${format(weekRow.week.to, "dd.MM.yyyy")}`}
       >
         <strong>{weekRow.week.label}</strong>
-        <span>
-          {format(weekRow.week.from, "dd.MM")} -{" "}
-          {format(weekRow.week.to, "dd.MM")}
-        </span>
+        <div className="capacity-week-label-right">
+          {isPartialWeek && (
+            <span className="capacity-week-partial-note" title={`Nur ${weekWorkingDays} von 5 Arbeitstagen im gewählten Zeitraum`}>
+              {weekWorkingDays} Tage
+            </span>
+          )}
+          <span>
+            {format(weekRow.week.from, "dd.MM")} -{" "}
+            {format(weekRow.week.to, "dd.MM")}
+          </span>
+        </div>
       </div>
       <div
         className="capacity-week-track"
-        aria-label={`${weekRow.week.label}: ${formatHours(weekRow.plannedMinutes / 60)} geplant von ${formatHours(weekRow.capacityHours)} Kapazität.`}
+        aria-label={`${weekRow.week.label}: ${formatHours(weekRow.plannedMinutes / 60)} geplant von ${formatHours(weekRow.effectiveCapacityHours)} verfügbarer Kap.`}
       >
         <div
           className="capacity-week-inner"
           style={{ width: `${displayPercent}%` }}
         >
           <div
-            className="capacity-zone"
-            style={{ width: `${capacityZonePercent}%` }}
+            className={`capacity-zone${hasAbsent ? " capacity-zone--partial" : ""}`}
+            style={{ width: `${availableZonePercent}%` }}
           />
+          {hasAbsent && (
+            <div
+              className={`capacity-absent-zone${availableZonePercent <= 0 ? " capacity-absent-zone--isolated" : ""}`}
+              style={{ left: `${availableZonePercent}%`, width: `${absentZonePercent}%` }}
+              aria-label={absentTooltip}
+              onMouseEnter={(event) => onTooltip(absentTooltip, event)}
+              onMouseMove={(event) => onTooltip(absentTooltip, event)}
+              onMouseLeave={onTooltipClear}
+            />
+          )}
           <div
             className="capacity-stacked-bar"
             style={{ width: `${stackWidthPercent}%` }}
@@ -1441,8 +1512,13 @@ function CapacityWeekBar({
         </div>
       </div>
       <div className="capacity-week-stats">
-        <span>{formatHours(weekRow.plannedMinutes / 60)} geplant</span>
-        <span>{formatDecimal(weekRow.customerTargetPercent)}%</span>
+        <span>
+          {formatHours(weekRow.plannedMinutes / 60)}
+          <span className="capacity-week-cap"> / {formatHours(weekRow.effectiveCapacityHours)}</span>
+        </span>
+        <span style={{ color: getWorkloadColor(weekRow.customerTargetPercent) }}>
+          {formatDecimal(weekRow.customerTargetPercent)}%
+        </span>
       </div>
     </div>
   );
@@ -1731,6 +1807,7 @@ function isCapacityResponse(response: unknown): response is CapacityResponse {
 function buildUserCapacityWeeks(
   row: UserCapacityRow,
   weeks: CapacityWeek[],
+  userAbsences: AworkAbsence[],
   unresolvedHintsByTaskId: Record<string, string>,
 ): UserCapacityWeek[] {
   return weeks.map((week) => {
@@ -1773,15 +1850,26 @@ function buildUserCapacityWeeks(
       projectTotalsByKey.set(key, current);
     });
 
-    const capacityHours = calculateWeekCapacityHours(
+    const totalCapacityHours = calculateWeekCapacityHours(
       row.inputs.weeklyHours,
       week,
     );
-    const targetHours = capacityHours * (row.inputs.customerPercent / 100);
+    const absentDays = calculateAbsentWorkingDays(
+      userAbsences,
+      row.user.id,
+      week.from,
+      week.to,
+    );
+    const absentHours = Math.min(
+      totalCapacityHours,
+      absentDays * (row.inputs.weeklyHours / 5),
+    );
+    const effectiveCapacityHours = Math.max(0, totalCapacityHours - absentHours);
+    const targetHours = effectiveCapacityHours * (row.inputs.customerPercent / 100);
     const plannedHours = plannedMinutes / 60;
     const utilizationPercent =
-      capacityHours > 0
-        ? (plannedHours / capacityHours) * 100
+      effectiveCapacityHours > 0
+        ? (plannedHours / effectiveCapacityHours) * 100
         : plannedMinutes > 0
           ? 100
           : 0;
@@ -1794,7 +1882,10 @@ function buildUserCapacityWeeks(
 
     return {
       week,
-      capacityHours,
+      totalCapacityHours,
+      absentHours,
+      absentDays,
+      effectiveCapacityHours,
       targetHours,
       plannedMinutes,
       utilizationPercent,
@@ -1812,10 +1903,19 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
     0,
   );
   const plannedHours = plannedMinutes / 60;
-  const capacityHours = weekRows.reduce(
-    (sum, week) => sum + week.capacityHours,
+  const totalCapacityHours = weekRows.reduce(
+    (sum, week) => sum + week.totalCapacityHours,
     0,
   );
+  const absentHours = weekRows.reduce(
+    (sum, week) => sum + week.absentHours,
+    0,
+  );
+  const absentDays = weekRows.reduce(
+    (sum, week) => sum + week.absentDays,
+    0,
+  );
+  const effectiveCapacityHours = Math.max(0, totalCapacityHours - absentHours);
   const targetHours = weekRows.reduce((sum, week) => sum + week.targetHours, 0);
   const blockerCount = weekRows.reduce(
     (sum, week) =>
@@ -1829,16 +1929,20 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
 
   return {
     plannedHours,
-    capacityHours,
+    totalCapacityHours,
+    absentHours,
+    absentDays,
+    effectiveCapacityHours,
     targetHours,
     workloadPercent:
-      capacityHours > 0 ? (plannedHours / capacityHours) * 100 : 0,
+      effectiveCapacityHours > 0 ? (plannedHours / effectiveCapacityHours) * 100 : 0,
     customerTargetPercent:
       targetHours > 0 ? (plannedHours / targetHours) * 100 : 0,
     blockerCount,
-    isOverloaded: weekRows.some((week) => week.customerTargetPercent > 100),
+    isOverloaded: targetHours > 0 && plannedHours > targetHours,
   };
 }
+
 
 function summarizeWeekProjectTotals(
   weekRows: UserCapacityWeek[],
@@ -1906,7 +2010,8 @@ function calculateWeekCapacityHours(
   weeklyHours: number,
   week: CapacityWeek,
 ): number {
-  return weeklyHours * (week.dayCount / 7);
+  const workingDays = countWorkingDaysInRange(week.from, week.to);
+  return weeklyHours * (workingDays / 5);
 }
 
 function endOfDay(date: Date): Date {
@@ -2034,6 +2139,16 @@ function formatHours(hours: number): string {
 
 function formatDecimal(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function formatAbsentDays(days: number): string {
+  if (days <= 0) return "";
+  const rounded = Math.round(days * 2) / 2;
+  if (rounded === 0.5) return "½ Tag";
+  const whole = Math.floor(rounded);
+  const half = rounded - whole === 0.5;
+  if (whole === 0) return "½ Tag";
+  return half ? `${whole}½ Tage` : `${whole} ${whole === 1 ? "Tag" : "Tage"}`;
 }
 
 function formatTopProjects(projects: ProjectTotal[]): string {

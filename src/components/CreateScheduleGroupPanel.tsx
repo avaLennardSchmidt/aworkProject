@@ -1,6 +1,7 @@
 import { addDays, eachDayOfInterval, format, getDay, isAfter, parseISO, set } from "date-fns";
 import { de } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { AworkProject, AworkProjectTask, AworkUser, CreateTaskSchedulePayload } from "../types/awork";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
 import { formatSearchPlaceholder, SearchableSelect } from "./SearchableSelect";
@@ -19,6 +20,7 @@ interface CreateScheduleGroupPanelProps {
   isCreating: boolean;
   myAssignedTaskIds: Set<string>;
   myAssignedProjectIds: Set<string>;
+  workflowToggle?: ReactNode;
   onLoadProjects: () => Promise<void>;
   onProjectChange: (projectId: string) => Promise<void>;
   onCreate: (payloads: CreateTaskSchedulePayload[], options: CreateGroupOptions) => Promise<void>;
@@ -50,6 +52,7 @@ export function CreateScheduleGroupPanel({
   isCreating,
   myAssignedTaskIds,
   myAssignedProjectIds,
+  workflowToggle,
   onLoadProjects,
   onProjectChange,
   onCreate,
@@ -189,10 +192,12 @@ export function CreateScheduleGroupPanel({
 
   return (
     <section className="panel create-panel">
-      <div>
-        <p className="eyebrow">Gruppe anlegen</p>
-        <h2>Geplante Aufgaben-Blocker anlegen</h2>
-        <p className="section-copy">Projekt auswählen, bestehende Aufgabe wählen oder neue anlegen, dann Wochenzeitraum planen.</p>
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Workflow</p>
+          <h2>Blocker anlegen</h2>
+        </div>
+        {workflowToggle}
       </div>
 
       <div className="create-grid project-selection-grid">
@@ -244,12 +249,36 @@ export function CreateScheduleGroupPanel({
       <div className="create-grid task-mode-grid">
         <div className="form-row task-mode-row">
           <label>Aufgabe</label>
-          <div className="task-mode-toggle" role="tablist" aria-label="Aufgabenmodus">
-            <button type="button" className={taskMode === "existing" ? "active" : ""} disabled={!projectId} onClick={() => handleTaskModeChange("existing")}>
-              Bestehende Aufgabe
+          <div
+            className={`task-toggle task-toggle--${taskMode}`}
+            role="tablist"
+            aria-label="Aufgabenmodus"
+          >
+            <button
+              type="button"
+              role="tab"
+              className={taskMode === "existing" ? "active" : ""}
+              disabled={!projectId}
+              aria-selected={taskMode === "existing"}
+              onClick={() => handleTaskModeChange("existing")}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2 3.5h10M2 7h8M2 10.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+              Bestehend
             </button>
-            <button type="button" className={taskMode === "new" ? "active" : ""} disabled={!projectId} onClick={() => handleTaskModeChange("new")}>
-              Neue Aufgabe
+            <button
+              type="button"
+              role="tab"
+              className={taskMode === "new" ? "active" : ""}
+              disabled={!projectId}
+              aria-selected={taskMode === "new"}
+              onClick={() => handleTaskModeChange("new")}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
+              </svg>
+              Neu anlegen
             </button>
           </div>
         </div>
@@ -275,7 +304,7 @@ export function CreateScheduleGroupPanel({
             </div>
 
             <div className="form-row">
-              <label>Bestehende Aufgabe</label>
+              <label>Aufgabe</label>
               <SearchableSelect
                 value={taskId}
                 disabled={!projectId || isLoadingTasks}

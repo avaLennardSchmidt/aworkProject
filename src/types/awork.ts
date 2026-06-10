@@ -60,6 +60,15 @@ export interface CreateTaskSchedulePayload {
   plannedDuration: number;
 }
 
+export interface AworkAbsence {
+  id: string;
+  userId: string | null;
+  startOn: string;
+  endOn: string;
+  isHalfDayOnStart: boolean;
+  isHalfDayOnEnd: boolean;
+}
+
 export interface CreateProjectTaskPayload {
   name: string;
   plannedDuration?: number;

@@ -63,7 +63,7 @@ export function PlannerUserSelector({
         </button>
         {analysisHref ? (
           <a className="primary-link-button planner-analysis-link" href={analysisHref}>
-            Team-Kapazitätsanalyse
+            Kapazität
           </a>
         ) : null}
       </div>
