@@ -891,7 +891,9 @@ function App() {
                 <span className="refresh-notice-title">
                   Synchronisiere geplante Aufgaben im Hintergrund...
                 </span>
-                <span className="refresh-notice-detail">{scheduleRefreshNotice}</span>
+                <span className="refresh-notice-detail">
+                  {scheduleRefreshNotice}
+                </span>
               </div>
             </div>
           ) : null}
