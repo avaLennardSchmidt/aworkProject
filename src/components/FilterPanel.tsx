@@ -211,11 +211,39 @@ export function FilterPanel({
             </>
           ) : (
             <>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                <path d="M15 9a6 6 0 0 1-10.5 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                <path d="M3 9a6 6 0 0 1 10.5-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                <path d="M13.5 5V2.5H16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M4.5 13v2.5H2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M15 9a6 6 0 0 1-10.5 4"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M3 9a6 6 0 0 1 10.5-4"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M13.5 5V2.5H16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M4.5 13v2.5H2"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               Blocker laden
             </>

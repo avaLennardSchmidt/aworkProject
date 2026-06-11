@@ -12,12 +12,7 @@ import {
   subMonths,
 } from "date-fns";
 import { de } from "date-fns/locale";
-import {
-  useId,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 
 interface DatePickerInputProps {
   id?: string;
@@ -130,15 +125,27 @@ export function DatePickerInput({
       >
         <span className="date-picker-trigger-icon" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <rect x="1" y="2.5" width="12" height="10" rx="1.8" stroke="currentColor" strokeWidth="1.4" fill="none" />
+            <rect
+              x="1"
+              y="2.5"
+              width="12"
+              height="10"
+              rx="1.8"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              fill="none"
+            />
             <path d="M1 6h12" stroke="currentColor" strokeWidth="1.4" />
-            <path d="M4.5 1v3M9.5 1v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <path
+              d="M4.5 1v3M9.5 1v3"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
           </svg>
         </span>
         <span>
-          {selectedDate
-            ? format(selectedDate, "dd.MM.yyyy")
-            : placeholder}
+          {selectedDate ? format(selectedDate, "dd.MM.yyyy") : placeholder}
         </span>
       </button>
 
@@ -160,7 +167,13 @@ export function DatePickerInput({
               onClick={() => setViewMonth((m) => subMonths(m, 1))}
             >
               <svg width="6" height="11" viewBox="0 0 6 11" fill="none">
-                <path d="M5 1L1 5.5 5 10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M5 1L1 5.5 5 10"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
             <span className="date-picker-month-label">
@@ -174,15 +187,24 @@ export function DatePickerInput({
               onClick={() => setViewMonth((m) => addMonths(m, 1))}
             >
               <svg width="6" height="11" viewBox="0 0 6 11" fill="none">
-                <path d="M1 1l4 4.5L1 10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M1 1l4 4.5L1 10"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
           </div>
-
           <div className="date-picker-grid" role="grid">
             <div className="date-picker-weekdays" role="row">
               {DAY_NAMES.map((name) => (
-                <div key={name} className="date-picker-weekday" role="columnheader">
+                <div
+                  key={name}
+                  className="date-picker-weekday"
+                  role="columnheader"
+                >
                   {name}
                 </div>
               ))}
@@ -216,7 +238,9 @@ export function DatePickerInput({
                         .filter(Boolean)
                         .join(" ")}
                       aria-selected={isSelected}
-                      aria-label={format(date, "EEEE, dd. MMMM yyyy", { locale: de })}
+                      aria-label={format(date, "EEEE, dd. MMMM yyyy", {
+                        locale: de,
+                      })}
                       aria-pressed={isSelected}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => selectDay(date)}
@@ -236,7 +260,8 @@ export function DatePickerInput({
             >
               Heute
             </button>
-          </div>        </div>
+          </div>{" "}
+        </div>
       )}
     </div>
   );

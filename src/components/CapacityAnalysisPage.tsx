@@ -598,8 +598,21 @@ export function CapacityAnalysisPage({
             Geplante Projektzeit und verfügbare Team-Kapazität in einer Ansicht.
           </p>
           <a className="ghost-link-button" href={getPlannerHref()}>
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ marginRight: 7 }}>
-              <path d="M10.5 3L5.5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+              style={{ marginRight: 7 }}
+            >
+              <path
+                d="M10.5 3L5.5 8l5 5"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             Zurück zum Planner
           </a>
@@ -783,13 +796,22 @@ export function CapacityAnalysisPage({
                     className={`user-chip${isSelected ? " is-selected" : ""}`}
                     aria-pressed={isSelected}
                     title={formatUserName(user)}
-                    onClick={() =>
-                      togglePreselectionUser(user.id, !isSelected)
-                    }
+                    onClick={() => togglePreselectionUser(user.id, !isSelected)}
                   >
                     <span className="user-chip-check" aria-hidden="true">
-                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6.5l2.5 2.5L10 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 6.5l2.5 2.5L10 3.5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     </span>
                     {shortUserName(user)}
@@ -927,7 +949,9 @@ export function CapacityAnalysisPage({
                           inputMode="decimal"
                           placeholder="—"
                           value={bulkWeeklyHoursInput}
-                          aria-invalid={isInvalidNumberInput(bulkWeeklyHoursInput)}
+                          aria-invalid={isInvalidNumberInput(
+                            bulkWeeklyHoursInput,
+                          )}
                           className={
                             isInvalidNumberInput(bulkWeeklyHoursInput)
                               ? "input-invalid"
@@ -945,7 +969,9 @@ export function CapacityAnalysisPage({
                           inputMode="numeric"
                           placeholder="70"
                           value={bulkCustomerPercentInput}
-                          aria-invalid={isInvalidNumberInput(bulkCustomerPercentInput)}
+                          aria-invalid={isInvalidNumberInput(
+                            bulkCustomerPercentInput,
+                          )}
                           className={
                             isInvalidNumberInput(bulkCustomerPercentInput)
                               ? "input-invalid"
@@ -962,7 +988,8 @@ export function CapacityAnalysisPage({
                         title="Setzt nur die ausgefüllten Felder für alle ausgewählten Nutzer."
                         disabled={
                           visibleSelectedRowSummaries.length === 0 ||
-                          (!bulkWeeklyHoursInput && !bulkCustomerPercentInput) ||
+                          (!bulkWeeklyHoursInput &&
+                            !bulkCustomerPercentInput) ||
                           isInvalidNumberInput(bulkWeeklyHoursInput) ||
                           isInvalidNumberInput(bulkCustomerPercentInput)
                         }

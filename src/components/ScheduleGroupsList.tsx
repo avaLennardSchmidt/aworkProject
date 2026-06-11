@@ -160,9 +160,7 @@ export function ScheduleGroupsList({
           className="primary-button"
           disabled={selectedGroupIds.size < 1 || !isMultiEditAvailable}
           title={
-            !isMultiEditAvailable
-              ? "Gruppenbearbeitung nicht verfügbar"
-              : ""
+            !isMultiEditAvailable ? "Gruppenbearbeitung nicht verfügbar" : ""
           }
           onClick={onMultiEdit}
         >
@@ -271,56 +269,56 @@ function ProjectRows({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
             >
-            <td>
-              <input
-                type="checkbox"
-                className="group-select-checkbox"
-                checked={selectedGroupIds.has(group.groupId)}
-                aria-label={`${group.taskName} auswählen`}
-                onChange={(event) =>
-                  onSelectionChange(group.groupId, event.target.checked)
-                }
-              />
-            </td>
-            <td>
-              <div className="task-cell">
-                <strong>{group.taskName}</strong>
-                <span>{group.taskId}</span>
-              </div>
-            </td>
-            <td>
-              <span className="time-window table-time-window">
-                {group.weekdayLabel} {group.startTime}-{group.endTime}
-              </span>
-            </td>
-            <td>{group.schedules.length}</td>
-            <td>{formatMinutesAsHours(group.totalMinutes)}</td>
-            <td>{group.firstDate}</td>
-            <td>{group.lastDate}</td>
-            <td>
-              <div className="table-actions">
-                <button
-                  type="button"
-                  className="table-icon-button table-edit-button"
-                  title="Zeitfenster ändern"
-                  aria-label="Zeitfenster ändern"
-                  onClick={() => onChangeTimeWindow(group)}
-                >
-                  <span aria-hidden="true">✎</span>
-                </button>
-                <button
-                  type="button"
-                  className="table-icon-button table-delete-button"
-                  title="Gruppe ausplanen"
-                  aria-label="Gruppe ausplanen"
-                  onClick={() => onDeleteGroup(group)}
-                >
-                  <span aria-hidden="true">x</span>
-                </button>
-              </div>
-            </td>
-          </motion.tr>
-        ))}
+              <td>
+                <input
+                  type="checkbox"
+                  className="group-select-checkbox"
+                  checked={selectedGroupIds.has(group.groupId)}
+                  aria-label={`${group.taskName} auswählen`}
+                  onChange={(event) =>
+                    onSelectionChange(group.groupId, event.target.checked)
+                  }
+                />
+              </td>
+              <td>
+                <div className="task-cell">
+                  <strong>{group.taskName}</strong>
+                  <span>{group.taskId}</span>
+                </div>
+              </td>
+              <td>
+                <span className="time-window table-time-window">
+                  {group.weekdayLabel} {group.startTime}-{group.endTime}
+                </span>
+              </td>
+              <td>{group.schedules.length}</td>
+              <td>{formatMinutesAsHours(group.totalMinutes)}</td>
+              <td>{group.firstDate}</td>
+              <td>{group.lastDate}</td>
+              <td>
+                <div className="table-actions">
+                  <button
+                    type="button"
+                    className="table-icon-button table-edit-button"
+                    title="Zeitfenster ändern"
+                    aria-label="Zeitfenster ändern"
+                    onClick={() => onChangeTimeWindow(group)}
+                  >
+                    <span aria-hidden="true">✎</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="table-icon-button table-delete-button"
+                    title="Gruppe ausplanen"
+                    aria-label="Gruppe ausplanen"
+                    onClick={() => onDeleteGroup(group)}
+                  >
+                    <span aria-hidden="true">x</span>
+                  </button>
+                </div>
+              </td>
+            </motion.tr>
+          ))}
       </AnimatePresence>
     </>
   );

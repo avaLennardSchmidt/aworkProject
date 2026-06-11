@@ -1,8 +1,21 @@
-import { addDays, eachDayOfInterval, format, getDay, isAfter, parseISO, set } from "date-fns";
+import {
+  addDays,
+  eachDayOfInterval,
+  format,
+  getDay,
+  isAfter,
+  parseISO,
+  set,
+} from "date-fns";
 import { de } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { AworkProject, AworkProjectTask, AworkUser, CreateTaskSchedulePayload } from "../types/awork";
+import type {
+  AworkProject,
+  AworkProjectTask,
+  AworkUser,
+  CreateTaskSchedulePayload,
+} from "../types/awork";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
 import { DatePickerInput } from "./DatePickerInput";
 import { formatSearchPlaceholder, SearchableSelect } from "./SearchableSelect";
@@ -25,7 +38,10 @@ interface CreateScheduleGroupPanelProps {
   workflowToggle?: ReactNode;
   onLoadProjects: () => Promise<void>;
   onProjectChange: (projectId: string) => Promise<void>;
-  onCreate: (payloads: CreateTaskSchedulePayload[], options: CreateGroupOptions) => Promise<void>;
+  onCreate: (
+    payloads: CreateTaskSchedulePayload[],
+    options: CreateGroupOptions,
+  ) => Promise<void>;
 }
 
 type TaskMode = "existing" | "new";
@@ -40,8 +56,19 @@ const taskModeOptions = [
     value: "existing" as const,
     label: "Bestehend",
     icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-        <path d="M2 3.5h10M2 7h8M2 10.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M2 3.5h10M2 7h8M2 10.5h5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -49,8 +76,19 @@ const taskModeOptions = [
     value: "new" as const,
     label: "Neu anlegen",
     icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-        <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M7 2v10M2 7h10"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -89,7 +127,9 @@ export function CreateScheduleGroupPanel({
   const [weekday, setWeekday] = useState(1);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
-  const [projectStatusFilter, setProjectStatusFilter] = useState(PROJECT_FILTER_ACTIVE);
+  const [projectStatusFilter, setProjectStatusFilter] = useState(
+    PROJECT_FILTER_ACTIVE,
+  );
   const [taskStatusFilter, setTaskStatusFilter] = useState(TASK_FILTER_ALL);
   const [onlyMyProjects, setOnlyMyProjects] = useState(false);
   const [onlyMyAssignedTasks, setOnlyMyAssignedTasks] = useState(false);
@@ -103,8 +143,12 @@ export function CreateScheduleGroupPanel({
 
   const selectedProject = projects.find((project) => project.id === projectId);
   const selectedTask = tasks.find((task) => task.id === taskId);
-  const effectiveTaskId = taskMode === "existing" ? taskId : NEW_TASK_PLACEHOLDER_ID;
-  const effectiveTaskName = taskMode === "existing" ? selectedTask?.name ?? "Keine Aufgabe ausgewählt" : newTaskName.trim() || "Neue Aufgabe";
+  const effectiveTaskId =
+    taskMode === "existing" ? taskId : NEW_TASK_PLACEHOLDER_ID;
+  const effectiveTaskName =
+    taskMode === "existing"
+      ? (selectedTask?.name ?? "Keine Aufgabe ausgewählt")
+      : newTaskName.trim() || "Neue Aufgabe";
   const projectStatusOptions = useMemo(
     () => [
       { value: PROJECT_FILTER_ACTIVE, label: "Alle aktiven Projekte" },
@@ -130,7 +174,13 @@ export function CreateScheduleGroupPanel({
         ),
         selectedProject,
       ),
-    [projectStatusFilter, projects, selectedProject, onlyMyProjects, myAssignedProjectIds],
+    [
+      projectStatusFilter,
+      projects,
+      selectedProject,
+      onlyMyProjects,
+      myAssignedProjectIds,
+    ],
   );
   const filteredTasks = useMemo(
     () =>
@@ -142,21 +192,47 @@ export function CreateScheduleGroupPanel({
         ),
         selectedTask,
       ),
-    [taskStatusFilter, tasks, selectedTask, onlyMyAssignedTasks, myAssignedTaskIds],
+    [
+      taskStatusFilter,
+      tasks,
+      selectedTask,
+      onlyMyAssignedTasks,
+      myAssignedTaskIds,
+    ],
   );
   const projectOptions = useMemo(
-    () => filteredProjects.map((project) => ({ value: project.id, label: formatProjectOption(project) })),
+    () =>
+      filteredProjects.map((project) => ({
+        value: project.id,
+        label: formatProjectOption(project),
+      })),
     [filteredProjects],
   );
   const taskOptions = useMemo(
-    () => filteredTasks.map((task) => ({ value: task.id, label: formatTaskOption(task) })),
+    () =>
+      filteredTasks.map((task) => ({
+        value: task.id,
+        label: formatTaskOption(task),
+      })),
     [filteredTasks],
   );
   const previewPayloads = useMemo(
-    () => buildPayloads({ currentUser, taskId: effectiveTaskId, from, to, weekday, startTime, endTime }),
+    () =>
+      buildPayloads({
+        currentUser,
+        taskId: effectiveTaskId,
+        from,
+        to,
+        weekday,
+        startTime,
+        endTime,
+      }),
     [currentUser, effectiveTaskId, from, to, weekday, startTime, endTime],
   );
-  const totalMinutes = previewPayloads.reduce((sum, payload) => sum + payload.plannedDuration / 60, 0);
+  const totalMinutes = previewPayloads.reduce(
+    (sum, payload) => sum + payload.plannedDuration / 60,
+    0,
+  );
 
   async function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
@@ -206,10 +282,14 @@ export function CreateScheduleGroupPanel({
   function validate(): string {
     if (!projectId) return "Bitte Projekt auswählen.";
     if (taskMode === "existing" && !taskId) return "Bitte Aufgabe auswählen.";
-    if (taskMode === "new" && !newTaskName.trim()) return "Bitte Aufgabenname eingeben.";
-    if (previewPayloads.length === 0) return "Der ausgewählte Zeitraum enthält den Wochentag nicht.";
-    if (!isAfter(parseISO(to), parseISO(from)) && to !== from) return "Das Bis-Datum muss nach dem Von-Datum liegen.";
-    if (previewPayloads.some((payload) => payload.plannedDuration <= 0)) return "Die Startzeit muss vor der Endzeit liegen.";
+    if (taskMode === "new" && !newTaskName.trim())
+      return "Bitte Aufgabenname eingeben.";
+    if (previewPayloads.length === 0)
+      return "Der ausgewählte Zeitraum enthält den Wochentag nicht.";
+    if (!isAfter(parseISO(to), parseISO(from)) && to !== from)
+      return "Das Bis-Datum muss nach dem Von-Datum liegen.";
+    if (previewPayloads.some((payload) => payload.plannedDuration <= 0))
+      return "Die Startzeit muss vor der Endzeit liegen.";
     return "";
   }
 
@@ -238,7 +318,10 @@ export function CreateScheduleGroupPanel({
             disabled={isLoadingProjects}
             options={projectStatusOptions}
             placeholder="Projektstatus auswählen"
-            searchPlaceholder={formatSearchPlaceholder("Status filtern", projectStatusOptions.length)}
+            searchPlaceholder={formatSearchPlaceholder(
+              "Status filtern",
+              projectStatusOptions.length,
+            )}
             emptyLabel="Keine Status gefunden"
             onChange={(value) => {
               setProjectStatusFilter(value);
@@ -257,8 +340,15 @@ export function CreateScheduleGroupPanel({
             value={projectId}
             disabled={isLoadingProjects}
             options={projectOptions}
-            placeholder={isLoadingProjects ? "Projekte werden geladen..." : "Projekt auswählen"}
-            searchPlaceholder={formatSearchPlaceholder("Projekte filtern", projectOptions.length)}
+            placeholder={
+              isLoadingProjects
+                ? "Projekte werden geladen..."
+                : "Projekt auswählen"
+            }
+            searchPlaceholder={formatSearchPlaceholder(
+              "Projekte filtern",
+              projectOptions.length,
+            )}
             emptyLabel="Keine Projekte gefunden"
             onChange={(value) => void handleProjectChange(value)}
           />
@@ -270,7 +360,9 @@ export function CreateScheduleGroupPanel({
               type="checkbox"
               checked={onlyMyProjects}
               disabled={myAssignedProjectIds.size === 0}
-              onChange={(event) => handleOnlyMyProjectsChange(event.target.checked)}
+              onChange={(event) =>
+                handleOnlyMyProjectsChange(event.target.checked)
+              }
             />
             Nur mir zugewiesene Projekte
           </label>
@@ -301,7 +393,10 @@ export function CreateScheduleGroupPanel({
                 disabled={!projectId || isLoadingTasks}
                 options={taskStatusOptions}
                 placeholder="Aufgabenstatus auswählen"
-                searchPlaceholder={formatSearchPlaceholder("Status filtern", taskStatusOptions.length)}
+                searchPlaceholder={formatSearchPlaceholder(
+                  "Status filtern",
+                  taskStatusOptions.length,
+                )}
                 emptyLabel="Keine Status gefunden"
                 onChange={(value) => {
                   setTaskStatusFilter(value);
@@ -317,20 +412,32 @@ export function CreateScheduleGroupPanel({
                 value={taskId}
                 disabled={!projectId || isLoadingTasks}
                 options={taskOptions}
-                placeholder={isLoadingTasks ? "Aufgaben werden geladen..." : "Aufgabe auswählen"}
-                searchPlaceholder={formatSearchPlaceholder("Aufgaben filtern", taskOptions.length)}
+                placeholder={
+                  isLoadingTasks
+                    ? "Aufgaben werden geladen..."
+                    : "Aufgabe auswählen"
+                }
+                searchPlaceholder={formatSearchPlaceholder(
+                  "Aufgaben filtern",
+                  taskOptions.length,
+                )}
                 emptyLabel="Keine Aufgaben gefunden"
                 onChange={setTaskId}
               />
             </div>
             <div className="form-row form-row-col2">
-              <label htmlFor="create-only-my-assigned-tasks" className="checkbox-row">
+              <label
+                htmlFor="create-only-my-assigned-tasks"
+                className="checkbox-row"
+              >
                 <input
                   id="create-only-my-assigned-tasks"
                   type="checkbox"
                   checked={onlyMyAssignedTasks}
                   disabled={myAssignedTaskIds.size === 0 || !projectId}
-                  onChange={(event) => handleOnlyMyAssignedTasksChange(event.target.checked)}
+                  onChange={(event) =>
+                    handleOnlyMyAssignedTasksChange(event.target.checked)
+                  }
                 />
                 Nur mir zugewiesene Aufgaben
               </label>
@@ -357,7 +464,10 @@ export function CreateScheduleGroupPanel({
           <SearchableSelect
             buttonId="create-weekday"
             value={String(weekday)}
-            options={weekdays.map((day) => ({ value: String(day.value), label: day.label }))}
+            options={weekdays.map((day) => ({
+              value: String(day.value),
+              label: day.label,
+            }))}
             placeholder="Wochentag auswählen"
             searchPlaceholder="Wochentage filtern (7 gefunden)"
             emptyLabel="Kein Wochentag gefunden."
@@ -375,11 +485,21 @@ export function CreateScheduleGroupPanel({
         </div>
         <div className="form-row">
           <label htmlFor="create-start">Start</label>
-          <input id="create-start" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+          <input
+            id="create-start"
+            type="time"
+            value={startTime}
+            onChange={(event) => setStartTime(event.target.value)}
+          />
         </div>
         <div className="form-row">
           <label htmlFor="create-end">Ende</label>
-          <input id="create-end" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+          <input
+            id="create-end"
+            type="time"
+            value={endTime}
+            onChange={(event) => setEndTime(event.target.value)}
+          />
         </div>
       </div>
 
@@ -388,17 +508,31 @@ export function CreateScheduleGroupPanel({
       <div className="create-preview">
         <h3>Vorschau</h3>
         <p>
-          {selectedProject?.name ?? "Kein Projekt ausgewählt"} · {effectiveTaskName}
+          {selectedProject?.name ?? "Kein Projekt ausgewählt"} ·{" "}
+          {effectiveTaskName}
         </p>
-        <p>{previewPayloads.length} Blocker · {formatMinutesAsHours(totalMinutes)}</p>
+        <p>
+          {previewPayloads.length} Blocker ·{" "}
+          {formatMinutesAsHours(totalMinutes)}
+        </p>
         <div className="preview-list create-preview-list">
           {previewPayloads.slice(0, 12).map((payload) => (
             <div key={payload.startDate} className="preview-row">
-              <span>{format(parseISO(payload.startDate), "EEEE, dd.MM.yyyy", { locale: de })}</span>
-              <strong>{startTime}-{endTime}</strong>
+              <span>
+                {format(parseISO(payload.startDate), "EEEE, dd.MM.yyyy", {
+                  locale: de,
+                })}
+              </span>
+              <strong>
+                {startTime}-{endTime}
+              </strong>
             </div>
           ))}
-          {previewPayloads.length > 12 ? <div className="preview-row"><span>{previewPayloads.length - 12} weitere Blocker</span></div> : null}
+          {previewPayloads.length > 12 ? (
+            <div className="preview-row">
+              <span>{previewPayloads.length - 12} weitere Blocker</span>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -429,7 +563,9 @@ function matchesTaskStatus(task: AworkProjectTask, filter: string): boolean {
   return statusFilterValue(task) === filter;
 }
 
-function buildStatusOptions(items: Array<AworkProject | AworkProjectTask>): Array<{ value: string; label: string }> {
+function buildStatusOptions(
+  items: Array<AworkProject | AworkProjectTask>,
+): Array<{ value: string; label: string }> {
   const statuses = new Map<string, string>();
   items.forEach((item) => {
     const value = statusFilterValue(item);
@@ -444,13 +580,17 @@ function buildStatusOptions(items: Array<AworkProject | AworkProjectTask>): Arra
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-function statusFilterValue(item: AworkProject | AworkProjectTask): string | undefined {
+function statusFilterValue(
+  item: AworkProject | AworkProjectTask,
+): string | undefined {
   const label = item.statusName ?? item.statusType ?? item.statusId;
   return label?.trim().toLocaleLowerCase();
 }
 
 function formatProjectOption(project: AworkProject): string {
-  return project.statusName ? `${project.name} (${project.statusName})` : project.name;
+  return project.statusName
+    ? `${project.name} (${project.statusName})`
+    : project.name;
 }
 
 function formatTaskOption(task: AworkProjectTask): string {
@@ -458,7 +598,10 @@ function formatTaskOption(task: AworkProjectTask): string {
   return task.statusName ? `${name} (${task.statusName})` : name;
 }
 
-function includeSelected<T extends { id: string }>(items: T[], selectedItem: T | undefined): T[] {
+function includeSelected<T extends { id: string }>(
+  items: T[],
+  selectedItem: T | undefined,
+): T[] {
   if (!selectedItem || items.some((item) => item.id === selectedItem.id)) {
     return items;
   }
@@ -486,14 +629,22 @@ function buildPayloads({
 
   const startDate = parseISO(from);
   const endDate = parseISO(to);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || isAfter(startDate, endDate)) return [];
+  if (
+    Number.isNaN(startDate.getTime()) ||
+    Number.isNaN(endDate.getTime()) ||
+    isAfter(startDate, endDate)
+  )
+    return [];
 
   return eachDayOfInterval({ start: startDate, end: endDate })
     .filter((date) => getDay(date) === weekday)
     .map((date) => {
       const start = setTime(date, startTime);
       const end = setTime(date, endTime);
-      const plannedDuration = Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
+      const plannedDuration = Math.max(
+        0,
+        Math.round((end.getTime() - start.getTime()) / 1000),
+      );
       return {
         taskId,
         userId: currentUser.id,
