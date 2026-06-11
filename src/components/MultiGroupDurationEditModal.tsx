@@ -7,6 +7,7 @@ import type {
   ScheduleGroup,
 } from "../types/planner";
 import { isOwnSchedule } from "../services/scheduleMapper";
+import { ModalShell } from "./ModalShell";
 import { SearchableSelect } from "./SearchableSelect";
 import {
   calculateDurationMinutes,
@@ -227,13 +228,7 @@ export function MultiGroupDurationEditModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div
-        className="modal multi-edit-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="multi-duration-title"
-      >
+    <ModalShell labelledBy="multi-duration-title" dialogClassName="modal multi-edit-modal" onClose={onClose}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Mehrfach-Bearbeitung</p>
@@ -245,7 +240,7 @@ export function MultiGroupDurationEditModal({
           <button
             type="button"
             className="icon-button"
-            aria-label="Close"
+            aria-label="Schließen"
             onClick={onClose}
           >
             x
@@ -290,7 +285,7 @@ export function MultiGroupDurationEditModal({
 
             {isDurationEditMode ? (
               <div className="form-row">
-                <label htmlFor="multi-direction">Change</label>
+                <label htmlFor="multi-direction">Änderung</label>
                 <SearchableSelect
                   buttonId="multi-direction"
                   value={direction}
@@ -299,13 +294,13 @@ export function MultiGroupDurationEditModal({
                       ? moveDirectionOptions
                       : durationDirectionOptions),
                   ]}
-                  placeholder="Select change"
+                  placeholder="Änderung auswählen"
                   searchPlaceholder={
                     editMode === "shift"
-                      ? "Filter move directions (2 found)"
-                      : "Filter changes (2 found)"
+                      ? "Verschiebungen filtern (2 gefunden)"
+                      : "Änderungen filtern (2 gefunden)"
                   }
-                  emptyLabel="No change found."
+                  emptyLabel="Keine Änderung gefunden."
                   menuWidth="compact"
                   onChange={(value) => setDirection(value as Direction)}
                 />
@@ -376,20 +371,20 @@ export function MultiGroupDurationEditModal({
           {editMode !== "shift" ? (
             <div className="multi-edit-row multi-edit-row-weekday">
               <div className="form-row">
-                <label htmlFor="multi-weekday">New weekday</label>
+                <label htmlFor="multi-weekday">Neuer Wochentag</label>
                 <SearchableSelect
                   buttonId="multi-weekday"
                   value={weekdayOverride}
                   options={[
-                    { value: "", label: "Keep current weekdays" },
+                    { value: "", label: "Aktuelle Wochentage behalten" },
                     ...weekdayOptions.map((day) => ({
                       value: String(day.value),
                       label: day.label,
                     })),
                   ]}
-                  placeholder="Select weekday"
-                  searchPlaceholder="Filter weekdays (8 found)"
-                  emptyLabel="No weekday found."
+                  placeholder="Wochentag auswählen"
+                  searchPlaceholder="Wochentage filtern (8 gefunden)"
+                  emptyLabel="Kein Wochentag gefunden."
                   menuWidth="compact"
                   onChange={setWeekdayOverride}
                 />
@@ -406,31 +401,29 @@ export function MultiGroupDurationEditModal({
 
         {error ? <div className="alert alert-error">{error}</div> : null}
 
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="danger-button unplan-selected-button"
-            onClick={handleUnplanPreview}
-          >
-            Ausplanen
-          </button>
-          <button type="button" className="ghost-button" onClick={onClose}>
-            Abbrechen
-          </button>
-          <button
-            type="button"
-            className="primary-button icon-button"
-            title="Änderungen vorschauen"
-            aria-label="Änderungen vorschauen"
-            onClick={handlePreview}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M3 9l4.5 4.5L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
+        <div className="modal-actions modal-actions-split">
+          <div className="modal-actions-left">
+            <button
+              type="button"
+              className="danger-button unplan-selected-button"
+              onClick={handleUnplanPreview}
+            >
+              Ausplanen
+            </button>
+          </div>
+          <div className="modal-actions-right">
+            <button type="button" className="ghost-button" onClick={onClose}>
+              Abbrechen
+            </button>
+            <button type="button" className="primary-button" onClick={handlePreview}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M3 9l4.5 4.5L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Vorschau
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

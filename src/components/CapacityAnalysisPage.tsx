@@ -45,6 +45,8 @@ import {
   formatSearchPlaceholder,
   MultiSearchableSelect,
 } from "./SearchableSelect";
+import { DatePickerInput } from "./DatePickerInput";
+import { SegmentedControl } from "./SegmentedControl";
 
 interface CapacityAnalysisPageProps {
   backendClient: BackendClient;
@@ -116,6 +118,12 @@ interface CapacityResponse {
 }
 
 type WorkloadFilterMode = "all" | "gt" | "lt";
+
+const workloadFilterOptions = [
+  { value: "all" as const, label: "Alle" },
+  { value: "gt" as const, label: "Über" },
+  { value: "lt" as const, label: "Unter" },
+];
 
 interface SelectedRowSummary {
   row: UserCapacityRow;
@@ -590,6 +598,9 @@ export function CapacityAnalysisPage({
             Geplante Projektzeit und verfügbare Team-Kapazität in einer Ansicht.
           </p>
           <a className="ghost-link-button" href={getPlannerHref()}>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ marginRight: 7 }}>
+              <path d="M10.5 3L5.5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
             Zurück zum Planner
           </a>
         </div>
@@ -617,22 +628,20 @@ export function CapacityAnalysisPage({
               <div className="analysis-date-inputs">
                 <div className="form-row">
                   <label htmlFor="analysis-from">Von</label>
-                  <input
+                  <DatePickerInput
                     id="analysis-from"
-                    type="date"
                     value={from}
                     disabled={isLoading}
-                    onChange={(event) => setFrom(event.target.value)}
+                    onChange={setFrom}
                   />
                 </div>
                 <div className="form-row">
                   <label htmlFor="analysis-to">Bis</label>
-                  <input
+                  <DatePickerInput
                     id="analysis-to"
-                    type="date"
                     value={to}
                     disabled={isLoading}
-                    onChange={(event) => setTo(event.target.value)}
+                    onChange={setTo}
                   />
                 </div>
               </div>
@@ -678,9 +687,21 @@ export function CapacityAnalysisPage({
                   isLoadingUsers ||
                   usersSelectedForAnalysis.length === 0
                 }
+                title={
+                  usersSelectedForAnalysis.length === 0
+                    ? "Erst unten mindestens einen Nutzer auswählen"
+                    : undefined
+                }
                 onClick={() => void loadAnalysis()}
               >
-                {isLoading ? "Lädt..." : "Analyse starten"}
+                {isLoading ? (
+                  <>
+                    <span className="button-spinner" aria-hidden="true" />
+                    Wird geladen...
+                  </>
+                ) : (
+                  "Analyse starten"
+                )}
               </button>
             </div>
             <p className="analysis-range-note">
@@ -718,9 +739,14 @@ export function CapacityAnalysisPage({
                   disabled={isLoading || isLoadingUsers}
                   onClick={() => void loadAvailableUsers()}
                 >
-                  {isLoadingUsers
-                    ? "Nutzer werden geladen..."
-                    : "Nutzer neu laden"}
+                  {isLoadingUsers ? (
+                    <>
+                      <span className="button-spinner" aria-hidden="true" />
+                      Wird geladen...
+                    </>
+                  ) : (
+                    "Nutzer neu laden"
+                  )}
                 </button>
                 <button
                   type="button"
@@ -744,22 +770,32 @@ export function CapacityAnalysisPage({
               </div>
             </div>
             <div
-              className="analysis-preselection-grid"
+              className="analysis-user-chips"
               role="group"
               aria-label="Nutzer"
             >
-              {availableUsers.map((user) => (
-                <label className="analysis-user-check" key={user.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedUserIds.has(user.id)}
-                    onChange={(event) =>
-                      togglePreselectionUser(user.id, event.target.checked)
+              {availableUsers.map((user) => {
+                const isSelected = selectedUserIds.has(user.id);
+                return (
+                  <button
+                    type="button"
+                    key={user.id}
+                    className={`user-chip${isSelected ? " is-selected" : ""}`}
+                    aria-pressed={isSelected}
+                    title={formatUserName(user)}
+                    onClick={() =>
+                      togglePreselectionUser(user.id, !isSelected)
                     }
-                  />
-                  <span>{formatUserName(user)}</span>
-                </label>
-              ))}
+                  >
+                    <span className="user-chip-check" aria-hidden="true">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6.5l2.5 2.5L10 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </span>
+                    {shortUserName(user)}
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -768,17 +804,26 @@ export function CapacityAnalysisPage({
               <div>
                 <strong>Abwesenheiten konnten nicht geladen werden.</strong>
                 <span>
-                  Kapazitätsberechnung ohne Urlaubskorrektur. Analyse erneut
-                  starten, um es nochmal zu versuchen.
+                  Die Kapazitätsberechnung läuft ohne Urlaubskorrektur.
                 </span>
               </div>
-              <button
-                type="button"
-                className="ghost-button analysis-absence-dismiss"
-                onClick={() => setAbsenceLoadFailed(false)}
-              >
-                Schließen
-              </button>
+              <div className="analysis-absence-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={isLoading}
+                  onClick={() => void loadAnalysis()}
+                >
+                  Nochmal versuchen
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button analysis-absence-dismiss"
+                  onClick={() => setAbsenceLoadFailed(false)}
+                >
+                  Schließen
+                </button>
+              </div>
             </section>
           ) : null}
 
@@ -790,8 +835,9 @@ export function CapacityAnalysisPage({
             <section className="panel">
               <div className="empty-state">
                 <p>
-                  Zeitraum auswählen und Analyse starten, um die Team-Kapazität
-                  zu laden.
+                  {usersSelectedForAnalysis.length === 0
+                    ? "Oben mindestens einen Nutzer auswählen, dann „Analyse starten“ klicken."
+                    : "Alles bereit — „Analyse starten“ klicken, um die Team-Kapazität zu laden."}
                 </p>
               </div>
             </section>
@@ -848,20 +894,12 @@ export function CapacityAnalysisPage({
                       </button>
                       <div className="analysis-toolbar-divider" />
                       <div className="analysis-workload-filter">
-                        <select
-                          id="analysis-workload-filter-mode"
-                          aria-label="Auslastungsvergleich"
+                        <SegmentedControl
                           value={workloadFilterMode}
-                          onChange={(event) =>
-                            setWorkloadFilterMode(
-                              event.target.value as WorkloadFilterMode,
-                            )
-                          }
-                        >
-                          <option value="all">Alle</option>
-                          <option value="gt">Größer als</option>
-                          <option value="lt">Kleiner als</option>
-                        </select>
+                          options={workloadFilterOptions}
+                          ariaLabel="Auslastungsvergleich"
+                          onChange={setWorkloadFilterMode}
+                        />
                         <div className="analysis-workload-threshold">
                           <input
                             type="number"
@@ -887,9 +925,14 @@ export function CapacityAnalysisPage({
                         <input
                           type="text"
                           inputMode="decimal"
-                          pattern="[0-9.]*"
                           placeholder="—"
                           value={bulkWeeklyHoursInput}
+                          aria-invalid={isInvalidNumberInput(bulkWeeklyHoursInput)}
+                          className={
+                            isInvalidNumberInput(bulkWeeklyHoursInput)
+                              ? "input-invalid"
+                              : undefined
+                          }
                           onChange={(event) =>
                             setBulkWeeklyHoursInput(event.target.value)
                           }
@@ -900,9 +943,14 @@ export function CapacityAnalysisPage({
                         <input
                           type="text"
                           inputMode="numeric"
-                          pattern="[0-9]*"
                           placeholder="70"
                           value={bulkCustomerPercentInput}
+                          aria-invalid={isInvalidNumberInput(bulkCustomerPercentInput)}
+                          className={
+                            isInvalidNumberInput(bulkCustomerPercentInput)
+                              ? "input-invalid"
+                              : undefined
+                          }
                           onChange={(event) =>
                             setBulkCustomerPercentInput(event.target.value)
                           }
@@ -911,10 +959,12 @@ export function CapacityAnalysisPage({
                       <button
                         type="button"
                         className="ghost-button"
+                        title="Setzt nur die ausgefüllten Felder für alle ausgewählten Nutzer."
                         disabled={
-                          visibleSelectedRowSummaries.length === 0 &&
-                          !bulkWeeklyHoursInput &&
-                          !bulkCustomerPercentInput
+                          visibleSelectedRowSummaries.length === 0 ||
+                          (!bulkWeeklyHoursInput && !bulkCustomerPercentInput) ||
+                          isInvalidNumberInput(bulkWeeklyHoursInput) ||
+                          isInvalidNumberInput(bulkCustomerPercentInput)
                         }
                         onClick={() => {
                           if (bulkWeeklyHoursInput) {
@@ -928,13 +978,10 @@ export function CapacityAnalysisPage({
                               );
                             });
                           }
-                          if (
-                            bulkCustomerPercentInput ||
-                            visibleSelectedRowSummaries.length > 0
-                          ) {
-                            const value = bulkCustomerPercentInput
-                              ? readPercentNumber(bulkCustomerPercentInput)
-                              : 70;
+                          if (bulkCustomerPercentInput) {
+                            const value = readPercentNumber(
+                              bulkCustomerPercentInput,
+                            );
                             visibleSelectedRowSummaries.forEach((entry) => {
                               updateCapacityInput(
                                 entry.row.user.id,
@@ -963,9 +1010,24 @@ export function CapacityAnalysisPage({
                     />
                   </div>
                 </div>
-                <p className="capacity-chart-note">
-                  Balken = Wochenstunden · Gelber Marker = Kunden-Ziel
-                </p>
+                <div className="capacity-chart-legend" aria-label="Legende">
+                  <span>
+                    <i className="legend-swatch legend-swatch-capacity" />
+                    Kapazität (Wochenstunden)
+                  </span>
+                  <span>
+                    <i className="legend-swatch legend-swatch-planned" />
+                    Geplante Projektzeit
+                  </span>
+                  <span>
+                    <i className="legend-swatch legend-swatch-target" />
+                    Kunden-Ziel — darüber gilt als überplant
+                  </span>
+                  <span>
+                    <i className="legend-swatch legend-swatch-absent" />
+                    Abwesenheit
+                  </span>
+                </div>
                 {visibleSelectedRowSummaries.length > 0 ? (
                   <div className="capacity-chart">
                     {visibleSelectedRowSummaries.map((entry) => {
@@ -1255,7 +1317,7 @@ function CapacityChartRow({
         <div className="capacity-row-main">
           <div
             className="capacity-week-grid"
-            aria-label={`${formatUserName(row.user)} planned project hours by calendar week`}
+            aria-label={`Geplante Projektstunden von ${formatUserName(row.user)} pro Kalenderwoche`}
           >
             {weekRows.map((weekRow) => (
               <CapacityWeekBar
@@ -2119,16 +2181,23 @@ function calculateWeekCount(from: string, to: string): number {
 }
 
 function readPositiveNumber(value: string): number {
-  const parsed = Number(value);
+  const parsed = Number(value.replace(",", "."));
   return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
 function readPercentNumber(value: string): number {
-  const parsed = Number(value);
+  const parsed = Number(value.replace(",", "."));
   if (!Number.isFinite(parsed)) {
     return 0;
   }
   return Math.min(100, Math.max(0, parsed));
+}
+
+function isInvalidNumberInput(value: string): boolean {
+  if (!value.trim()) {
+    return false;
+  }
+  return !Number.isFinite(Number(value.replace(",", ".")));
 }
 
 function buildProjectColorResolver(
@@ -2163,12 +2232,19 @@ function formatUserName(user: AworkUser): string {
   return user.email && name ? `${label} (${user.email})` : label;
 }
 
+function shortUserName(user: AworkUser): string {
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  return name || user.email || user.id;
+}
+
 function formatHours(hours: number): string {
-  return `${formatDecimal(hours)}h`;
+  return `${formatDecimal(hours)} h`;
 }
 
 function formatDecimal(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(1).replace(".", ",");
 }
 
 function formatAbsentDays(days: number): string {
@@ -2183,7 +2259,7 @@ function formatAbsentDays(days: number): string {
 
 function formatTopProjects(projects: ProjectTotal[]): string {
   if (projects.length === 0) {
-    return "No project time";
+    return "Keine Projektzeit";
   }
 
   return projects
@@ -2193,7 +2269,7 @@ function formatTopProjects(projects: ProjectTotal[]): string {
 
 function renderTopProjects(projects: ProjectTotal[]) {
   if (projects.length === 0) {
-    return "No project time";
+    return "Keine Projektzeit";
   }
 
   return projects.map((project, index) => (

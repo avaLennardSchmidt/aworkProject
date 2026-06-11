@@ -1,5 +1,6 @@
 import type { ScheduleGroup } from "../types/planner";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
+import { ModalShell } from "./ModalShell";
 
 interface ManualEditConfirmModalProps {
   group: ScheduleGroup;
@@ -10,15 +11,14 @@ interface ManualEditConfirmModalProps {
 
 export function ManualEditConfirmModal({ group, onBack, onCancel, onConfirm }: ManualEditConfirmModalProps) {
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="manual-confirm-title">
+    <ModalShell labelledBy="manual-confirm-title" onClose={onCancel}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Manuelle Bearbeitung</p>
             <h2 id="manual-confirm-title">{group.schedules.length} Blocker einzeln bearbeiten?</h2>
             <p>{group.taskName} · {group.projectName ?? "Projekt nicht aufgelöst"}</p>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onCancel}>
+          <button type="button" className="icon-button" aria-label="Schließen" onClick={onCancel}>
             x
           </button>
         </div>
@@ -44,7 +44,6 @@ export function ManualEditConfirmModal({ group, onBack, onCancel, onConfirm }: M
             Blocker manuell bearbeiten
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { fuzzyMatches } from "../services/fuzzySearch";
 import type { ScheduleGroup } from "../types/planner";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
@@ -114,6 +115,10 @@ export function ScheduleGroupsList({
           Keine geplanten Blocker für die aktuellen Filter und den ausgewählten
           Planner-Nutzer.
         </p>
+        <p className="empty-state-hint">
+          Tipp: Zeitraum oder Projektfilter oben anpassen — oder zum Workflow
+          „Anlegen" wechseln, um neue Blocker zu erstellen.
+        </p>
       </section>
     );
   }
@@ -168,7 +173,10 @@ export function ScheduleGroupsList({
       {filteredGroups.length === 0 ? (
         <section className="panel empty-state groups-search-empty">
           <h2>Keine Gruppen gefunden</h2>
-          <p>Aufgabe, Projekt, Wochentag oder Zeitfenster probieren.</p>
+          <p>
+            Für „{normalizedSearchQuery}" gibt es keine Treffer. Mit Aufgabe,
+            Projekt, Wochentag oder Zeitfenster suchen — z.B. „Montag 09:00".
+          </p>
         </section>
       ) : null}
 
@@ -253,9 +261,16 @@ function ProjectRows({
           </small>
         </th>
       </tr>
-      {!collapsed &&
-        section.groups.map((group) => (
-          <tr key={group.groupId}>
+      <AnimatePresence initial={false}>
+        {!collapsed &&
+          section.groups.map((group) => (
+            <motion.tr
+              key={group.groupId}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
             <td>
               <input
                 type="checkbox"
@@ -304,8 +319,9 @@ function ProjectRows({
                 </button>
               </div>
             </td>
-          </tr>
+          </motion.tr>
         ))}
+      </AnimatePresence>
     </>
   );
 }

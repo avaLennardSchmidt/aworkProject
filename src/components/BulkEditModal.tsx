@@ -9,6 +9,7 @@ import {
   getTimeHHmm,
 } from "../services/scheduleTimeCalculator";
 import { isOwnSchedule } from "../services/scheduleMapper";
+import { ModalShell } from "./ModalShell";
 import { SearchableSelect } from "./SearchableSelect";
 
 interface BulkEditModalProps {
@@ -87,23 +88,22 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
   }
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="bulk-edit-title">
+    <ModalShell labelledBy="bulk-edit-title" onClose={onClose}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Gruppen-Bearbeitung</p>
             <h2 id="bulk-edit-title">{group.taskName}</h2>
             <p>{group.projectName ?? "Kein Projekt im Blocker"}</p>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>
+          <button type="button" className="icon-button" aria-label="Schließen" onClick={onClose}>
             x
           </button>
         </div>
 
         <div className="summary-strip">
           <span>{group.weekdayLabel} {group.startTime}-{group.endTime}</span>
-          <span>{group.schedules.length} blockers</span>
-          <span>{formatMinutesAsHours(group.totalMinutes)} before</span>
+          <span>{group.schedules.length} Blocker</span>
+          <span>{formatMinutesAsHours(group.totalMinutes)} vorher</span>
         </div>
 
         <div className="filter-grid">
@@ -146,21 +146,15 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
             <button type="button" className="ghost-button" onClick={onClose}>
               Abbrechen
             </button>
-            <button
-              type="button"
-              className="primary-button icon-button"
-              title="Änderungen vorschauen"
-              aria-label="Änderungen vorschauen"
-              onClick={handlePreview}
-            >
+            <button type="button" className="primary-button" onClick={handlePreview}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
                 <path d="M3 9l4.5 4.5L15 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              Vorschau
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

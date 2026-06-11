@@ -1,5 +1,6 @@
 import type { PreviewChange, UpdateResult } from "../types/planner";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
+import { ModalShell } from "./ModalShell";
 
 interface PreviewChangesModalProps {
   changes: PreviewChange[];
@@ -24,14 +25,13 @@ export function PreviewChangesModal({
   const failureCount = updateResults?.filter((result) => !result.success).length ?? 0;
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+    <ModalShell labelledBy="preview-title" dialogClassName="modal modal-wide" onClose={isUpdating ? undefined : onCancel}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Vorschau</p>
             <h2 id="preview-title">{changes.length} Blocker werden geändert</h2>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onCancel}>
+          <button type="button" className="icon-button" aria-label="Schließen" onClick={onCancel}>
             x
           </button>
         </div>
@@ -80,11 +80,17 @@ export function PreviewChangesModal({
             Schließen
           </button>
           <button type="button" className="primary-button" disabled={isUpdating || Boolean(updateResults)} onClick={onApply}>
-            {isUpdating ? "Übernehmen..." : "Änderungen übernehmen"}
+            {isUpdating ? (
+              <>
+                <span className="button-spinner" aria-hidden="true" />
+                Wird übernommen...
+              </>
+            ) : (
+              "Änderungen übernehmen"
+            )}
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

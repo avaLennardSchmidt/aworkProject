@@ -1,5 +1,6 @@
 import type { DeleteResult, ScheduleGroup } from "../types/planner";
 import { formatMinutesAsHours, formatScheduleDateLabel, getTimeHHmm } from "../services/scheduleTimeCalculator";
+import { ModalShell } from "./ModalShell";
 
 interface DeleteGroupModalProps {
   group: ScheduleGroup;
@@ -14,8 +15,7 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
   const failureCount = deleteResults?.filter((result) => !result.success).length ?? 0;
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="delete-group-title">
+    <ModalShell labelledBy="delete-group-title" dialogClassName="modal modal-wide" onClose={isDeleting ? undefined : onCancel}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Gruppe ausplanen</p>
@@ -24,7 +24,7 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
               {group.taskName} · {group.projectName ?? "Projekt nicht aufgelöst"} · {group.weekdayLabel} {group.startTime}-{group.endTime}
             </p>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" disabled={isDeleting} onClick={onCancel}>
+          <button type="button" className="icon-button" aria-label="Schließen" disabled={isDeleting} onClick={onCancel}>
             x
           </button>
         </div>
@@ -74,10 +74,16 @@ export function DeleteGroupModal({ group, isDeleting, deleteResults, onCancel, o
             Schließen
           </button>
           <button type="button" className="danger-button" disabled={isDeleting || Boolean(deleteResults)} onClick={onDelete}>
-            {isDeleting ? "Wird ausgeplant..." : "Blocker ausplanen"}
+            {isDeleting ? (
+              <>
+                <span className="button-spinner" aria-hidden="true" />
+                Wird ausgeplant...
+              </>
+            ) : (
+              "Blocker ausplanen"
+            )}
           </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

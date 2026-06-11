@@ -42,8 +42,9 @@ export function PlannerUserSelector({
       </div>
       <div className="planner-user-controls">
         <div className="form-row">
-          <label>Ausgewählter Nutzer</label>
+          <label htmlFor="planner-user-select">Ausgewählter Nutzer</label>
           <SearchableSelect
+            buttonId="planner-user-select"
             value={selectedUserId}
             disabled={isLoadingUsers}
             options={options}
@@ -59,7 +60,14 @@ export function PlannerUserSelector({
           disabled={isLoadingUsers}
           onClick={() => void onLoadUsers()}
         >
-          {isLoadingUsers ? "Lädt..." : "Nutzer neu laden"}
+          {isLoadingUsers ? (
+            <>
+              <span className="button-spinner" aria-hidden="true" />
+              Wird geladen...
+            </>
+          ) : (
+            "Nutzer neu laden"
+          )}
         </button>
         {analysisHref ? (
           <a className="primary-link-button planner-analysis-link" href={analysisHref}>

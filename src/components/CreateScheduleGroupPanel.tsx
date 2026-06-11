@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { AworkProject, AworkProjectTask, AworkUser, CreateTaskSchedulePayload } from "../types/awork";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
+import { DatePickerInput } from "./DatePickerInput";
 import { formatSearchPlaceholder, SearchableSelect } from "./SearchableSelect";
+import { SegmentedControl } from "./SegmentedControl";
 
 export interface CreateGroupOptions {
   projectId: string;
@@ -32,6 +34,27 @@ const NEW_TASK_PLACEHOLDER_ID = "__new_task__";
 const PROJECT_FILTER_ACTIVE = "__active_projects__";
 const PROJECT_FILTER_ALL = "__all_projects__";
 const TASK_FILTER_ALL = "__all_task_statuses__";
+
+const taskModeOptions = [
+  {
+    value: "existing" as const,
+    label: "Bestehend",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M2 3.5h10M2 7h8M2 10.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    value: "new" as const,
+    label: "Neu anlegen",
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+];
 
 const weekdays = [
   { value: 1, label: "Montag" },
@@ -191,7 +214,13 @@ export function CreateScheduleGroupPanel({
   }
 
   return (
-    <section className="panel create-panel">
+    <form
+      className="panel create-panel"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleCreate();
+      }}
+    >
       <div className="panel-header">
         <div>
           <p className="eyebrow">Workflow</p>
@@ -202,8 +231,9 @@ export function CreateScheduleGroupPanel({
 
       <div className="create-grid project-selection-grid">
         <div className="form-row">
-          <label>Projektstatus</label>
+          <label htmlFor="create-project-status">Projektstatus</label>
           <SearchableSelect
+            buttonId="create-project-status"
             value={projectStatusFilter}
             disabled={isLoadingProjects}
             options={projectStatusOptions}
@@ -221,8 +251,9 @@ export function CreateScheduleGroupPanel({
         </div>
 
         <div className="form-row">
-          <label>Projekt</label>
+          <label htmlFor="create-project">Projekt</label>
           <SearchableSelect
+            buttonId="create-project"
             value={projectId}
             disabled={isLoadingProjects}
             options={projectOptions}
@@ -249,38 +280,13 @@ export function CreateScheduleGroupPanel({
       <div className="create-grid task-mode-grid">
         <div className="form-row task-mode-row">
           <label>Aufgabe</label>
-          <div
-            className={`task-toggle task-toggle--${taskMode}`}
-            role="tablist"
-            aria-label="Aufgabenmodus"
-          >
-            <button
-              type="button"
-              role="tab"
-              className={taskMode === "existing" ? "active" : ""}
-              disabled={!projectId}
-              aria-selected={taskMode === "existing"}
-              onClick={() => handleTaskModeChange("existing")}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <path d="M2 3.5h10M2 7h8M2 10.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-              </svg>
-              Bestehend
-            </button>
-            <button
-              type="button"
-              role="tab"
-              className={taskMode === "new" ? "active" : ""}
-              disabled={!projectId}
-              aria-selected={taskMode === "new"}
-              onClick={() => handleTaskModeChange("new")}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
-              </svg>
-              Neu anlegen
-            </button>
-          </div>
+          <SegmentedControl
+            value={taskMode}
+            options={taskModeOptions}
+            ariaLabel="Aufgabenmodus"
+            disabled={!projectId}
+            onChange={handleTaskModeChange}
+          />
         </div>
       </div>
 
@@ -288,8 +294,9 @@ export function CreateScheduleGroupPanel({
         {taskMode === "existing" ? (
           <>
             <div className="form-row">
-              <label>Aufgabenstatus</label>
+              <label htmlFor="create-task-status">Aufgabenstatus</label>
               <SearchableSelect
+                buttonId="create-task-status"
                 value={taskStatusFilter}
                 disabled={!projectId || isLoadingTasks}
                 options={taskStatusOptions}
@@ -304,8 +311,9 @@ export function CreateScheduleGroupPanel({
             </div>
 
             <div className="form-row">
-              <label>Aufgabe</label>
+              <label htmlFor="create-task">Aufgabe</label>
               <SearchableSelect
+                buttonId="create-task"
                 value={taskId}
                 disabled={!projectId || isLoadingTasks}
                 options={taskOptions}
@@ -346,19 +354,24 @@ export function CreateScheduleGroupPanel({
       <div className="create-grid schedule-fields-grid">
         <div className="form-row">
           <label htmlFor="create-weekday">Wochentag</label>
-          <select id="create-weekday" value={weekday} onChange={(event) => setWeekday(Number(event.target.value))}>
-            {weekdays.map((day) => (
-              <option key={day.value} value={day.value}>{day.label}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            buttonId="create-weekday"
+            value={String(weekday)}
+            options={weekdays.map((day) => ({ value: String(day.value), label: day.label }))}
+            placeholder="Wochentag auswählen"
+            searchPlaceholder="Wochentage filtern (7 gefunden)"
+            emptyLabel="Kein Wochentag gefunden."
+            menuWidth="compact"
+            onChange={(value) => setWeekday(Number(value))}
+          />
         </div>
         <div className="form-row">
           <label htmlFor="create-from">Von</label>
-          <input id="create-from" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+          <DatePickerInput id="create-from" value={from} onChange={setFrom} />
         </div>
         <div className="form-row">
           <label htmlFor="create-to">Bis</label>
-          <input id="create-to" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+          <DatePickerInput id="create-to" value={to} onChange={setTo} />
         </div>
         <div className="form-row">
           <label htmlFor="create-start">Start</label>
@@ -377,7 +390,7 @@ export function CreateScheduleGroupPanel({
         <p>
           {selectedProject?.name ?? "Kein Projekt ausgewählt"} · {effectiveTaskName}
         </p>
-        <p>{previewPayloads.length} blockers · {formatMinutesAsHours(totalMinutes)}</p>
+        <p>{previewPayloads.length} Blocker · {formatMinutesAsHours(totalMinutes)}</p>
         <div className="preview-list create-preview-list">
           {previewPayloads.slice(0, 12).map((payload) => (
             <div key={payload.startDate} className="preview-row">
@@ -389,10 +402,19 @@ export function CreateScheduleGroupPanel({
         </div>
       </div>
 
-      <button type="button" className="primary-button" disabled={isCreating} onClick={() => void handleCreate()}>
-        {isCreating ? "Wird angelegt..." : taskMode === "new" ? "Aufgabe und Blocker anlegen" : "Blocker anlegen"}
+      <button type="submit" className="primary-button" disabled={isCreating}>
+        {isCreating ? (
+          <>
+            <span className="button-spinner" aria-hidden="true" />
+            Wird angelegt...
+          </>
+        ) : taskMode === "new" ? (
+          "Aufgabe und Blocker anlegen"
+        ) : (
+          "Blocker anlegen"
+        )}
       </button>
-    </section>
+    </form>
   );
 }
 

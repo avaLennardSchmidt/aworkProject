@@ -960,7 +960,7 @@ function App() {
 
       {createSuccess ? (
         <SuccessPopup
-          title="BÄM, Aufgabe erledigt."
+          title="Blocker angelegt"
           message={`${createSuccess.count} Blocker erfolgreich angelegt.`}
           detail={
             createSuccess.taskCreated
@@ -975,7 +975,7 @@ function App() {
 
       {deleteSuccess ? (
         <SuccessPopup
-          title="BÄM, Gruppe ausgeplant."
+          title="Gruppe ausgeplant"
           message={`${deleteSuccess.count} Blocker erfolgreich ausgeplant.`}
           detail="Alle ausgewählten Blocker wurden aus dem Planner entfernt. Die awork-Aufgabe wurde nicht gelöscht."
           onClose={() => setDeleteSuccess(undefined)}
@@ -984,7 +984,7 @@ function App() {
 
       {updateSuccess ? (
         <SuccessPopup
-          title={updateSuccess.title ?? "BÄM, Zeitfenster angepasst."}
+          title={updateSuccess.title ?? "Zeitfenster angepasst"}
           message={`${updateSuccess.count} Blocker erfolgreich aktualisiert.`}
           detail={
             updateSuccess.detail ??

@@ -10,6 +10,8 @@ import {
 } from "date-fns";
 import type { ReactNode } from "react";
 import type { PlannerFilters } from "../types/planner";
+import { DatePickerInput } from "./DatePickerInput";
+import { formatSearchPlaceholder, SearchableSelect } from "./SearchableSelect";
 
 interface ProjectOption {
   id: string;
@@ -90,47 +92,51 @@ export function FilterPanel({
       <div className="filter-grid">
         <div className="form-row">
           <label htmlFor="date-from">Von</label>
-          <input
+          <DatePickerInput
             id="date-from"
-            type="date"
             value={filters.from}
             disabled={disabled}
-            onChange={(event) =>
-              onChange({ ...filters, from: event.target.value })
-            }
+            onChange={(value) => onChange({ ...filters, from: value })}
           />
         </div>
         <div className="form-row">
           <label htmlFor="date-to">Bis</label>
-          <input
+          <DatePickerInput
             id="date-to"
-            type="date"
             value={filters.to}
             disabled={disabled}
-            onChange={(event) =>
-              onChange({ ...filters, to: event.target.value })
-            }
+            onChange={(value) => onChange({ ...filters, to: value })}
           />
         </div>
         <div className="form-row project-filter-row">
           <label htmlFor="project-filter">Projekt</label>
-          <select
-            id="project-filter"
+          <SearchableSelect
+            buttonId="project-filter"
             value={filters.projectId}
             disabled={disabled || projectOptions.length === 0}
-            onChange={(event) =>
-              onChange({ ...filters, projectId: event.target.value })
+            options={[
+              {
+                value: "",
+                label:
+                  projectOptions.length > 0
+                    ? "Alle Projekte"
+                    : projectPlaceholder,
+              },
+              ...projectOptions.map((project) => ({
+                value: project.id,
+                label: project.name,
+              })),
+            ]}
+            placeholder={
+              projectOptions.length > 0 ? "Alle Projekte" : projectPlaceholder
             }
-          >
-            <option value="">
-              {projectOptions.length > 0 ? "Alle Projekte" : projectPlaceholder}
-            </option>
-            {projectOptions.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+            searchPlaceholder={formatSearchPlaceholder(
+              "Projekte filtern",
+              projectOptions.length,
+            )}
+            emptyLabel="Keine Projekte gefunden"
+            onChange={(value) => onChange({ ...filters, projectId: value })}
+          />
         </div>
       </div>
 
@@ -194,23 +200,25 @@ export function FilterPanel({
         </label>
         <button
           type="button"
-          className="primary-button icon-button"
+          className="primary-button"
           disabled={disabled || isLoading}
-          title={isLoading ? "Lädt..." : "Blocker laden"}
-          aria-label={isLoading ? "Lädt..." : "Blocker laden"}
           onClick={onLoad}
         >
           {isLoading ? (
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className="spin">
-              <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="2" strokeDasharray="28 16" strokeLinecap="round"/>
-            </svg>
+            <>
+              <span className="button-spinner" aria-hidden="true" />
+              Wird geladen...
+            </>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M15 9a6 6 0 0 1-10.5 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              <path d="M3 9a6 6 0 0 1 10.5-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              <path d="M13.5 5V2.5H16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M4.5 13v2.5H2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M15 9a6 6 0 0 1-10.5 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M3 9a6 6 0 0 1 10.5-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M13.5 5V2.5H16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4.5 13v2.5H2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Blocker laden
+            </>
           )}
         </button>
       </div>

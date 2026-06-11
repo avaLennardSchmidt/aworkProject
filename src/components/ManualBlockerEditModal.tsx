@@ -1,8 +1,10 @@
 import { addDays, format, parseISO, set } from "date-fns";
+import { DatePickerInput } from "./DatePickerInput";
 import { useMemo, useState } from "react";
 import type { AworkUser, CreateTaskSchedulePayload } from "../types/awork";
 import type { BlockerOperation, ScheduleGroup } from "../types/planner";
 import { isOwnSchedule } from "../services/scheduleMapper";
+import { ModalShell } from "./ModalShell";
 import {
   calculateDurationMinutes,
   formatMinutesAsHours,
@@ -164,15 +166,14 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
   }
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="modal modal-wide manual-edit-modal" role="dialog" aria-modal="true" aria-labelledby="manual-edit-title">
+    <ModalShell labelledBy="manual-edit-title" dialogClassName="modal modal-wide manual-edit-modal" onClose={onClose}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Manuelle Bearbeitung</p>
             <h2 id="manual-edit-title">{group.taskName}</h2>
             <p>{group.projectName ?? "Projekt nicht aufgelöst"}</p>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onClose}>x</button>
+          <button type="button" className="icon-button" aria-label="Schließen" onClick={onClose}>x</button>
         </div>
 
         <div className="preview-summary">
@@ -198,7 +199,7 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
                   <span>{getTimeHHmm(schedule.start)}-{getTimeHHmm(schedule.end)}</span>
                 </div>
                 <div className="manual-row-fields">
-                  <label>Datum<input type="date" value={view.row.date} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { date: event.target.value })} /></label>
+                  <label>Datum<DatePickerInput value={view.row.date} disabled={view.row.remove} onChange={(val) => updateExistingRow(schedule.id, { date: val })} /></label>
                   <label>Start<input type="time" value={view.row.startTime} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { startTime: event.target.value })} /></label>
                   <label>Ende<input type="time" value={view.row.endTime} disabled={view.row.remove} onChange={(event) => updateExistingRow(schedule.id, { endTime: event.target.value })} /></label>
                   <button type="button" className="ghost-button manual-reset-button" disabled={!view.changed} onClick={() => resetExistingRow(schedule.id)}>Zurücksetzen</button>
@@ -224,7 +225,7 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
               <div key={row.tempId} className={["manual-edit-row", "is-new", rowError ? "has-error" : ""].filter(Boolean).join(" ")}>
                 <div className="manual-row-date"><strong>Neuer Blocker</strong><span>{row.date}</span></div>
                 <div className="manual-row-fields">
-                  <label>Datum<input type="date" value={row.date} onChange={(event) => updateNewRow(row.tempId, { date: event.target.value })} /></label>
+                  <label>Datum<DatePickerInput value={row.date} onChange={(val) => updateNewRow(row.tempId, { date: val })} /></label>
                   <label>Start<input type="time" value={row.startTime} onChange={(event) => updateNewRow(row.tempId, { startTime: event.target.value })} /></label>
                   <label>Ende<input type="time" value={row.endTime} onChange={(event) => updateNewRow(row.tempId, { endTime: event.target.value })} /></label>
                   <button
@@ -250,8 +251,7 @@ export function ManualBlockerEditModal({ group, currentUser, onBack, onClose, on
           <button type="button" className="ghost-button" onClick={onClose}>Abbrechen</button>
           <button type="button" className="primary-button" onClick={handlePreview}>{operationCount} Änderung{operationCount === 1 ? "" : "en"} vorschauen</button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

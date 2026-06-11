@@ -1,5 +1,6 @@
 import type { BlockerOperation, BlockerOperationResult } from "../types/planner";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
+import { ModalShell } from "./ModalShell";
 
 interface BlockerOperationsPreviewModalProps {
   operations: BlockerOperation[];
@@ -23,14 +24,13 @@ export function BlockerOperationsPreviewModal({ operations, isApplying, results,
   const failureCount = results?.filter((result) => !result.success).length ?? 0;
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="operations-preview-title">
+    <ModalShell labelledBy="operations-preview-title" dialogClassName="modal modal-wide" onClose={isApplying ? undefined : onCancel}>
         <div className="modal-header">
           <div>
             <p className="eyebrow">Vorschau</p>
             <h2 id="operations-preview-title">{operations.length} Blocker-Operation{operations.length === 1 ? "" : "en"}</h2>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" onClick={onCancel}>x</button>
+          <button type="button" className="icon-button" aria-label="Schließen" onClick={onCancel}>x</button>
         </div>
 
         <div className="preview-summary">
@@ -60,10 +60,18 @@ export function BlockerOperationsPreviewModal({ operations, isApplying, results,
         <div className="modal-actions">
           <button type="button" className="ghost-button" disabled={isApplying || Boolean(results)} onClick={onBack}>Zurück</button>
           <button type="button" className="ghost-button" disabled={isApplying} onClick={onCancel}>Schließen</button>
-          <button type="button" className="primary-button" disabled={isApplying || Boolean(results)} onClick={onApply}>{isApplying ? "Übernehmen..." : "Änderungen übernehmen"}</button>
+          <button type="button" className="primary-button" disabled={isApplying || Boolean(results)} onClick={onApply}>
+            {isApplying ? (
+              <>
+                <span className="button-spinner" aria-hidden="true" />
+                Wird übernommen...
+              </>
+            ) : (
+              "Änderungen übernehmen"
+            )}
+          </button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }
 

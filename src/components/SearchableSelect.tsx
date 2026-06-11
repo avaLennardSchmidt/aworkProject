@@ -1,8 +1,11 @@
 import {
+  useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent,
   type RefObject,
   type WheelEvent,
 } from "react";
@@ -59,18 +62,49 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listboxId = useId();
   const selectedOption = options.find((option) => option.value === value);
   const filteredOptions = options.filter((option) =>
     fuzzyMatches(option.label, query),
   );
+  const activeIndex = Math.min(highlightedIndex, filteredOptions.length - 1);
   const layout = useDropdownLayout(isOpen, containerRef, menuRef, optionsRef);
+  useScrollHighlightedIntoView(isOpen, activeIndex, optionsRef);
 
   function close() {
     setIsOpen(false);
     setQuery("");
+    setHighlightedIndex(0);
+  }
+
+  function closeAndRefocus() {
+    close();
+    buttonRef.current?.focus();
+  }
+
+  function selectOption(optionValue: string) {
+    onChange(optionValue);
+    closeAndRefocus();
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    handleListNavigationKey(event, {
+      optionCount: filteredOptions.length,
+      activeIndex,
+      setHighlightedIndex,
+      onSelect: () => {
+        const option = filteredOptions[activeIndex];
+        if (option) {
+          selectOption(option.value);
+        }
+      },
+      onEscape: closeAndRefocus,
+    });
   }
 
   function handleMenuWheel(event: WheelEvent<HTMLDivElement>) {
@@ -89,6 +123,7 @@ export function SearchableSelect({
     >
       <button
         id={buttonId}
+        ref={buttonRef}
         type="button"
         className="searchable-select-button"
         disabled={disabled}
@@ -123,25 +158,43 @@ export function SearchableSelect({
             value={query}
             placeholder={searchPlaceholder}
             autoFocus
-            onChange={(event) => setQuery(event.target.value)}
+            role="combobox"
+            aria-controls={listboxId}
+            aria-expanded={isOpen}
+            aria-activedescendant={
+              filteredOptions[activeIndex]
+                ? `${listboxId}-option-${activeIndex}`
+                : undefined
+            }
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setHighlightedIndex(0);
+            }}
+            onKeyDown={handleSearchKeyDown}
           />
           <div
             ref={optionsRef}
+            id={listboxId}
             className="searchable-select-options"
             role="listbox"
           >
-            {filteredOptions.map((option) => (
+            {filteredOptions.map((option, index) => (
               <button
                 key={option.value}
+                id={`${listboxId}-option-${index}`}
                 type="button"
-                className={option.value === value ? "active" : ""}
+                className={[
+                  option.value === value ? "active" : "",
+                  index === activeIndex ? "highlighted" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 role="option"
                 aria-selected={option.value === value}
+                data-highlighted={index === activeIndex || undefined}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange(option.value);
-                  close();
-                }}
+                onMouseMove={() => setHighlightedIndex(index)}
+                onClick={() => selectOption(option.value)}
               >
                 {option.label}
               </button>
@@ -169,19 +222,45 @@ export function MultiSearchableSelect({
 }: MultiSearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listboxId = useId();
   const selectedValues = new Set(values);
   const filteredOptions = options.filter((option) =>
     fuzzyMatches(option.label, query),
   );
   const selectedCount = values.length;
+  const activeIndex = Math.min(highlightedIndex, filteredOptions.length - 1);
   const layout = useDropdownLayout(isOpen, containerRef, menuRef, optionsRef);
+  useScrollHighlightedIntoView(isOpen, activeIndex, optionsRef);
 
   function close() {
     setIsOpen(false);
     setQuery("");
+    setHighlightedIndex(0);
+  }
+
+  function closeAndRefocus() {
+    close();
+    buttonRef.current?.focus();
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    handleListNavigationKey(event, {
+      optionCount: filteredOptions.length,
+      activeIndex,
+      setHighlightedIndex,
+      onSelect: () => {
+        const option = filteredOptions[activeIndex];
+        if (option) {
+          toggleOption(option.value);
+        }
+      },
+      onEscape: closeAndRefocus,
+    });
   }
 
   function handleMenuWheel(event: WheelEvent<HTMLDivElement>) {
@@ -228,6 +307,7 @@ export function MultiSearchableSelect({
     >
       <button
         id={buttonId}
+        ref={buttonRef}
         type="button"
         className="searchable-select-button"
         disabled={disabled}
@@ -261,22 +341,43 @@ export function MultiSearchableSelect({
             value={query}
             placeholder={searchPlaceholder}
             autoFocus
-            onChange={(event) => setQuery(event.target.value)}
+            role="combobox"
+            aria-controls={listboxId}
+            aria-expanded={isOpen}
+            aria-activedescendant={
+              filteredOptions[activeIndex]
+                ? `${listboxId}-option-${activeIndex}`
+                : undefined
+            }
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setHighlightedIndex(0);
+            }}
+            onKeyDown={handleSearchKeyDown}
           />
           <div
             ref={optionsRef}
+            id={listboxId}
             className="searchable-select-options"
             role="listbox"
             aria-multiselectable="true"
           >
-            {filteredOptions.map((option) => (
+            {filteredOptions.map((option, index) => (
               <button
                 key={option.value}
+                id={`${listboxId}-option-${index}`}
                 type="button"
-                className={selectedValues.has(option.value) ? "active" : ""}
+                className={[
+                  selectedValues.has(option.value) ? "active" : "",
+                  index === activeIndex ? "highlighted" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 role="option"
                 aria-selected={selectedValues.has(option.value)}
+                data-highlighted={index === activeIndex || undefined}
                 onMouseDown={(event) => event.preventDefault()}
+                onMouseMove={() => setHighlightedIndex(index)}
                 onClick={() => toggleOption(option.value)}
               >
                 {option.label}
@@ -294,6 +395,51 @@ export function MultiSearchableSelect({
 
 export function formatSearchPlaceholder(label: string, count: number): string {
   return `${label} (${count} gefunden)`;
+}
+
+function handleListNavigationKey(
+  event: KeyboardEvent<HTMLInputElement>,
+  handlers: {
+    optionCount: number;
+    activeIndex: number;
+    setHighlightedIndex: (index: number) => void;
+    onSelect: () => void;
+    onEscape: () => void;
+  },
+) {
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    handlers.setHighlightedIndex(
+      Math.min(handlers.activeIndex + 1, handlers.optionCount - 1),
+    );
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    handlers.setHighlightedIndex(Math.max(handlers.activeIndex - 1, 0));
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    handlers.onSelect();
+  } else if (event.key === "Escape") {
+    // Nur das Dropdown schließen, nicht den umgebenden Modal-Dialog.
+    event.stopPropagation();
+    handlers.onEscape();
+  }
+}
+
+function useScrollHighlightedIntoView(
+  isOpen: boolean,
+  activeIndex: number,
+  optionsRef: RefObject<HTMLDivElement | null>,
+) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const highlighted = optionsRef.current?.querySelector<HTMLElement>(
+      "[data-highlighted]",
+    );
+    highlighted?.scrollIntoView({ block: "nearest" });
+  }, [isOpen, activeIndex, optionsRef]);
 }
 
 function useDropdownLayout(
