@@ -136,8 +136,12 @@ function App() {
     projectId: "",
     onlyAssigned: false,
   }));
-  const [myAssignedTaskIds, setMyAssignedTaskIds] = useState<Set<string>>(new Set());
-  const [myAssignedProjectIds, setMyAssignedProjectIds] = useState<Set<string>>(new Set());
+  const [myAssignedTaskIds, setMyAssignedTaskIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [myAssignedProjectIds, setMyAssignedProjectIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [isMultiEditAvailable] = useState(true);
   const isAnalysisRoute = isCapacityAnalysisRoute();
 
@@ -239,7 +243,11 @@ function App() {
       if (filters.hidePast && isBefore(scheduleEnd, today)) return false;
       if (filters.projectId && schedule.projectId !== filters.projectId)
         return false;
-      if (filters.onlyAssigned && myAssignedTaskIds.size > 0 && !myAssignedTaskIds.has(schedule.taskId))
+      if (
+        filters.onlyAssigned &&
+        myAssignedTaskIds.size > 0 &&
+        !myAssignedTaskIds.has(schedule.taskId)
+      )
         return false;
       return true;
     });
@@ -364,7 +372,11 @@ function App() {
     setStatusMessage("");
 
     try {
-      const [scheduleResponse, plannerUserTaskResponse, myAssignedTasksResponse] = await Promise.all([
+      const [
+        scheduleResponse,
+        plannerUserTaskResponse,
+        myAssignedTasksResponse,
+      ] = await Promise.all([
         backendClient.getTaskSchedules({
           from: filters.from,
           to: filters.to,
@@ -481,13 +493,17 @@ function App() {
     try {
       const [projectsResponse, myTasksResponse] = await Promise.all([
         backendClient.getProjects(),
-        myAssignedTaskIds.size === 0 ? backendClient.getUserAssignedTasks(currentUser.id) : Promise.resolve<unknown>(null),
+        myAssignedTaskIds.size === 0
+          ? backendClient.getUserAssignedTasks(currentUser.id)
+          : Promise.resolve<unknown>(null),
       ]);
       setAvailableProjects(mapProjectsResponse(projectsResponse));
       if (myAssignedTaskIds.size === 0) {
         const myTasksArray = mapProjectTasksResponse(myTasksResponse);
         setMyAssignedTaskIds(new Set(myTasksArray.map((t) => t.id)));
-        setMyAssignedProjectIds(new Set(myTasksArray.map((t) => t.projectId).filter(Boolean)));
+        setMyAssignedProjectIds(
+          new Set(myTasksArray.map((t) => t.projectId).filter(Boolean)),
+        );
       }
     } catch (projectError) {
       setError(
@@ -817,7 +833,8 @@ function App() {
           <h1>Self-Service Bulk Planner</h1>
         </div>
         <p>
-          Geplante Aufgaben-Blocker für den ausgewählten Planner-Nutzer bearbeiten.
+          Geplante Aufgaben-Blocker für den ausgewählten Planner-Nutzer
+          bearbeiten.
         </p>
       </header>
 
@@ -853,7 +870,13 @@ function App() {
             hasLoadedSchedules={hasLoadedSchedules}
             disabled={!plannerUser}
             isLoading={isLoadingSchedules}
-            workflowToggle={<WorkflowChooser value={workflow} disabled={!currentUser} onChange={setWorkflow} />}
+            workflowToggle={
+              <WorkflowChooser
+                value={workflow}
+                disabled={!currentUser}
+                onChange={setWorkflow}
+              />
+            }
             onChange={setFilters}
             onLoad={loadSchedules}
           />
@@ -894,7 +917,13 @@ function App() {
           isCreating={isCreatingSchedules}
           myAssignedTaskIds={myAssignedTaskIds}
           myAssignedProjectIds={myAssignedProjectIds}
-          workflowToggle={<WorkflowChooser value={workflow} disabled={!currentUser} onChange={setWorkflow} />}
+          workflowToggle={
+            <WorkflowChooser
+              value={workflow}
+              disabled={!currentUser}
+              onChange={setWorkflow}
+            />
+          }
           onLoadProjects={loadProjects}
           onProjectChange={loadProjectTasks}
           onCreate={createTaskSchedules}
@@ -906,7 +935,11 @@ function App() {
               <p className="eyebrow">Workflow</p>
               <h2>Blocker anlegen</h2>
             </div>
-            <WorkflowChooser value={workflow} disabled={!currentUser} onChange={setWorkflow} />
+            <WorkflowChooser
+              value={workflow}
+              disabled={!currentUser}
+              onChange={setWorkflow}
+            />
           </div>
         </section>
       ) : null}

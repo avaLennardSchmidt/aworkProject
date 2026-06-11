@@ -13,7 +13,9 @@ import {
  * If same weekday appears every 7 days, they're continuous.
  * If a week is skipped (gap > 7 days for same weekday), creates separate group.
  */
-function splitByContinuity(schedules: AworkTaskSchedule[]): AworkTaskSchedule[][] {
+function splitByContinuity(
+  schedules: AworkTaskSchedule[],
+): AworkTaskSchedule[][] {
   if (schedules.length === 0) return [];
   if (schedules.length === 1) return [schedules];
 
@@ -29,7 +31,9 @@ function splitByContinuity(schedules: AworkTaskSchedule[]): AworkTaskSchedule[][
     const curr = parseISO(sorted[i].start);
 
     // Calculate days difference
-    const daysDiff = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.round(
+      (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     // If exactly 7 days apart, they're continuous (same weekday next week)
     // Allow small tolerance for DST changes (6-8 days)
@@ -46,7 +50,9 @@ function splitByContinuity(schedules: AworkTaskSchedule[]): AworkTaskSchedule[][
   return result;
 }
 
-export function groupSchedules(schedules: AworkTaskSchedule[]): ScheduleGroup[] {
+export function groupSchedules(
+  schedules: AworkTaskSchedule[],
+): ScheduleGroup[] {
   const groups = new Map<string, AworkTaskSchedule[]>();
 
   schedules.forEach((schedule) => {
@@ -77,12 +83,16 @@ export function groupSchedules(schedules: AworkTaskSchedule[]): ScheduleGroup[] 
       const startTime = getTimeHHmm(first.start);
       const endTime = getTimeHHmm(first.end);
       const totalMinutes = sorted.reduce(
-        (sum, schedule) => sum + calculateDurationMinutes(schedule.start, schedule.end),
+        (sum, schedule) =>
+          sum + calculateDurationMinutes(schedule.start, schedule.end),
         0,
       );
 
       // If multiple sub-groups, append index to make groupId unique
-      const uniqueGroupId = continuousSubGroups.length > 1 ? `${groupId}#${subGroupIndex}` : groupId;
+      const uniqueGroupId =
+        continuousSubGroups.length > 1
+          ? `${groupId}#${subGroupIndex}`
+          : groupId;
 
       result.push({
         groupId: uniqueGroupId,
@@ -102,5 +112,7 @@ export function groupSchedules(schedules: AworkTaskSchedule[]): ScheduleGroup[] 
     });
   });
 
-  return result.sort((a, b) => a.taskName.localeCompare(b.taskName) || a.weekday - b.weekday);
+  return result.sort(
+    (a, b) => a.taskName.localeCompare(b.taskName) || a.weekday - b.weekday,
+  );
 }

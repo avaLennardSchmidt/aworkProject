@@ -69,7 +69,9 @@ export function DatePickerInput({
   const [direction, setDirection] = useState<"down" | "up">("down");
   const [yearScroll, setYearScroll] = useState(0); // Offset in years
   const [monthScroll, setMonthScroll] = useState(0); // Offset in months
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -84,12 +86,12 @@ export function DatePickerInput({
     setView("calendar");
     setYearScroll(0);
     setMonthScroll(0);
-    
+
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       const menuHeight = 420; // approximate menu height
       const hasSpaceBelow = window.innerHeight - rect.bottom > menuHeight + 12;
-      
+
       if (hasSpaceBelow) {
         setDirection("down");
         setMenuPos({
@@ -138,7 +140,7 @@ export function DatePickerInput({
 
   const currentMonth = getMonth(viewMonth);
   const currentYear = getYear(viewMonth);
-  
+
   // Show 3 visible months at a time, centered
   const baseMonth = (currentMonth + monthScroll - 1) % 12;
   const visibleMonths = [
@@ -146,7 +148,7 @@ export function DatePickerInput({
     (baseMonth + 1) % 12,
     (baseMonth + 2) % 12,
   ];
-  
+
   // Show 3 visible years at a time, centered
   const baseYear = currentYear + yearScroll - 1; // -1 to show year before, current, year after
   const visibleYears = [baseYear, baseYear + 1, baseYear + 2];
@@ -273,44 +275,46 @@ export function DatePickerInput({
                 </div>
                 {Array.from({ length: days.length / 7 }, (_, rowIdx) => (
                   <div key={rowIdx} className="date-picker-week" role="row">
-                    {days.slice(rowIdx * 7, rowIdx * 7 + 7).map((date, colIdx) => {
-                      if (!date) {
+                    {days
+                      .slice(rowIdx * 7, rowIdx * 7 + 7)
+                      .map((date, colIdx) => {
+                        if (!date) {
+                          return (
+                            <div
+                              key={colIdx}
+                              className="date-picker-cell date-picker-cell--empty"
+                              role="gridcell"
+                              aria-hidden="true"
+                            />
+                          );
+                        }
+                        const isoStr = toIso(date);
+                        const isSelected = value === isoStr;
+                        const isCurrentDay = isToday(date);
                         return (
-                          <div
-                            key={colIdx}
-                            className="date-picker-cell date-picker-cell--empty"
+                          <button
+                            key={isoStr}
+                            type="button"
                             role="gridcell"
-                            aria-hidden="true"
-                          />
+                            className={[
+                              "date-picker-cell",
+                              isSelected ? "date-picker-cell--selected" : "",
+                              isCurrentDay ? "date-picker-cell--today" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            aria-selected={isSelected}
+                            aria-label={format(date, "EEEE, dd. MMMM yyyy", {
+                              locale: de,
+                            })}
+                            aria-pressed={isSelected}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => selectDay(date)}
+                          >
+                            {getDate(date)}
+                          </button>
                         );
-                      }
-                      const isoStr = toIso(date);
-                      const isSelected = value === isoStr;
-                      const isCurrentDay = isToday(date);
-                      return (
-                        <button
-                          key={isoStr}
-                          type="button"
-                          role="gridcell"
-                          className={[
-                            "date-picker-cell",
-                            isSelected ? "date-picker-cell--selected" : "",
-                            isCurrentDay ? "date-picker-cell--today" : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          aria-selected={isSelected}
-                          aria-label={format(date, "EEEE, dd. MMMM yyyy", {
-                            locale: de,
-                          })}
-                          aria-pressed={isSelected}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => selectDay(date)}
-                        >
-                          {getDate(date)}
-                        </button>
-                      );
-                    })}
+                      })}
                   </div>
                 ))}
               </div>
@@ -341,7 +345,13 @@ export function DatePickerInput({
                       aria-label="Monat zurück"
                     >
                       <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
-                        <path d="M1 7L6 1L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M1 7L6 1L11 7"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     </button>
                     <div className="date-picker-month-display">
@@ -349,7 +359,8 @@ export function DatePickerInput({
                         const monthName = format(new Date(2024, month), "MMM", {
                           locale: de,
                         });
-                        const isCurrentMonth = month === currentMonth && monthScroll === 0;
+                        const isCurrentMonth =
+                          month === currentMonth && monthScroll === 0;
                         return (
                           <button
                             key={`${month}-${idx}`}
@@ -357,7 +368,10 @@ export function DatePickerInput({
                             className={`date-picker-month-item ${idx === 1 ? "is-center" : ""} ${isCurrentMonth ? "is-selected" : ""}`}
                             onClick={() => {
                               if (idx === 1) {
-                                selectMonthYear(month, currentYear + yearScroll);
+                                selectMonthYear(
+                                  month,
+                                  currentYear + yearScroll,
+                                );
                               } else {
                                 setMonthScroll((m) => m + (idx - 1));
                               }
@@ -377,7 +391,13 @@ export function DatePickerInput({
                       aria-label="Monat vorwärts"
                     >
                       <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
-                        <path d="M1 1L6 7L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M1 1L6 7L11 1"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -393,7 +413,13 @@ export function DatePickerInput({
                       aria-label="Jahr zurück"
                     >
                       <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
-                        <path d="M1 7L6 1L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M1 7L6 1L11 7"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     </button>
                     <div className="date-picker-year-display">
@@ -423,7 +449,13 @@ export function DatePickerInput({
                       aria-label="Jahr vorwärts"
                     >
                       <svg width="12" height="8" viewBox="0 0 12 8" fill="none">
-                        <path d="M1 1L6 7L11 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M1 1L6 7L11 1"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     </button>
                   </div>
