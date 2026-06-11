@@ -3266,29 +3266,55 @@ select:disabled {
   bottom: 20px;
   z-index: 90;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  width: min(420px, calc(100vw - 40px));
-  padding: 14px 16px;
-  color: #194162;
-  background: #eaf4fc;
-  border: 1px solid #c8dff1;
-  border-radius: 8px;
-  box-shadow: 0 16px 44px rgb(25 65 98 / 0.18);
+  width: min(360px, calc(100vw - 32px));
+  padding: 10px 12px;
+  color: #365062;
+  background: rgb(249 252 255 / 0.9);
+  border: 1px solid #d9e6f1;
+  border-radius: 10px;
+  box-shadow: 0 10px 22px rgb(36 69 94 / 0.1);
+  backdrop-filter: blur(4px);
   pointer-events: none;
 }
 
-.refresh-notice div {
+.refresh-notice .spinner {
+  width: 13px;
+  height: 13px;
+  border-width: 2px;
+  border-color: #c7d7e5;
+  border-top-color: #7396b2;
+  flex-shrink: 0;
+}
+
+.refresh-notice-copy {
   display: grid;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 
-.refresh-notice strong {
-  color: #19384f;
+.refresh-notice-title {
+  color: #334e61;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
-.refresh-notice span:last-child {
-  color: #435d73;
-  font-size: 0.9rem;
-  line-height: 1.35;
+.refresh-notice-detail {
+  color: #6c8192;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .refresh-notice {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    bottom: 12px;
+  }
 }

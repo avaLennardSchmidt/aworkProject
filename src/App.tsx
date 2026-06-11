@@ -886,10 +886,12 @@ function App() {
           ) : null}
           {scheduleRefreshNotice ? (
             <div className="refresh-notice" aria-live="polite">
-              <span className="spinner" />
-              <div>
-                <strong>Geplante Aufgaben werden aktualisiert</strong>
-                <span>{scheduleRefreshNotice}</span>
+              <span className="spinner" aria-hidden="true" />
+              <div className="refresh-notice-copy">
+                <span className="refresh-notice-title">
+                  Synchronisiere geplante Aufgaben im Hintergrund...
+                </span>
+                <span className="refresh-notice-detail">{scheduleRefreshNotice}</span>
               </div>
             </div>
           ) : null}
