@@ -1024,20 +1024,20 @@ export function CapacityAnalysisPage({
                         Auf Auswahl anwenden
                       </button>
                     </div>
-                    <input
-                      id="analysis-user-search"
-                      className="analysis-user-search"
-                      aria-label="Nutzer suchen"
-                      type="search"
-                      value={chartUserSearch}
-                      placeholder="Nutzer filtern..."
-                      onChange={(event) =>
-                        setChartUserSearch(event.target.value)
-                      }
-                    />
                   </div>
                 </div>
                 <div className="capacity-chart-legend" aria-label="Legende">
+                  <input
+                    id="analysis-user-search"
+                    className="analysis-user-search"
+                    aria-label="Nutzer suchen"
+                    type="search"
+                    value={chartUserSearch}
+                    placeholder="Nutzer filtern..."
+                    onChange={(event) =>
+                      setChartUserSearch(event.target.value)
+                    }
+                  />
                   <span>
                     <i className="legend-swatch legend-swatch-capacity" />
                     Kapazität (Wochenstunden)

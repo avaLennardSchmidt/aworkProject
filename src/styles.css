@@ -1926,6 +1926,7 @@ select:disabled {
 
 .capacity-bulk-inputs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: flex-end;
 }
@@ -1957,10 +1958,13 @@ select:disabled {
 }
 
 .capacity-bulk-inputs .ghost-button {
-  height: 42px;
+  height: auto;
   min-height: 42px;
   padding: 9px 12px;
+  line-height: 1.2;
   font-size: 0.88rem;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .capacity-marker-legend {
@@ -1997,11 +2001,20 @@ select:disabled {
 .capacity-chart-legend {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px 18px;
   margin: 0 0 14px;
   color: var(--color-text-muted);
   font-size: 0.85rem;
   line-height: 1.4;
+}
+
+.capacity-chart-legend .analysis-user-search {
+  flex: 0 0 250px;
+  width: 250px;
+  max-width: 100%;
+  margin-right: 10px;
+  align-self: center;
 }
 
 .capacity-chart-legend span {
@@ -2585,6 +2598,13 @@ select:disabled {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .capacity-chart-legend .analysis-user-search {
+    order: -1;
+    flex: 1 0 100%;
+    width: 100%;
+    margin-right: 0;
+  }
+
   .manual-edit-row {
     grid-template-columns: 1fr;
   }
@@ -2599,6 +2619,65 @@ select:disabled {
     grid-template-columns:
       minmax(130px, 1.2fr) minmax(92px, 1fr) minmax(92px, 1fr)
       42px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .analysis-section-heading-chart {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-chart-controls {
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .analysis-chart-toolbar {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .analysis-chart-toolbar .ghost-button {
+    flex: 1 1 190px;
+    min-width: 0;
+    height: auto;
+    min-height: 36px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .analysis-toolbar-divider {
+    display: none;
+  }
+
+  .analysis-workload-filter {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .analysis-workload-filter .segmented-control {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .capacity-bulk-inputs {
+    width: 100%;
+    justify-content: flex-start;
+    align-items: flex-end;
+  }
+
+  .capacity-bulk-inputs label {
+    flex: 1 1 180px;
+    min-width: 0;
+    max-width: 260px;
+  }
+
+  .capacity-bulk-inputs .ghost-button {
+    align-self: flex-end;
   }
 }
 
@@ -2664,6 +2743,49 @@ select:disabled {
 
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analysis-chart-controls {
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .analysis-chart-toolbar {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .analysis-chart-toolbar .ghost-button {
+    flex: 1 1 190px;
+    min-width: 0;
+    height: auto;
+    min-height: 36px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .analysis-toolbar-divider {
+    display: none;
+  }
+
+  .analysis-workload-filter {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .analysis-workload-filter .segmented-control {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .capacity-chart-legend .analysis-user-search {
+    flex: 1 0 100%;
+    width: 100%;
+    margin-right: 0;
   }
 
   .manual-row-fields {
