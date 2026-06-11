@@ -46,7 +46,12 @@ export async function applyBlockerOperations(
         continue;
       }
 
-      await client.createTaskSchedule(operation.payload);
+      console.log("[applyBlockerOperations] Creating blocker:", {
+        tempId: operation.tempId,
+        payload: operation.payload,
+      });
+      const createResponse = await client.createTaskSchedule(operation.payload);
+      console.log("[applyBlockerOperations] Create response:", createResponse);
       results.push({ operationId: operation.tempId, kind: operation.kind, success: true });
     } catch (error) {
       const operationId = operation.kind === "create" ? operation.tempId : operation.schedule.id;

@@ -541,10 +541,10 @@ function App() {
   async function createTaskSchedules(
     payloads: CreateTaskSchedulePayload[],
     options: CreateGroupOptions,
-  ) {
+  ): Promise<boolean> {
     if (!plannerUser) {
       setError("Bitte Planner-Nutzer auswählen.");
-      return;
+      return false;
     }
 
     setIsCreatingSchedules(true);
@@ -629,12 +629,15 @@ function App() {
             "Aufgaben-Blocker nach dem Anlegen werden aktualisiert. Du kannst weiterarbeiten, neue awork-Daten erscheinen gleich.",
         });
       }
+
+      return successCount > 0;
     } catch (createError) {
       setError(
         createError instanceof Error
           ? createError.message
           : "Aufgabe oder Blocker konnten nicht angelegt werden.",
       );
+      return false;
     } finally {
       setIsCreatingSchedules(false);
     }

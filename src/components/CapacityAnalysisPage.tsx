@@ -1034,9 +1034,7 @@ export function CapacityAnalysisPage({
                     type="search"
                     value={chartUserSearch}
                     placeholder="Nutzer filtern..."
-                    onChange={(event) =>
-                      setChartUserSearch(event.target.value)
-                    }
+                    onChange={(event) => setChartUserSearch(event.target.value)}
                   />
                   <span>
                     <i className="legend-swatch legend-swatch-capacity" />

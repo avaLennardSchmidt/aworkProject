@@ -41,7 +41,7 @@ interface CreateScheduleGroupPanelProps {
   onCreate: (
     payloads: CreateTaskSchedulePayload[],
     options: CreateGroupOptions,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
 }
 
 type TaskMode = "existing" | "new";
@@ -104,6 +104,17 @@ const weekdays = [
   { value: 0, label: "Sonntag" },
 ];
 
+function getDefaultScheduleFields() {
+  const today = new Date();
+  return {
+    from: format(today, "yyyy-MM-dd"),
+    to: format(addDays(today, 28), "yyyy-MM-dd"),
+    weekday: 1,
+    startTime: "09:00",
+    endTime: "10:00",
+  };
+}
+
 export function CreateScheduleGroupPanel({
   currentUser,
   projects,
@@ -118,15 +129,16 @@ export function CreateScheduleGroupPanel({
   onProjectChange,
   onCreate,
 }: CreateScheduleGroupPanelProps) {
+  const defaults = getDefaultScheduleFields();
   const [projectId, setProjectId] = useState("");
   const [taskMode, setTaskMode] = useState<TaskMode>("existing");
   const [taskId, setTaskId] = useState("");
   const [newTaskName, setNewTaskName] = useState("");
-  const [from, setFrom] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [to, setTo] = useState(format(addDays(new Date(), 28), "yyyy-MM-dd"));
-  const [weekday, setWeekday] = useState(1);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("10:00");
+  const [from, setFrom] = useState(defaults.from);
+  const [to, setTo] = useState(defaults.to);
+  const [weekday, setWeekday] = useState(defaults.weekday);
+  const [startTime, setStartTime] = useState(defaults.startTime);
+  const [endTime, setEndTime] = useState(defaults.endTime);
   const [projectStatusFilter, setProjectStatusFilter] = useState(
     PROJECT_FILTER_ACTIVE,
   );
@@ -273,10 +285,20 @@ export function CreateScheduleGroupPanel({
       return;
     }
 
-    await onCreate(previewPayloads, {
+    const created = await onCreate(previewPayloads, {
       projectId,
       newTaskName: taskMode === "new" ? newTaskName.trim() : undefined,
     });
+
+    if (created) {
+      const nextDefaults = getDefaultScheduleFields();
+      setFrom(nextDefaults.from);
+      setTo(nextDefaults.to);
+      setWeekday(nextDefaults.weekday);
+      setStartTime(nextDefaults.startTime);
+      setEndTime(nextDefaults.endTime);
+      setError("");
+    }
   }
 
   function validate(): string {
