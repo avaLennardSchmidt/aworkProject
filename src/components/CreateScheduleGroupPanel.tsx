@@ -386,7 +386,7 @@ export function CreateScheduleGroupPanel({
                 handleOnlyMyProjectsChange(event.target.checked)
               }
             />
-            Nur mir zugewiesene Projekte
+            <span>Nur mir zugewiesene Projekte</span>
           </label>
         </div>
       </div>
@@ -461,7 +461,7 @@ export function CreateScheduleGroupPanel({
                     handleOnlyMyAssignedTasksChange(event.target.checked)
                   }
                 />
-                Nur mir zugewiesene Aufgaben
+                <span>Nur mir zugewiesene Aufgaben</span>
               </label>
             </div>
           </>

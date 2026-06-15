@@ -138,8 +138,7 @@ select:disabled {
   gap: 8px;
 }
 
-.form-row label,
-.checkbox-row {
+.form-row label {
   color: var(--color-text-secondary);
   font-weight: 700;
 }
@@ -160,6 +159,17 @@ select:disabled {
   background: #fbfcfd;
   border: 1px solid var(--color-border-strong);
   border-radius: 6px;
+}
+
+/* reset form-row input overrides for toggle switches */
+.form-row .checkbox-row input[type="checkbox"] {
+  width: 36px;
+  min-height: 20px;
+  padding: 0;
+  background: var(--color-surface);
+  border: none;
+  box-shadow: inset 0 0 0 1.5px var(--color-border-strong);
+  border-radius: 999px;
 }
 
 .project-field-hint {
@@ -321,24 +331,74 @@ select:disabled {
   border-color: var(--color-border);
 }
 
-.connection-success {
+.connection-user {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
   align-items: center;
-  padding: 14px;
-  background: #eef8f4;
-  border: 1px solid #c8e8dc;
-  border-radius: 8px;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
 }
 
-.connection-success div {
-  display: grid;
-  gap: 3px;
+.connection-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.connection-success span {
-  color: #52606d;
+.connection-user-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.connection-user-info strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.connection-user-info span {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.connection-user-id {
+  font-family: ui-monospace, "Cascadia Code", monospace;
+  font-size: 0.72rem !important;
+  opacity: 0.65;
+}
+
+.connection-disconnect-btn:hover {
+  color: var(--color-danger) !important;
+  border-color: var(--color-danger-border) !important;
+}
+
+.connection-note {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 
 .alert {
@@ -414,15 +474,75 @@ select:disabled {
   margin-top: 18px;
 }
 
-.checkbox-row {
-  display: inline-flex;
-  gap: 10px;
+.toggle-group {
+  display: flex;
+  gap: 20px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
-.checkbox-row input {
-  width: 18px;
-  height: 18px;
+.checkbox-row {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+  user-select: none;
+}
+
+.checkbox-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: none;
+  box-shadow: inset 0 0 0 1.5px var(--color-border-strong);
+  cursor: pointer;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checkbox-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checkbox-row input[type="checkbox"]:checked {
+  background: var(--color-accent);
+  box-shadow: none;
+}
+
+.checkbox-row input[type="checkbox"]:checked::after {
+  background: white;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  transform: translateX(16px);
+}
+
+.checkbox-row input[type="checkbox"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.checkbox-row:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.checkbox-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 .loading-state {
@@ -584,9 +704,9 @@ select:disabled {
   display: inline-flex;
   width: fit-content;
   margin-left: auto;
-  padding: 4px;
-  gap: 2px;
-  background: #f0f3f6;
+  padding: 3px;
+  gap: 1px;
+  background: #eaeff4;
   border: 1px solid var(--color-border);
   border-radius: 9px;
 }
@@ -596,15 +716,16 @@ select:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 14px;
   color: var(--color-text-muted);
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   font-size: 0.88rem;
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
+  cursor: pointer;
   transition: color 0.16s ease;
 }
 
@@ -625,9 +746,10 @@ select:disabled {
   position: absolute;
   inset: 0;
   background: var(--color-surface);
-  border: 1px solid var(--color-accent-border);
-  border-radius: 6px;
-  box-shadow: 0 1px 4px rgb(29 35 41 / 0.12);
+  border-radius: 7px;
+  box-shadow:
+    0 1px 3px rgb(29 35 41 / 0.10),
+    0 0 0 1px rgb(29 35 41 / 0.05);
 }
 
 .segmented-label {
@@ -715,6 +837,9 @@ select:disabled {
 }
 
 .user-chip.is-selected .user-chip-check {
+  color: var(--color-surface);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   animation: check-pop 0.25s ease-out;
 }
 
@@ -771,16 +896,29 @@ select:disabled {
 }
 
 .task-mode-grid {
-  grid-template-columns: minmax(260px, 380px);
+  grid-template-columns: 1fr;
 }
 
 .task-mode-row {
-  align-content: start;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.task-mode-row label {
+  margin: 0;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .task-mode-row .segmented-control {
   margin-left: 0;
-  align-self: flex-start;
+  flex-shrink: 0;
 }
 
 .create-preview {
@@ -2041,12 +2179,6 @@ select:disabled {
     color 0.15s ease;
 }
 
-.user-chip.is-selected .user-chip-check {
-  color: var(--color-surface);
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
 .analysis-presets .ghost-button,
 .date-presets .ghost-button {
   min-height: 32px;
@@ -3238,27 +3370,24 @@ select:disabled {
   border-color: var(--color-danger);
 }
 
-.backend-startup-indicator {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  background: #fff5db;
-  border: 1px solid #f1d58f;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.1);
-  z-index: 100;
+/* .backend-startup-indicator removed — BackendStatusIndicator now uses .status-toast classes */
+
+/* spinner variant inside the 28px icon bubble */
+.status-toast__spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  border-color: #c8dff1;
+  border-top-color: #2f6fb3;
+  flex-shrink: 0;
 }
 
-.backend-startup-indicator p {
-  margin: 0;
-  color: #60440a;
-  font-weight: 600;
-  font-size: 0.9rem;
+.status-toast--info .status-toast__spinner {
+  border-color: #c8dff1;
+  border-top-color: #2f6fb3;
 }
+
+/* ── Refresh notice (bottom-right background sync) ─────────────── */
 
 .refresh-notice {
   position: fixed;
@@ -3266,45 +3395,68 @@ select:disabled {
   bottom: 20px;
   z-index: 90;
   display: flex;
-  gap: 10px;
-  align-items: center;
-  width: min(360px, calc(100vw - 32px));
-  padding: 10px 12px;
-  color: #365062;
-  background: rgb(249 252 255 / 0.9);
-  border: 1px solid #d9e6f1;
-  border-radius: 10px;
-  box-shadow: 0 10px 22px rgb(36 69 94 / 0.1);
-  backdrop-filter: blur(4px);
+  gap: 12px;
+  align-items: flex-start;
+  width: min(360px, calc(100vw - 40px));
+  padding: 14px 14px 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 4px 10px rgb(0 0 0 / 0.07),
+    0 12px 28px rgb(0 0 0 / 0.07);
+  overflow: hidden;
   pointer-events: none;
+}
+
+.refresh-notice::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--color-accent);
+}
+
+.refresh-notice__icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent-soft);
+  margin-top: 2px;
 }
 
 .refresh-notice .spinner {
   width: 13px;
   height: 13px;
   border-width: 2px;
-  border-color: #c7d7e5;
-  border-top-color: #7396b2;
+  border-color: var(--color-accent-border);
+  border-top-color: var(--color-accent);
   flex-shrink: 0;
 }
 
 .refresh-notice-copy {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
+  padding-top: 5px;
 }
 
 .refresh-notice-title {
-  color: #334e61;
-  font-size: 0.86rem;
-  font-weight: 600;
-  line-height: 1.2;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .refresh-notice-detail {
-  color: #6c8192;
-  font-size: 0.78rem;
-  line-height: 1.25;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3316,5 +3468,153 @@ select:disabled {
     left: 12px;
     width: auto;
     bottom: 12px;
+  }
+}
+
+/* ── Status Toast (corner notifications) ─────────────────────── */
+
+.status-toast-region {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 40px));
+  pointer-events: none;
+}
+
+.status-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 14px 18px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 4px 10px rgb(0 0 0 / 0.07),
+    0 12px 28px rgb(0 0 0 / 0.07);
+  overflow: hidden;
+  pointer-events: all;
+  cursor: default;
+}
+
+/* left accent strip */
+.status-toast::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 12px 0 0 12px;
+}
+
+.status-toast--success::before { background: var(--color-accent); }
+.status-toast--error::before   { background: var(--color-danger); }
+.status-toast--info::before    { background: #2f6fb3; }
+
+/* icon bubble */
+.status-toast__icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0;
+}
+
+.status-toast--success .status-toast__icon {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.status-toast--error .status-toast__icon {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.status-toast--info .status-toast__icon {
+  background: #eaf4fc;
+  color: #2f6fb3;
+}
+
+/* message text */
+.status-toast__message {
+  flex: 1;
+  margin: 0;
+  padding-top: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+/* close button */
+.status-toast__close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 3px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.status-toast__close:hover {
+  opacity: 1;
+  background: var(--color-border);
+}
+
+.status-toast__close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+/* progress bar */
+.status-toast__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  transform-origin: left center;
+  animation: toast-progress-shrink linear forwards;
+}
+
+.status-toast--success .status-toast__progress { background: var(--color-accent-border); }
+.status-toast--error .status-toast__progress   { background: var(--color-danger-border); }
+.status-toast--info .status-toast__progress    { background: #c8dff1; }
+
+@keyframes toast-progress-shrink {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-toast__progress {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .status-toast-region {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
   }
 }

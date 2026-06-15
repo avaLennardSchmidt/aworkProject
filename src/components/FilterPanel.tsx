@@ -176,28 +176,30 @@ export function FilterPanel({
       </div>
 
       <div className="filter-actions">
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={filters.hidePast}
-            disabled={disabled}
-            onChange={(event) =>
-              onChange({ ...filters, hidePast: event.target.checked })
-            }
-          />
-          Vergangene Blocker ausblenden
-        </label>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={filters.onlyAssigned}
-            disabled={disabled}
-            onChange={(event) =>
-              onChange({ ...filters, onlyAssigned: event.target.checked })
-            }
-          />
-          Nur mir zugewiesene Aufgaben
-        </label>
+        <div className="toggle-group">
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={filters.hidePast}
+              disabled={disabled}
+              onChange={(event) =>
+                onChange({ ...filters, hidePast: event.target.checked })
+              }
+            />
+            <span>Vergangene Blocker ausblenden</span>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={filters.onlyAssigned}
+              disabled={disabled}
+              onChange={(event) =>
+                onChange({ ...filters, onlyAssigned: event.target.checked })
+              }
+            />
+            <span>Nur mir zugewiesene Aufgaben</span>
+          </label>
+        </div>
         <button
           type="button"
           className="primary-button"

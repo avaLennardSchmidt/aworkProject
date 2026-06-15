@@ -89,22 +89,29 @@ export function DatePickerInput({
 
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const menuHeight = 420; // approximate menu height
-      const hasSpaceBelow = window.innerHeight - rect.bottom > menuHeight + 12;
+      const MENU_WIDTH = 284;
+      const MENU_HEIGHT = 358;
+      const GAP = 6;
+      const MARGIN = 8;
 
-      if (hasSpaceBelow) {
-        setDirection("down");
-        setMenuPos({
-          top: rect.bottom + 6,
-          left: rect.left,
-        });
-      } else {
-        setDirection("up");
-        setMenuPos({
-          top: rect.top - menuHeight - 6,
-          left: rect.left,
-        });
-      }
+      // Pick the direction that has more room
+      const spaceBelow = window.innerHeight - rect.bottom - MARGIN;
+      const spaceAbove = rect.top - MARGIN;
+      const openDown = spaceBelow >= MENU_HEIGHT || spaceBelow >= spaceAbove;
+
+      let top = openDown
+        ? rect.bottom + GAP
+        : rect.top - MENU_HEIGHT - GAP;
+
+      // Clamp vertical so popup never leaves the viewport
+      top = Math.max(MARGIN, Math.min(top, window.innerHeight - MENU_HEIGHT - MARGIN));
+
+      // Clamp horizontal so popup never overflows left or right
+      let left = rect.left;
+      left = Math.max(MARGIN, Math.min(left, window.innerWidth - MENU_WIDTH - MARGIN));
+
+      setDirection(openDown ? "down" : "up");
+      setMenuPos({ top, left });
     }
     setIsOpen(true);
   }

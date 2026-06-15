@@ -49,7 +49,7 @@ import {
   type CreateGroupOptions,
 } from "./components/CreateScheduleGroupPanel";
 import { DeleteGroupModal } from "./components/DeleteGroupModal";
-import { ErrorAlert } from "./components/ErrorAlert";
+import { StatusToast } from "./components/StatusToast";
 import { FilterPanel } from "./components/FilterPanel";
 import { LoadingState } from "./components/LoadingState";
 import { ManualBlockerEditModal } from "./components/ManualBlockerEditModal";
@@ -66,6 +66,7 @@ import {
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
 import { clearFeatureAccessCache } from "./config/featureAccess";
+import { AnimatePresence } from "motion/react";
 
 const backendClient = new BackendClient();
 
@@ -75,6 +76,7 @@ interface LoadSchedulesOptions {
 
 function App() {
   const lastSessionCheckRef = useRef(0);
+  const sessionRestoredRef = useRef(false);
   const [currentUser, setCurrentUser] = useState<AworkUser>();
   const [selectedPlannerUserId, setSelectedPlannerUserId] = useState("");
   const [workflow, setWorkflow] = useState<PlannerWorkflow>("manage");
@@ -280,11 +282,13 @@ function App() {
       if (status.authenticated && status.user) {
         setCurrentUser(status.user);
         setSelectedPlannerUserId("");
-        setStatusMessage(
-          returnedFromLogin
-            ? "awork Login erfolgreich. Workflow wählen."
-            : "awork-Session wiederhergestellt.",
-        );
+        if (returnedFromLogin) {
+          setStatusMessage("awork Login erfolgreich. Workflow wählen.");
+          sessionRestoredRef.current = true;
+        } else if (!sessionRestoredRef.current) {
+          setStatusMessage("awork-Session wiederhergestellt.");
+          sessionRestoredRef.current = true;
+        }
       } else if (returnedFromLogin) {
         setError(
           "awork Login erfolgreich, aber keine Backend-Session gefunden. Bitte Backend neu starten.",
@@ -334,6 +338,7 @@ function App() {
   async function handleDisconnect() {
     await backendClient.logout();
     clearFeatureAccessCache();
+    sessionRestoredRef.current = false;
     setCurrentUser(undefined);
     setSelectedPlannerUserId("");
     setAllSchedules([]);
@@ -810,7 +815,9 @@ function App() {
   if (isAnalysisRoute) {
     return (
       <>
-        <BackendStatusIndicator backendClient={backendClient} />
+        <div className="status-toast-region">
+          <BackendStatusIndicator backendClient={backendClient} />
+        </div>
         <CapacityAnalysisPage
           backendClient={backendClient}
           currentUser={currentUser}
@@ -826,7 +833,6 @@ function App() {
 
   return (
     <main className="app-shell">
-      <BackendStatusIndicator backendClient={backendClient} />
       <header className="app-header">
         <div>
           <p className="eyebrow">awork planner utility</p>
@@ -838,10 +844,6 @@ function App() {
         </p>
       </header>
 
-      <ErrorAlert message={error} />
-      {statusMessage ? (
-        <div className="alert alert-success">{statusMessage}</div>
-      ) : null}
 
       <ConnectionPanel
         currentUser={currentUser}
@@ -886,7 +888,9 @@ function App() {
           ) : null}
           {scheduleRefreshNotice ? (
             <div className="refresh-notice" aria-live="polite">
-              <span className="spinner" aria-hidden="true" />
+              <span className="refresh-notice__icon" aria-hidden="true">
+                <span className="spinner" />
+              </span>
               <div className="refresh-notice-copy">
                 <span className="refresh-notice-title">
                   Synchronisiere geplante Aufgaben im Hintergrund...
@@ -1061,6 +1065,28 @@ function App() {
           onApply={handleApplyChanges}
         />
       ) : null}
+      <div className="status-toast-region">
+        <BackendStatusIndicator backendClient={backendClient} />
+        <AnimatePresence>
+          {error ? (
+            <StatusToast
+              key="error"
+              message={error}
+              variant="error"
+              onDismiss={() => setError("")}
+            />
+          ) : null}
+          {statusMessage ? (
+            <StatusToast
+              key="status"
+              message={statusMessage}
+              variant="success"
+              autoDismissMs={5000}
+              onDismiss={() => setStatusMessage("")}
+            />
+          ) : null}
+        </AnimatePresence>
+      </div>
     </main>
   );
 }

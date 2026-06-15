@@ -5,3 +5,9 @@ dist
 .env
 .env.*
 !.env.example
+
+# AI agent config — local only
+.claude/
+.github/skills/
+PRODUCT.md
+DESIGN.md
