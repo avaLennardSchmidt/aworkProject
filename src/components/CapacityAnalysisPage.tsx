@@ -1996,8 +1996,8 @@ function buildUserCapacityWeeks(
           ? 100
           : 0;
     const customerTargetPercent =
-      targetHours > 0
-        ? (plannedHours / targetHours) * 100
+      effectiveCapacityHours > 0
+        ? (plannedHours / effectiveCapacityHours) * 100
         : plannedMinutes > 0
           ? 100
           : 0;
@@ -2055,7 +2055,7 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
         ? (plannedHours / effectiveCapacityHours) * 100
         : 0,
     customerTargetPercent:
-      targetHours > 0 ? (plannedHours / targetHours) * 100 : 0,
+      effectiveCapacityHours > 0 ? (plannedHours / effectiveCapacityHours) * 100 : 0,
     blockerCount,
     isOverloaded: targetHours > 0 && plannedHours > targetHours,
   };
