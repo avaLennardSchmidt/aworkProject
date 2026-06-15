@@ -14,13 +14,19 @@ import {
   setYear,
 } from "date-fns";
 import { de } from "date-fns/locale";
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+
+interface AbsenceRange {
+  startOn: string;
+  endOn: string;
+}
 
 interface DatePickerInputProps {
   id?: string;
   value: string; // YYYY-MM-DD or ""
   placeholder?: string;
   disabled?: boolean;
+  absenceRanges?: AbsenceRange[];
   onChange: (value: string) => void;
 }
 
@@ -58,6 +64,7 @@ export function DatePickerInput({
   value,
   placeholder = "Datum wählen",
   disabled,
+  absenceRanges,
   onChange,
 }: DatePickerInputProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -79,6 +86,11 @@ export function DatePickerInput({
 
   const selectedDate = parseValue(value);
   const days = buildCalendarDays(viewMonth);
+  const isAbsentDate = useMemo(() => {
+    if (!absenceRanges?.length) return (_: string) => false;
+    return (iso: string) =>
+      absenceRanges.some((r) => iso >= r.startOn && iso <= r.endOn);
+  }, [absenceRanges]);
 
   function open() {
     const parsed = parseValue(value);
@@ -298,6 +310,7 @@ export function DatePickerInput({
                         const isoStr = toIso(date);
                         const isSelected = value === isoStr;
                         const isCurrentDay = isToday(date);
+                        const isAbsent = isAbsentDate(isoStr);
                         return (
                           <button
                             key={isoStr}
@@ -307,6 +320,7 @@ export function DatePickerInput({
                               "date-picker-cell",
                               isSelected ? "date-picker-cell--selected" : "",
                               isCurrentDay ? "date-picker-cell--today" : "",
+                              isAbsent ? "date-picker-cell--absent" : "",
                             ]
                               .filter(Boolean)
                               .join(" ")}

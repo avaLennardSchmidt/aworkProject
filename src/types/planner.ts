@@ -14,6 +14,7 @@ export interface ScheduleGroup {
   totalMinutes: number;
   firstDate: string;
   lastDate: string;
+  taskStatusType?: string;
 }
 
 export interface PlannerFilters {

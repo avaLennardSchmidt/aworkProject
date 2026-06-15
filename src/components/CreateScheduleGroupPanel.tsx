@@ -26,6 +26,11 @@ export interface CreateGroupOptions {
   newTaskName?: string;
 }
 
+interface AbsenceRange {
+  startOn: string;
+  endOn: string;
+}
+
 interface CreateScheduleGroupPanelProps {
   currentUser: AworkUser;
   projects: AworkProject[];
@@ -35,6 +40,7 @@ interface CreateScheduleGroupPanelProps {
   isCreating: boolean;
   myAssignedTaskIds: Set<string>;
   myAssignedProjectIds: Set<string>;
+  absenceRanges?: AbsenceRange[];
   workflowToggle?: ReactNode;
   onLoadProjects: () => Promise<void>;
   onProjectChange: (projectId: string) => Promise<void>;
@@ -124,6 +130,7 @@ export function CreateScheduleGroupPanel({
   isCreating,
   myAssignedTaskIds,
   myAssignedProjectIds,
+  absenceRanges,
   workflowToggle,
   onLoadProjects,
   onProjectChange,
@@ -499,11 +506,11 @@ export function CreateScheduleGroupPanel({
         </div>
         <div className="form-row">
           <label htmlFor="create-from">Von</label>
-          <DatePickerInput id="create-from" value={from} onChange={setFrom} />
+          <DatePickerInput id="create-from" value={from} absenceRanges={absenceRanges} onChange={setFrom} />
         </div>
         <div className="form-row">
           <label htmlFor="create-to">Bis</label>
-          <DatePickerInput id="create-to" value={to} onChange={setTo} />
+          <DatePickerInput id="create-to" value={to} absenceRanges={absenceRanges} onChange={setTo} />
         </div>
         <div className="form-row">
           <label htmlFor="create-start">Start</label>

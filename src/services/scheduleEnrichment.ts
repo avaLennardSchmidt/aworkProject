@@ -7,10 +7,6 @@ export function enrichSchedulesWithProjectTasks(
   const tasksById = new Map(projectTasks.map((task) => [task.id, task]));
 
   return schedules.map((schedule) => {
-    if (schedule.projectId && schedule.projectName) {
-      return schedule;
-    }
-
     const task = tasksById.get(schedule.taskId);
     if (!task) {
       return {
@@ -25,6 +21,7 @@ export function enrichSchedulesWithProjectTasks(
       taskName: schedule.taskName ?? task.name,
       projectId: schedule.projectId ?? task.projectId,
       projectName: schedule.projectName ?? task.projectName,
+      taskStatusType: schedule.taskStatusType ?? task.statusType,
     };
   });
 }

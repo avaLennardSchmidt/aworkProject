@@ -26,7 +26,9 @@ import {
 import { mapProjectsResponse } from "./services/projectMapper";
 import { updateScheduleChanges } from "./services/scheduleUpdater";
 import { applyBlockerOperations } from "./services/scheduleOperations";
+import { mapAbsencesResponse } from "./services/absenceMapper";
 import type {
+  AworkAbsence,
   AworkProject,
   AworkProjectTask,
   AworkTaskSchedule,
@@ -109,6 +111,7 @@ function App() {
     failed: number;
   }>();
   const [allSchedules, setAllSchedules] = useState<AworkTaskSchedule[]>([]);
+  const [plannerAbsences, setPlannerAbsences] = useState<AworkAbsence[]>([]);
   const [availableProjects, setAvailableProjects] = useState<AworkProject[]>(
     [],
   );
@@ -210,6 +213,13 @@ function App() {
       }
     );
   }, [availableUsers, currentUser, selectedPlannerUserId]);
+
+  const plannerAbsenceRanges = useMemo(() => {
+    if (!plannerUser) return [];
+    return plannerAbsences
+      .filter((a) => a.userId === plannerUser.id)
+      .map((a) => ({ startOn: a.startOn, endOn: a.endOn }));
+  }, [plannerAbsences, plannerUser]);
 
   const projectOptions = useMemo(() => {
     const projects = new Map<string, string>();
@@ -313,6 +323,7 @@ function App() {
   function handlePlannerUserChange(userId: string) {
     setSelectedPlannerUserId(userId);
     setAllSchedules([]);
+    setPlannerAbsences([]);
     setProjectTasksForCreate([]);
     setHasLoadedSchedules(false);
     setFilters((currentFilters) => ({ ...currentFilters, projectId: "" }));
@@ -342,6 +353,7 @@ function App() {
     setCurrentUser(undefined);
     setSelectedPlannerUserId("");
     setAllSchedules([]);
+    setPlannerAbsences([]);
     setAvailableProjects([]);
     setAvailableUsers([]);
     setProjectTasksForCreate([]);
@@ -432,6 +444,12 @@ function App() {
       setAllSchedules(enrichedSchedules);
       setSelectedGroupIds(new Set());
       setHasLoadedSchedules(true);
+      try {
+        const absencesRaw = await backendClient.getAbsences();
+        setPlannerAbsences(mapAbsencesResponse(absencesRaw));
+      } catch {
+        // Absence data unavailable — date picker shows no absence highlights
+      }
 
       if (mapped.schedules.length === 0) {
         setStatusMessage(
@@ -925,6 +943,7 @@ function App() {
           isCreating={isCreatingSchedules}
           myAssignedTaskIds={myAssignedTaskIds}
           myAssignedProjectIds={myAssignedProjectIds}
+          absenceRanges={plannerAbsenceRanges}
           workflowToggle={
             <WorkflowChooser
               value={workflow}

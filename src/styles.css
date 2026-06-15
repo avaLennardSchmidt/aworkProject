@@ -576,6 +576,20 @@ select:disabled {
   margin-bottom: 14px;
 }
 
+.section-heading--row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-stats {
+  font-size: 0.88rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  margin-left: 6px;
+}
+
 .group-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -1277,6 +1291,17 @@ select:disabled {
   );
   border-color: transparent;
   color: var(--color-surface);
+}
+
+.date-picker-cell--absent {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+
+.date-picker-cell--absent:hover {
+  background: #f8d7d8;
+  color: var(--color-danger);
 }
 
 .date-picker-footer {
@@ -2405,6 +2430,11 @@ select:disabled {
   border: 1px solid rgb(212 148 30 / 0.5);
 }
 
+.legend-swatch-current-week {
+  background: rgb(30 122 95 / 0.045);
+  border: 1px solid rgb(30 122 95 / 0.32);
+}
+
 .capacity-row {
   display: grid;
   gap: 12px;
@@ -2412,7 +2442,7 @@ select:disabled {
   padding: 14px;
   background: #f7f9fb;
   border: 1px solid #e1e7ed;
-  border-left: 3px solid transparent;
+  border-left: 3px solid #e1e7ed;
   border-radius: 8px;
 }
 
@@ -2553,6 +2583,38 @@ select:disabled {
   white-space: nowrap;
 }
 
+.capacity-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.capacity-icon-button:hover {
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+}
+
+.capacity-export-all-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .overbooked-label {
   display: inline-flex;
   align-items: center;
@@ -2607,6 +2669,15 @@ select:disabled {
   background: var(--color-surface);
   border: 1px solid #dbe4ec;
   border-radius: 8px;
+}
+
+.capacity-week.is-current-week {
+  border-color: rgb(30 122 95 / 0.32);
+  background: rgb(30 122 95 / 0.045);
+}
+
+.capacity-week.is-current-week .capacity-week-label strong {
+  color: var(--color-accent-deep);
 }
 
 .capacity-week-label,
@@ -3314,6 +3385,26 @@ select:disabled {
 .task-cell span {
   color: #768390;
   font-size: 0.78rem;
+}
+
+.task-cell-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.task-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger-border);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .table-time-window {

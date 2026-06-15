@@ -37,6 +37,7 @@ export interface AworkTaskSchedule {
   userId?: string;
   start: string;
   end: string;
+  taskStatusType?: string;
   raw: unknown;
 }
 

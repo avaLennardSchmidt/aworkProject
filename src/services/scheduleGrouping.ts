@@ -100,6 +100,7 @@ export function groupSchedules(
         taskName: first.taskName ?? "Aufgabe ohne Namen",
         projectId: first.projectId,
         projectName: first.projectName,
+        taskStatusType: first.taskStatusType,
         weekday,
         weekdayLabel: format(parseISO(first.start), "EEEE", { locale: de }),
         startTime,

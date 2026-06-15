@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { format } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
 import { fuzzyMatches } from "../services/fuzzySearch";
 import type { ScheduleGroup } from "../types/planner";
@@ -81,6 +82,15 @@ export function ScheduleGroupsList({
     selectedGroupIds.has(group.groupId),
   ).length;
 
+  const filteredTotalMinutes = useMemo(
+    () => filteredGroups.reduce((sum, g) => sum + g.totalMinutes, 0),
+    [filteredGroups],
+  );
+  const filteredTotalBlockers = useMemo(
+    () => filteredGroups.reduce((sum, g) => sum + g.schedules.length, 0),
+    [filteredGroups],
+  );
+
   function toggleGroupSelection(groupId: string, selected: boolean) {
     const next = new Set(selectedGroupIds);
     if (selected) {
@@ -125,9 +135,30 @@ export function ScheduleGroupsList({
 
   return (
     <section className="groups-section">
-      <div className="section-heading">
-        <p className="eyebrow">Blocker-Gruppen</p>
-        <h2>{filteredGroups.length} bearbeitbare Gruppen</h2>
+      <div className="section-heading section-heading--row">
+        <div>
+          <p className="eyebrow">Blocker-Gruppen</p>
+          <h2>
+            {filteredGroups.length} bearbeitbare Gruppen
+            {filteredGroups.length > 0 && (
+              <span className="section-stats">
+                {" · "}
+                {formatMinutesAsHours(filteredTotalMinutes)}
+                {" · "}
+                {filteredTotalBlockers} Blocker
+              </span>
+            )}
+          </h2>
+        </div>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={filteredGroups.length === 0}
+          title="Gefilterte Gruppen als CSV exportieren"
+          onClick={() => exportGroupsAsCsv(filteredGroups)}
+        >
+          CSV exportieren
+        </button>
       </div>
 
       <div className="groups-search-row">
@@ -282,7 +313,17 @@ function ProjectRows({
               </td>
               <td>
                 <div className="task-cell">
-                  <strong>{group.taskName}</strong>
+                  <div className="task-cell-name">
+                    <strong>{group.taskName}</strong>
+                    {isClosedTaskStatus(group.taskStatusType) && (
+                      <span
+                        className="task-status-badge"
+                        title={`Aufgabenstatus: ${group.taskStatusType}`}
+                      >
+                        Abgeschlossen
+                      </span>
+                    )}
+                  </div>
                   <span>{group.taskId}</span>
                 </div>
               </td>
@@ -376,4 +417,47 @@ function compareGroupsWithinProject(
     a.startTime.localeCompare(b.startTime) ||
     a.endTime.localeCompare(b.endTime)
   );
+}
+
+function isClosedTaskStatus(statusType: string | undefined): boolean {
+  if (!statusType) return false;
+  const normalized = statusType.trim().toLowerCase();
+  return ["done", "closed", "completed"].includes(normalized);
+}
+
+function exportGroupsAsCsv(groups: ScheduleGroup[]) {
+  const header = [
+    "Projekt",
+    "Aufgabe",
+    "Wochentag",
+    "Startzeit",
+    "Endzeit",
+    "Anzahl Blocker",
+    "Gesamt-Stunden",
+    "Erster",
+    "Letzter",
+  ];
+  const rows = groups.map((g) => [
+    g.projectName ?? "Projekt nicht aufgelöst",
+    g.taskName,
+    g.weekdayLabel,
+    g.startTime,
+    g.endTime,
+    g.schedules.length,
+    formatMinutesAsHours(g.totalMinutes),
+    g.firstDate,
+    g.lastDate,
+  ]);
+  const csv = [header, ...rows]
+    .map((row) =>
+      row.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(";"),
+    )
+    .join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `blocker-gruppen-${format(new Date(), "yyyy-MM-dd")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }

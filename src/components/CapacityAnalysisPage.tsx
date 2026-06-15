@@ -1036,6 +1036,21 @@ export function CapacityAnalysisPage({
                     placeholder="Nutzer filtern..."
                     onChange={(event) => setChartUserSearch(event.target.value)}
                   />
+                  <button
+                    type="button"
+                    className="ghost-button capacity-export-all-button"
+                    disabled={visibleSelectedRowSummaries.length === 0}
+                    title="Kapazität aller angezeigten Nutzer als CSV exportieren"
+                    onClick={() =>
+                      exportCapacityCsv(
+                        visibleSelectedRowSummaries,
+                        "kapazitaet-alle-nutzer",
+                      )
+                    }
+                  >
+                    <CsvExportIcon />
+                    CSV exportieren
+                  </button>
                   <span>
                     <i className="legend-swatch legend-swatch-capacity" />
                     Kapazität (Wochenstunden)
@@ -1051,6 +1066,10 @@ export function CapacityAnalysisPage({
                   <span>
                     <i className="legend-swatch legend-swatch-absent" />
                     Abwesenheit
+                  </span>
+                  <span>
+                    <i className="legend-swatch legend-swatch-current-week" />
+                    Aktuelle Woche
                   </span>
                 </div>
                 {visibleSelectedRowSummaries.length > 0 ? (
@@ -1236,6 +1255,22 @@ function CapacityChartRow({
   );
   const workloadColor = getWorkloadColor(totals.customerTargetPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
+  const [copied, setCopied] = useState(false);
+
+  function copyCapacitySummary() {
+    const text = `${formatUserName(row.user)} — ${formatDecimal(totals.customerTargetPercent)}% (${formatHours(totals.plannedHours)} / ${formatHours(totals.effectiveCapacityHours)})`;
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function exportUserCapacity() {
+    exportCapacityCsv(
+      [{ row, weekRows }],
+      `kapazitaet-${slugifyName(formatUserName(row.user))}`,
+    );
+  }
 
   function showProjectTooltip(text: string, event: MouseEvent<HTMLElement>) {
     const tooltipWidth = 360;
@@ -1266,6 +1301,24 @@ function CapacityChartRow({
                 {formatAbsentDays(totals.absentDays)} Urlaub
               </span>
             )}
+            <button
+              type="button"
+              className="capacity-icon-button"
+              aria-label="Kapazitätszusammenfassung kopieren"
+              title="Kapazitätszusammenfassung in Zwischenablage kopieren"
+              onClick={copyCapacitySummary}
+            >
+              {copied ? <CheckIcon /> : <CopyIcon />}
+            </button>
+            <button
+              type="button"
+              className="capacity-icon-button"
+              aria-label="Kapazität dieses Nutzers als CSV exportieren"
+              title="Kapazität dieses Nutzers als CSV exportieren"
+              onClick={exportUserCapacity}
+            >
+              <CsvExportIcon />
+            </button>
           </div>
           <span
             style={{ color: workloadColor }}
@@ -1527,11 +1580,14 @@ function CapacityWeekBar({
     weekRow.week.to,
   );
   const isPartialWeek = weekWorkingDays < 5;
+  const isCurrentWeek = weekRow.week.key === currentIsoWeekKey();
   const customerTargetTooltip = `Erwartete Projektkapazät | ${formatHours(weekRow.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der Wochenstunden`;
   const absentTooltip = `Abwesenheit\n${formatAbsentDays(weekRow.absentDays)} · ${formatHours(weekRow.absentHours)} weniger Kap.`;
 
   return (
-    <div className={`capacity-week ${isOverbooked ? "is-overbooked" : ""}`}>
+    <div
+      className={`capacity-week ${isOverbooked ? "is-overbooked" : ""} ${isCurrentWeek ? "is-current-week" : ""}`}
+    >
       <div
         className="capacity-week-label"
         title={`${weekRow.week.label}: ${format(weekRow.week.from, "dd.MM.yyyy")} - ${format(weekRow.week.to, "dd.MM.yyyy")}`}
@@ -2353,4 +2409,129 @@ function getWorkloadColor(workloadPercent: number): string {
 
 function getPlannerHref(): string {
   return import.meta.env.BASE_URL || "/";
+}
+
+function currentIsoWeekKey(): string {
+  const now = new Date();
+  return `${format(now, "RRRR")}-${getISOWeek(now)}`;
+}
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect
+        x="5.5"
+        y="5.5"
+        width="8"
+        height="8"
+        rx="1.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path
+        d="M3 10.5H2.5A1.5 1.5 0 0 1 1 9V2.5A1.5 1.5 0 0 1 2.5 1H9A1.5 1.5 0 0 1 10.5 2.5V3"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M3 8.5L6.5 12L13 4.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CsvExportIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 1.5V10M8 10L5 7M8 10L11 7"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2.5 11V13A1.5 1.5 0 0 0 4 14.5H12A1.5 1.5 0 0 0 13.5 13V11"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function exportCapacityCsv(
+  entries: Array<{ row: UserCapacityRow; weekRows: UserCapacityWeek[] }>,
+  filenameBase: string,
+) {
+  const header = [
+    "Nutzer",
+    "Woche",
+    "Von",
+    "Bis",
+    "Geplant (h)",
+    "Verfügbare Kapazität (h)",
+    "Abwesenheit (h)",
+    "Kundenziel (h)",
+    "Auslastung (%)",
+  ];
+
+  const rows: (string | number)[][] = [];
+  entries.forEach(({ row, weekRows }) => {
+    const userName = formatUserName(row.user);
+    weekRows.forEach((week) => {
+      rows.push([
+        userName,
+        week.week.label,
+        format(week.week.from, "dd.MM.yyyy"),
+        format(week.week.to, "dd.MM.yyyy"),
+        csvNumber(week.plannedMinutes / 60),
+        csvNumber(week.effectiveCapacityHours),
+        csvNumber(week.absentHours),
+        csvNumber(week.targetHours),
+        csvNumber(week.customerTargetPercent),
+      ]);
+    });
+  });
+
+  const csv = [header, ...rows]
+    .map((row) =>
+      row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(";"),
+    )
+    .join("\n");
+
+  const blob = new Blob(["﻿" + csv], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filenameBase}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvNumber(value: number): string {
+  return (Math.round(value * 10) / 10).toString().replace(".", ",");
+}
+
+function slugifyName(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9]+/g, "-")
+      .replaceAll(/^-+|-+$/g, "") || "nutzer"
+  );
 }
