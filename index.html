@@ -4,20 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>awork Self-Service Bulk Planner</title>
-    <script type="module" crossorigin src="/aworkProject/assets/index-C6Wdo1Jk.js"></script>
+    <script type="module" crossorigin src="/aworkProject/assets/index-s21atFlw.js"></script>
     <link rel="stylesheet" crossorigin href="/aworkProject/assets/index-CbAcWty0.css">
   </head>
   <body>
     <script>
       // Runs before React — capture session ID and clean URL instantly
-      (function() {
+      (function () {
         var p = new URLSearchParams(location.search);
-        var s = p.get('session');
-        if (s) { localStorage.setItem('awork_planner_session', s); }
-        if (p.has('session') || p.has('aworkLogin')) {
-          p.delete('session'); p.delete('aworkLogin');
+        var s = p.get("session");
+        if (s) {
+          localStorage.setItem("awork_planner_session", s);
+          sessionStorage.setItem("awork_planner_login_redirect", "1");
+        }
+        if (p.has("session") || p.has("aworkLogin")) {
+          p.delete("session");
+          p.delete("aworkLogin");
           var q = p.toString();
-          history.replaceState(null, '', q ? location.pathname + '?' + q : location.pathname);
+          history.replaceState(
+            null,
+            "",
+            q ? location.pathname + "?" + q : location.pathname,
+          );
         }
       })();
     </script>
