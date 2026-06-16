@@ -123,6 +123,10 @@ export class BackendClient {
   async getUsers(): Promise<AworkUser[]> {
     const response = await this.request<unknown>("/api/users");
     return extractArray(response)
+      .filter((u) => {
+        const rec = u as Record<string, unknown>;
+        return !rec.isDeactivated;
+      })
       .map(mapNullableUser)
       .filter((user): user is AworkUser => Boolean(user))
       .filter(isUserInPdsOrSimTeam)
