@@ -15,6 +15,8 @@ import type {
 import { DatePickerInput } from "./DatePickerInput";
 import { ModalShell } from "./ModalShell";
 
+type Metric = "nutzer" | "logins" | "besuche";
+
 interface MonitoringModalProps {
   backendClient: BackendClient;
   onClose: () => void;
@@ -35,6 +37,7 @@ export function MonitoringModal({
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dayLogs, setDayLogs] = useState<MonitoringLogEntry[]>([]);
   const [isDayLoading, setIsDayLoading] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<Metric>("nutzer");
 
   const loadData = useCallback(
     (fromDate: string, toDate: string) => {
@@ -146,23 +149,42 @@ export function MonitoringModal({
       ) : (
         <>
           <div className="monitoring-stats-row">
-            <div className="monitoring-stat-card">
+            <button
+              type="button"
+              className={`monitoring-stat-card monitoring-stat-card--nutzer${selectedMetric === "nutzer" ? " active" : ""}`}
+              onClick={() => setSelectedMetric("nutzer")}
+            >
               <strong>{uniqueUserIds.size}</strong>
               <span>Nutzer</span>
-            </div>
-            <div className="monitoring-stat-card">
+            </button>
+            <button
+              type="button"
+              className={`monitoring-stat-card monitoring-stat-card--logins${selectedMetric === "logins" ? " active" : ""}`}
+              onClick={() => setSelectedMetric("logins")}
+            >
               <strong>{totalLogins}</strong>
               <span>Logins</span>
-            </div>
-            <div className="monitoring-stat-card">
+            </button>
+            <button
+              type="button"
+              className={`monitoring-stat-card monitoring-stat-card--besuche${selectedMetric === "besuche" ? " active" : ""}`}
+              onClick={() => setSelectedMetric("besuche")}
+            >
               <strong>{totalVisits}</strong>
               <span>Besuche</span>
-            </div>
+            </button>
           </div>
 
-          <h3 className="monitoring-section-title">Unique Logins pro Tag</h3>
+          <h3 className="monitoring-section-title">
+            {selectedMetric === "nutzer"
+              ? "Unique Nutzer pro Tag"
+              : selectedMetric === "logins"
+                ? "Logins pro Tag"
+                : "Besuche pro Tag"}
+          </h3>
           <UsageChart
             stats={chartStats}
+            metric={selectedMetric}
             selectedDay={selectedDay}
             onDayClick={handleDayClick}
           />
@@ -351,13 +373,17 @@ function buildDayUserRows(logs: MonitoringLogEntry[]): DayUserRow[] {
 
 function UsageChart({
   stats,
+  metric,
   selectedDay,
   onDayClick,
 }: {
   stats: MonitoringDailyStats[];
+  metric: Metric;
   selectedDay: string | null;
   onDayClick: (date: string) => void;
 }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   if (stats.length === 0) {
     return (
       <div className="monitoring-chart-scroll">
@@ -368,6 +394,27 @@ function UsageChart({
     );
   }
 
+  const getValue = (s: MonitoringDailyStats) =>
+    metric === "nutzer"
+      ? s.unique_users
+      : metric === "logins"
+        ? s.logins
+        : s.session_starts;
+
+  const color =
+    metric === "nutzer"
+      ? "var(--color-accent)"
+      : metric === "logins"
+        ? "#4f7cf7"
+        : "#f59e3a";
+
+  const colorDeep =
+    metric === "nutzer"
+      ? "var(--color-accent-deep, #2a7d5f)"
+      : metric === "logins"
+        ? "#2d5de8"
+        : "#d97e1a";
+
   const dayWidth = 48;
   const paddingY = 28;
   const yAxisWidth = 36;
@@ -377,20 +424,28 @@ function UsageChart({
   const naturalWidth = stats.length * dayWidth + 20;
   const svgWidth = Math.max(naturalWidth, minChartPx);
 
-  const maxUsers = Math.max(...stats.map((s) => s.unique_users), 1);
-  const niceMax = getNiceMax(maxUsers);
+  const maxVal = Math.max(...stats.map(getValue), 1);
+  const niceMax = getNiceMax(maxVal);
 
   const spacing =
     stats.length > 1 ? (svgWidth - 20) / stats.length : svgWidth / 2;
 
   const points = stats.map((s, i) => {
     const x = stats.length > 1 ? 10 + i * spacing + spacing / 2 : svgWidth / 2;
-    const y = paddingY + chartHeight - (s.unique_users / niceMax) * chartHeight;
-    return { x, y, date: s.date, value: s.unique_users };
+    const y = paddingY + chartHeight - (getValue(s) / niceMax) * chartHeight;
+    return { x, y, date: s.date, value: getValue(s) };
   });
+
+  const peakIdx = points.reduce(
+    (best, p, i) => (p.value > points[best].value ? i : best),
+    0,
+  );
 
   const polyline = points.map((p) => `${p.x},${p.y}`).join(" ");
   const labelInterval = Math.max(1, Math.floor(stats.length / 10));
+
+  const tooltipW = 82;
+  const tooltipH = 34;
 
   return (
     <div className="monitoring-chart-wrapper">
@@ -441,27 +496,52 @@ function UsageChart({
           <polyline
             points={polyline}
             fill="none"
-            stroke="var(--color-accent)"
+            stroke={color}
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
+
+          {/* Peak day outer ring */}
+          {maxVal > 1 && (
+            <>
+              <circle
+                cx={points[peakIdx].x}
+                cy={points[peakIdx].y}
+                r={11}
+                fill="none"
+                stroke="#f5c842"
+                strokeWidth="2"
+                opacity="0.7"
+                pointerEvents="none"
+              />
+              <text
+                x={points[peakIdx].x}
+                y={points[peakIdx].y - 14}
+                textAnchor="middle"
+                fontSize="10"
+                fill="#c89b00"
+                fontWeight="700"
+                pointerEvents="none"
+              >
+                ★
+              </text>
+            </>
+          )}
 
           {points.map((p, i) => (
             <circle
               key={i}
               cx={p.x}
               cy={p.y}
-              r={selectedDay === p.date ? 7 : 5}
-              fill={
-                selectedDay === p.date
-                  ? "var(--color-accent-deep)"
-                  : "var(--color-accent)"
-              }
+              r={hoveredIdx === i || selectedDay === p.date ? 7 : 5}
+              fill={selectedDay === p.date ? colorDeep : color}
               stroke="var(--color-surface)"
               strokeWidth="2"
               className="monitoring-dot"
               onClick={() => onDayClick(p.date)}
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
             />
           ))}
 
@@ -479,6 +559,49 @@ function UsageChart({
                 {format(new Date(p.date), "dd.MM.")}
               </text>
             ))}
+
+          {/* Hover tooltip — rendered last so it sits on top */}
+          {hoveredIdx !== null && (() => {
+            const p = points[hoveredIdx];
+            const dateLabel = format(new Date(p.date), "dd. MMM", { locale: de });
+            const tx = Math.max(
+              tooltipW / 2 + 4,
+              Math.min(svgWidth - tooltipW / 2 - 4, p.x),
+            );
+            const ty = Math.max(paddingY - 8, p.y - tooltipH - 12);
+            return (
+              <g pointerEvents="none">
+                <rect
+                  x={tx - tooltipW / 2}
+                  y={ty}
+                  width={tooltipW}
+                  height={tooltipH}
+                  rx="6"
+                  fill="#1e2a35"
+                  opacity="0.92"
+                />
+                <text
+                  x={tx}
+                  y={ty + 13}
+                  textAnchor="middle"
+                  fontSize="9"
+                  fill="#adb8c2"
+                >
+                  {dateLabel}
+                </text>
+                <text
+                  x={tx}
+                  y={ty + 27}
+                  textAnchor="middle"
+                  fontSize="13"
+                  fontWeight="700"
+                  fill="#fff"
+                >
+                  {p.value}
+                </text>
+              </g>
+            );
+          })()}
         </svg>
       </div>
     </div>

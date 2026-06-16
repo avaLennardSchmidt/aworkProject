@@ -3766,20 +3766,60 @@ select:disabled {
 }
 
 .monitoring-stat-card {
+  --card-color: var(--color-accent);
   flex: 1;
   min-width: 100px;
-  padding: 12px 16px;
+  padding: 14px 16px;
   background: var(--color-accent-soft);
-  border: 1px solid var(--color-accent-border);
-  border-radius: 8px;
+  border: 1.5px solid var(--color-accent-border);
+  border-radius: 10px;
   text-align: center;
+  cursor: pointer;
+  appearance: none;
+  font-family: inherit;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.monitoring-stat-card--logins {
+  --card-color: #4f7cf7;
+}
+
+.monitoring-stat-card--besuche {
+  --card-color: #f59e3a;
+}
+
+.monitoring-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: var(--card-color);
+}
+
+.monitoring-stat-card:focus-visible {
+  outline: 2px solid var(--card-color);
+  outline-offset: 2px;
+}
+
+.monitoring-stat-card.active {
+  background: var(--card-color);
+  border-color: var(--card-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.monitoring-stat-card.active strong,
+.monitoring-stat-card.active span {
+  color: #fff;
 }
 
 .monitoring-stat-card strong {
   display: block;
   font-size: 1.5rem;
   line-height: 1.2;
-  color: var(--color-accent);
+  color: var(--card-color);
 }
 
 .monitoring-stat-card span {
