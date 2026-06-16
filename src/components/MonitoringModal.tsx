@@ -561,47 +561,50 @@ function UsageChart({
             ))}
 
           {/* Hover tooltip — rendered last so it sits on top */}
-          {hoveredIdx !== null && (() => {
-            const p = points[hoveredIdx];
-            const dateLabel = format(new Date(p.date), "dd. MMM", { locale: de });
-            const tx = Math.max(
-              tooltipW / 2 + 4,
-              Math.min(svgWidth - tooltipW / 2 - 4, p.x),
-            );
-            const ty = Math.max(paddingY - 8, p.y - tooltipH - 12);
-            return (
-              <g pointerEvents="none">
-                <rect
-                  x={tx - tooltipW / 2}
-                  y={ty}
-                  width={tooltipW}
-                  height={tooltipH}
-                  rx="6"
-                  fill="#1e2a35"
-                  opacity="0.92"
-                />
-                <text
-                  x={tx}
-                  y={ty + 13}
-                  textAnchor="middle"
-                  fontSize="9"
-                  fill="#adb8c2"
-                >
-                  {dateLabel}
-                </text>
-                <text
-                  x={tx}
-                  y={ty + 27}
-                  textAnchor="middle"
-                  fontSize="13"
-                  fontWeight="700"
-                  fill="#fff"
-                >
-                  {p.value}
-                </text>
-              </g>
-            );
-          })()}
+          {hoveredIdx !== null &&
+            (() => {
+              const p = points[hoveredIdx];
+              const dateLabel = format(new Date(p.date), "dd. MMM", {
+                locale: de,
+              });
+              const tx = Math.max(
+                tooltipW / 2 + 4,
+                Math.min(svgWidth - tooltipW / 2 - 4, p.x),
+              );
+              const ty = Math.max(paddingY - 8, p.y - tooltipH - 12);
+              return (
+                <g pointerEvents="none">
+                  <rect
+                    x={tx - tooltipW / 2}
+                    y={ty}
+                    width={tooltipW}
+                    height={tooltipH}
+                    rx="6"
+                    fill="#1e2a35"
+                    opacity="0.92"
+                  />
+                  <text
+                    x={tx}
+                    y={ty + 13}
+                    textAnchor="middle"
+                    fontSize="9"
+                    fill="#adb8c2"
+                  >
+                    {dateLabel}
+                  </text>
+                  <text
+                    x={tx}
+                    y={ty + 27}
+                    textAnchor="middle"
+                    fontSize="13"
+                    fontWeight="700"
+                    fill="#fff"
+                  >
+                    {p.value}
+                  </text>
+                </g>
+              );
+            })()}
         </svg>
       </div>
     </div>
