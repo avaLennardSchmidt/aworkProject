@@ -67,6 +67,7 @@ import {
 } from "./components/WorkflowChooser";
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
+import { MonitoringModal } from "./components/MonitoringModal";
 import { clearFeatureAccessCache } from "./config/featureAccess";
 import { AnimatePresence } from "motion/react";
 
@@ -94,6 +95,8 @@ function App() {
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isCreatingSchedules, setIsCreatingSchedules] = useState(false);
   const [error, setError] = useState("");
+  const [hasMonitoringAccess, setHasMonitoringAccess] = useState(false);
+  const [showMonitoringModal, setShowMonitoringModal] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [createSuccess, setCreateSuccess] = useState<{
     count: number;
@@ -292,6 +295,14 @@ function App() {
       if (status.authenticated && status.user) {
         setCurrentUser(status.user);
         setSelectedPlannerUserId("");
+        backendClient
+          .getMonitoringAccess()
+          .then((r) => setHasMonitoringAccess(r.hasAccess))
+          .catch(() => setHasMonitoringAccess(false));
+        if (!sessionStorage.getItem("awork_planner_session_tracked")) {
+          sessionStorage.setItem("awork_planner_session_tracked", "1");
+          backendClient.trackActivity("session_start").catch(() => {});
+        }
         if (returnedFromLogin) {
           setStatusMessage("awork Login erfolgreich. Workflow wählen.");
           sessionRestoredRef.current = true;
@@ -351,6 +362,8 @@ function App() {
     clearFeatureAccessCache();
     sessionRestoredRef.current = false;
     setCurrentUser(undefined);
+    setHasMonitoringAccess(false);
+    setShowMonitoringModal(false);
     setSelectedPlannerUserId("");
     setAllSchedules([]);
     setPlannerAbsences([]);
@@ -854,7 +867,33 @@ function App() {
       <header className="app-header">
         <div>
           <p className="eyebrow">awork planner utility</p>
-          <h1>Self-Service Bulk Planner</h1>
+          <h1>
+            Self-Service Bulk Planner
+            {hasMonitoringAccess ? (
+              <button
+                className="monitoring-trigger"
+                onClick={() => setShowMonitoringModal(true)}
+                aria-label="Monitoring Tool öffnen"
+                title="Monitoring Tool"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 16h16M4 12l3-4 3 2 4-6 2 3"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : null}
+          </h1>
         </div>
         <p>
           Geplante Aufgaben-Blocker für den ausgewählten Planner-Nutzer
@@ -1084,6 +1123,14 @@ function App() {
           onApply={handleApplyChanges}
         />
       ) : null}
+
+      {showMonitoringModal ? (
+        <MonitoringModal
+          backendClient={backendClient}
+          onClose={() => setShowMonitoringModal(false)}
+        />
+      ) : null}
+
       <div className="status-toast-region">
         <BackendStatusIndicator backendClient={backendClient} />
         <AnimatePresence>

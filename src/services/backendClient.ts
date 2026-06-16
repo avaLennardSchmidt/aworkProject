@@ -43,6 +43,27 @@ interface CapacityAnalysisQuery {
   to: string;
 }
 
+export interface MonitoringLogEntry {
+  id: number;
+  timestamp: string;
+  user_id: string;
+  user_name: string;
+  action: string;
+  details: string | null;
+}
+
+export interface MonitoringDailyStats {
+  date: string;
+  total_events: number;
+  unique_users: number;
+  logins: number;
+  session_starts: number;
+  blockers_created: number;
+  blockers_edited: number;
+  blockers_deleted: number;
+  analysis_views: number;
+}
+
 type BackendStatusListener = (status: "ok" | "starting") => void;
 
 export class BackendClient {
@@ -201,6 +222,40 @@ export class BackendClient {
         method: "DELETE",
       },
     );
+  }
+
+  async getMonitoringAccess(): Promise<{ hasAccess: boolean }> {
+    return this.request<{ hasAccess: boolean }>("/api/monitoring/access");
+  }
+
+  async getMonitoringLogs(options?: {
+    from?: string;
+    to?: string;
+    limit?: number;
+  }): Promise<MonitoringLogEntry[]> {
+    const params = new URLSearchParams();
+    if (options?.from) params.set("from", options.from);
+    if (options?.to) params.set("to", options.to);
+    if (options?.limit) params.set("limit", String(options.limit));
+    const query = params.size ? `?${params.toString()}` : "";
+    return this.request<MonitoringLogEntry[]>(`/api/monitoring/logs${query}`);
+  }
+
+  async getMonitoringStats(
+    from: string,
+    to: string,
+  ): Promise<MonitoringDailyStats[]> {
+    const params = new URLSearchParams({ from, to });
+    return this.request<MonitoringDailyStats[]>(
+      `/api/monitoring/stats?${params.toString()}`,
+    );
+  }
+
+  async trackActivity(action: string, details?: string): Promise<void> {
+    await this.request("/api/monitoring/track", {
+      method: "POST",
+      body: JSON.stringify({ action, details }),
+    });
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {

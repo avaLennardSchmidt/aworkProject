@@ -11,3 +11,5 @@ dist
 .github/skills/
 PRODUCT.md
 DESIGN.md
+/mcp.json
+.vscode/mcp.json
