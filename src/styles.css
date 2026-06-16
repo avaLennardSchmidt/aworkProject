@@ -3994,8 +3994,30 @@ select:disabled {
   border-bottom: 1px solid var(--color-border);
 }
 
+.monitoring-day-detail .monitoring-user-row {
+  grid-template-columns: 1fr 80px 80px 100px;
+}
+
 .monitoring-user-row:last-child {
   border-bottom: none;
+}
+
+.monitoring-stat-compact {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.monitoring-stat-time {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.monitoring-last-login {
+  color: var(--color-text-muted);
+  font-size: 0.77rem;
 }
 
 .monitoring-user-header {

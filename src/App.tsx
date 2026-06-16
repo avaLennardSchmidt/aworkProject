@@ -8,10 +8,6 @@ import {
   startOfToday,
 } from "date-fns";
 import { BackendClient } from "./services/backendClient";
-import {
-  getStoredSessionToken,
-  storeSessionTokenFromUrl,
-} from "./services/backendClient";
 import { groupSchedules } from "./services/scheduleGrouping";
 import { deleteScheduleGroup } from "./services/scheduleDeleter";
 import {
@@ -158,7 +154,6 @@ function App() {
     const returnedFromLogin = params.get("aworkLogin") === "success";
 
     if (returnedFromLogin) {
-      storeSessionTokenFromUrl();
       setStatusMessage("awork Login abgeschlossen. Session wird geprüft...");
       params.delete("aworkLogin");
       const nextQuery = params.toString();
@@ -166,16 +161,16 @@ function App() {
         ? `${window.location.pathname}?${nextQuery}`
         : window.location.pathname;
       window.history.replaceState({}, document.title, nextUrl);
-    }
-
-    if (returnedFromLogin || getStoredSessionToken()) {
       void restoreBackendSession(returnedFromLogin);
+    } else {
+      // Session cookie is automatically sent by the browser, just restore if we have a session
+      void restoreBackendSession(false);
     }
   }, []);
 
   useEffect(() => {
     function shouldCheckSession() {
-      return Boolean(currentUser || getStoredSessionToken());
+      return Boolean(currentUser);
     }
 
     function maybeRestoreSession() {

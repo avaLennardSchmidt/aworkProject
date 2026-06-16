@@ -211,23 +211,39 @@ interface UserSummaryRow {
   userName: string;
   logins: number;
   visits: number;
+  lastLoginTimestamp: string | null;
+  lastVisitTimestamp: string | null;
 }
 
 function buildUserSummary(logs: MonitoringLogEntry[]): UserSummaryRow[] {
   const map = new Map<
     string,
-    { userName: string; logins: number; visits: number }
+    {
+      userName: string;
+      logins: number;
+      visits: number;
+      lastLoginTimestamp: string | null;
+      lastVisitTimestamp: string | null;
+    }
   >();
   for (const log of logs) {
     const existing = map.get(log.user_id);
     if (existing) {
-      if (log.action === "login") existing.logins++;
-      if (log.action === "session_start") existing.visits++;
+      if (log.action === "login") {
+        existing.logins++;
+        existing.lastLoginTimestamp = log.timestamp;
+      }
+      if (log.action === "session_start") {
+        existing.visits++;
+        existing.lastVisitTimestamp = log.timestamp;
+      }
     } else {
       map.set(log.user_id, {
         userName: log.user_name,
         logins: log.action === "login" ? 1 : 0,
         visits: log.action === "session_start" ? 1 : 0,
+        lastLoginTimestamp: log.action === "login" ? log.timestamp : null,
+        lastVisitTimestamp: log.action === "session_start" ? log.timestamp : null,
       });
     }
   }
@@ -264,8 +280,22 @@ function UserTable({ users }: { users: UserSummaryRow[] }) {
             {user.userName}
             <span className="monitoring-user-id">{user.userId}</span>
           </span>
-          <span>{user.logins}</span>
-          <span>{user.visits}</span>
+          <span className="monitoring-stat-compact">
+            {user.logins}
+            {user.lastLoginTimestamp && (
+              <span className="monitoring-stat-time">
+                {formatRelativeTime(user.lastLoginTimestamp)}
+              </span>
+            )}
+          </span>
+          <span className="monitoring-stat-compact">
+            {user.visits}
+            {user.lastVisitTimestamp && (
+              <span className="monitoring-stat-time">
+                {formatRelativeTime(user.lastVisitTimestamp)}
+              </span>
+            )}
+          </span>
         </div>
       ))}
     </div>
@@ -314,8 +344,22 @@ function DayDetail({
           {userRows.map((row) => (
             <div key={row.userId} className="monitoring-user-row">
               <span>{row.userName}</span>
-              <span>{row.logins}</span>
-              <span>{row.visits}</span>
+              <span className="monitoring-stat-compact">
+                {row.logins}
+                {row.lastLoginTimestamp && (
+                  <span className="monitoring-stat-time">
+                    {formatRelativeTime(row.lastLoginTimestamp)}
+                  </span>
+                )}
+              </span>
+              <span className="monitoring-stat-compact">
+                {row.visits}
+                {row.lastVisitTimestamp && (
+                  <span className="monitoring-stat-time">
+                    {formatRelativeTime(row.lastVisitTimestamp)}
+                  </span>
+                )}
+              </span>
               <span className="monitoring-actions-cell">
                 {row.actions.length > 0
                   ? row.actions.map(formatAction).join(", ")
@@ -335,19 +379,32 @@ interface DayUserRow {
   logins: number;
   visits: number;
   actions: string[];
+  lastLoginTimestamp: string | null;
+  lastVisitTimestamp: string | null;
 }
 
 function buildDayUserRows(logs: MonitoringLogEntry[]): DayUserRow[] {
   const map = new Map<
     string,
-    { userName: string; logins: number; visits: number; actions: Set<string> }
+    {
+      userName: string;
+      logins: number;
+      visits: number;
+      actions: Set<string>;
+      lastLoginTimestamp: string | null;
+      lastVisitTimestamp: string | null;
+    }
   >();
   for (const log of logs) {
     const existing = map.get(log.user_id);
     if (existing) {
-      if (log.action === "login") existing.logins++;
-      else if (log.action === "session_start") existing.visits++;
-      else existing.actions.add(log.action);
+      if (log.action === "login") {
+        existing.logins++;
+        existing.lastLoginTimestamp = log.timestamp;
+      } else if (log.action === "session_start") {
+        existing.visits++;
+        existing.lastVisitTimestamp = log.timestamp;
+      } else existing.actions.add(log.action);
     } else {
       map.set(log.user_id, {
         userName: log.user_name,
@@ -357,6 +414,8 @@ function buildDayUserRows(logs: MonitoringLogEntry[]): DayUserRow[] {
           log.action !== "login" && log.action !== "session_start"
             ? new Set([log.action])
             : new Set(),
+        lastLoginTimestamp: log.action === "login" ? log.timestamp : null,
+        lastVisitTimestamp: log.action === "session_start" ? log.timestamp : null,
       });
     }
   }
@@ -367,6 +426,8 @@ function buildDayUserRows(logs: MonitoringLogEntry[]): DayUserRow[] {
       logins: data.logins,
       visits: data.visits,
       actions: [...data.actions],
+      lastLoginTimestamp: data.lastLoginTimestamp,
+      lastVisitTimestamp: data.lastVisitTimestamp,
     }))
     .sort((a, b) => b.logins - a.logins || b.visits - a.visits);
 }
@@ -619,6 +680,21 @@ function getNiceMax(value: number): number {
   if (normalized <= 3) return Math.ceil(3 * magnitude);
   if (normalized <= 5) return Math.ceil(5 * magnitude);
   return Math.ceil(10 * magnitude);
+}
+
+function formatRelativeTime(isoString: string): string {
+  const now = new Date();
+  const date = new Date(isoString);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "gerade eben";
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+  return format(date, "dd.MM");
 }
 
 function formatAction(action: string): string {
