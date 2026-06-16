@@ -10,7 +10,6 @@ import {
 import { BackendClient } from "./services/backendClient";
 import {
   getStoredSessionId,
-  storeSessionIdFromUrl,
   clearStoredSessionId,
 } from "./services/backendClient";
 import { groupSchedules } from "./services/scheduleGrouping";
@@ -155,22 +154,10 @@ function App() {
   const isAnalysisRoute = isCapacityAnalysisRoute();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const returnedFromLogin = params.get("aworkLogin") === "success";
-
-    if (returnedFromLogin) {
-      storeSessionIdFromUrl();
-      setStatusMessage("awork Login abgeschlossen. Session wird geprüft...");
-      params.delete("aworkLogin");
-      params.delete("session");
-      const nextQuery = params.toString();
-      const nextUrl = nextQuery
-        ? `${window.location.pathname}?${nextQuery}`
-        : window.location.pathname;
-      window.history.replaceState({}, document.title, nextUrl);
-      void restoreBackendSession(returnedFromLogin);
-    } else if (getStoredSessionId()) {
-      void restoreBackendSession(false);
+    // Session ID is captured from URL by inline script in index.html (before React loads).
+    // Here we just check if we have a stored session and restore it.
+    if (getStoredSessionId()) {
+      void restoreBackendSession(true);
     }
   }, []);
 
@@ -290,42 +277,69 @@ function App() {
   async function restoreBackendSession(returnedFromLogin = false) {
     setIsConnecting(true);
     setError("");
+    if (returnedFromLogin) {
+      setStatusMessage("awork Login abgeschlossen. Session wird geprüft...");
+    }
 
-    try {
-      const status = await backendClient.getAuthStatus();
-      if (status.authenticated && status.user) {
-        setCurrentUser(status.user);
-        setSelectedPlannerUserId("");
-        backendClient
-          .getMonitoringAccess()
-          .then((r) => setHasMonitoringAccess(r.hasAccess))
-          .catch(() => setHasMonitoringAccess(false));
-        if (!sessionStorage.getItem("awork_planner_session_tracked")) {
-          sessionStorage.setItem("awork_planner_session_tracked", "1");
-          backendClient.trackActivity("session_start").catch(() => {});
+    // Retry up to 3 times to handle Render cold starts
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const status = await backendClient.getAuthStatus();
+        if (status.authenticated && status.user) {
+          setCurrentUser(status.user);
+          setSelectedPlannerUserId("");
+          backendClient
+            .getMonitoringAccess()
+            .then((r) => setHasMonitoringAccess(r.hasAccess))
+            .catch(() => setHasMonitoringAccess(false));
+          if (!sessionStorage.getItem("awork_planner_session_tracked")) {
+            sessionStorage.setItem("awork_planner_session_tracked", "1");
+            backendClient.trackActivity("session_start").catch(() => {});
+          }
+          if (returnedFromLogin) {
+            setStatusMessage("awork Login erfolgreich. Workflow wählen.");
+            sessionRestoredRef.current = true;
+          } else if (!sessionRestoredRef.current) {
+            setStatusMessage("awork-Session wiederhergestellt.");
+            sessionRestoredRef.current = true;
+          }
+          setIsConnecting(false);
+          return;
+        } else if (returnedFromLogin) {
+          // Session not found in backend — might be Render cold start, DB not yet loaded
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          clearStoredSessionId();
+          setError(
+            "awork Login erfolgreich, aber keine Backend-Session gefunden. Bitte erneut anmelden.",
+          );
+        } else {
+          // Stored session is stale
+          clearStoredSessionId();
         }
-        if (returnedFromLogin) {
-          setStatusMessage("awork Login erfolgreich. Workflow wählen.");
-          sessionRestoredRef.current = true;
-        } else if (!sessionRestoredRef.current) {
-          setStatusMessage("awork-Session wiederhergestellt.");
-          sessionRestoredRef.current = true;
+        break;
+      } catch (sessionError) {
+        lastError = sessionError;
+        if (attempt < 2) {
+          setStatusMessage("Backend startet... bitte warten.");
+          await new Promise((r) => setTimeout(r, 3000));
+          continue;
         }
-      } else if (returnedFromLogin) {
-        setError(
-          "awork Login erfolgreich, aber keine Backend-Session gefunden. Bitte Backend neu starten.",
-        );
       }
-    } catch (sessionError) {
-      setCurrentUser(undefined);
+    }
+
+    setCurrentUser(undefined);
+    if (lastError && !error) {
       setError(
-        sessionError instanceof Error
-          ? sessionError.message
+        lastError instanceof Error
+          ? lastError.message
           : "Backend-Session konnte nicht geprüft werden.",
       );
-    } finally {
-      setIsConnecting(false);
     }
+    setIsConnecting(false);
   }
 
   function handleLogin() {
