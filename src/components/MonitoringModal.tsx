@@ -243,7 +243,8 @@ function buildUserSummary(logs: MonitoringLogEntry[]): UserSummaryRow[] {
         logins: log.action === "login" ? 1 : 0,
         visits: log.action === "session_start" ? 1 : 0,
         lastLoginTimestamp: log.action === "login" ? log.timestamp : null,
-        lastVisitTimestamp: log.action === "session_start" ? log.timestamp : null,
+        lastVisitTimestamp:
+          log.action === "session_start" ? log.timestamp : null,
       });
     }
   }
@@ -415,7 +416,8 @@ function buildDayUserRows(logs: MonitoringLogEntry[]): DayUserRow[] {
             ? new Set([log.action])
             : new Set(),
         lastLoginTimestamp: log.action === "login" ? log.timestamp : null,
-        lastVisitTimestamp: log.action === "session_start" ? log.timestamp : null,
+        lastVisitTimestamp:
+          log.action === "session_start" ? log.timestamp : null,
       });
     }
   }
