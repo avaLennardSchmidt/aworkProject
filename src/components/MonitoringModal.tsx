@@ -1,5 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+} from "date-fns";
 import { de } from "date-fns/locale";
 import type { BackendClient } from "../services/backendClient";
 import type {
@@ -37,7 +43,11 @@ export function MonitoringModal({
       setSelectedDay(null);
       Promise.all([
         backendClient.getMonitoringStats(fromDate, toDate),
-        backendClient.getMonitoringLogs({ from: fromDate, to: toDate, limit: 500 }),
+        backendClient.getMonitoringLogs({
+          from: fromDate,
+          to: toDate,
+          limit: 500,
+        }),
       ])
         .then(([statsData, logsData]) => {
           setStats(statsData);
@@ -116,16 +126,10 @@ export function MonitoringModal({
           <DatePickerInput value={to} onChange={setTo} />
         </label>
         <div className="monitoring-presets">
-          <button
-            className="ghost-button"
-            onClick={() => applyPreset("week")}
-          >
+          <button className="ghost-button" onClick={() => applyPreset("week")}>
             Diese Woche
           </button>
-          <button
-            className="ghost-button"
-            onClick={() => applyPreset("month")}
-          >
+          <button className="ghost-button" onClick={() => applyPreset("month")}>
             Dieser Monat
           </button>
         </div>
@@ -214,7 +218,11 @@ function UserTable({ users }: { users: UserSummaryRow[] }) {
   if (users.length === 0) {
     return (
       <p
-        style={{ padding: "0 24px 24px", color: "#5c6874", fontSize: "0.85rem" }}
+        style={{
+          padding: "0 24px 24px",
+          color: "#5c6874",
+          fontSize: "0.85rem",
+        }}
       >
         Keine Nutzer im gewählten Zeitraum.
       </p>
@@ -372,16 +380,12 @@ function UsageChart({
   const maxUsers = Math.max(...stats.map((s) => s.unique_users), 1);
   const niceMax = getNiceMax(maxUsers);
 
-  const spacing = stats.length > 1
-    ? (svgWidth - 20) / stats.length
-    : svgWidth / 2;
+  const spacing =
+    stats.length > 1 ? (svgWidth - 20) / stats.length : svgWidth / 2;
 
   const points = stats.map((s, i) => {
-    const x = stats.length > 1
-      ? 10 + i * spacing + spacing / 2
-      : svgWidth / 2;
-    const y =
-      paddingY + chartHeight - (s.unique_users / niceMax) * chartHeight;
+    const x = stats.length > 1 ? 10 + i * spacing + spacing / 2 : svgWidth / 2;
+    const y = paddingY + chartHeight - (s.unique_users / niceMax) * chartHeight;
     return { x, y, date: s.date, value: s.unique_users };
   });
 
@@ -449,7 +453,11 @@ function UsageChart({
               cx={p.x}
               cy={p.y}
               r={selectedDay === p.date ? 7 : 5}
-              fill={selectedDay === p.date ? "var(--color-accent-deep)" : "var(--color-accent)"}
+              fill={
+                selectedDay === p.date
+                  ? "var(--color-accent-deep)"
+                  : "var(--color-accent)"
+              }
               stroke="var(--color-surface)"
               strokeWidth="2"
               className="monitoring-dot"
@@ -458,9 +466,7 @@ function UsageChart({
           ))}
 
           {points
-            .filter(
-              (_, i) => i % labelInterval === 0 || i === stats.length - 1,
-            )
+            .filter((_, i) => i % labelInterval === 0 || i === stats.length - 1)
             .map((p, i) => (
               <text
                 key={i}

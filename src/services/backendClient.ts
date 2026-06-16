@@ -211,7 +211,10 @@ export class BackendClient {
     );
   }
 
-  async deleteTaskSchedule(scheduleId: string, userId?: string): Promise<unknown> {
+  async deleteTaskSchedule(
+    scheduleId: string,
+    userId?: string,
+  ): Promise<unknown> {
     const params = new URLSearchParams();
     if (userId) {
       params.set("userId", userId);
@@ -372,7 +375,11 @@ function mapNullableUser(rawUser: unknown): AworkUser | undefined {
 }
 
 function formatUserName(user: AworkUser): string {
-  return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || user.id;
+  return (
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.email ||
+    user.id
+  );
 }
 
 function extractArray(response: unknown): unknown[] {
@@ -382,7 +389,12 @@ function extractArray(response: unknown): unknown[] {
   if (!isRecord(response)) {
     return [];
   }
-  const candidates = [response.items, response.data, response.results, response.users];
+  const candidates = [
+    response.items,
+    response.data,
+    response.results,
+    response.users,
+  ];
   const arrayCandidate = candidates.find(Array.isArray);
   return arrayCandidate ?? [];
 }

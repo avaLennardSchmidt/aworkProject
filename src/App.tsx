@@ -901,7 +901,6 @@ function App() {
         </p>
       </header>
 
-
       <ConnectionPanel
         currentUser={currentUser}
         isConnecting={isConnecting}

@@ -504,7 +504,9 @@ select:disabled {
   border: none;
   box-shadow: inset 0 0 0 1.5px var(--color-border-strong);
   cursor: pointer;
-  transition: background 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .checkbox-row input[type="checkbox"]::after {
@@ -516,7 +518,10 @@ select:disabled {
   height: 14px;
   border-radius: 50%;
   background: var(--color-border-strong);
-  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .checkbox-row input[type="checkbox"]:checked {
@@ -762,7 +767,7 @@ select:disabled {
   background: var(--color-surface);
   border-radius: 7px;
   box-shadow:
-    0 1px 3px rgb(29 35 41 / 0.10),
+    0 1px 3px rgb(29 35 41 / 0.1),
     0 0 0 1px rgb(29 35 41 / 0.05);
 }
 
@@ -3603,9 +3608,15 @@ select:disabled {
   border-radius: 12px 0 0 12px;
 }
 
-.status-toast--success::before { background: var(--color-accent); }
-.status-toast--error::before   { background: var(--color-danger); }
-.status-toast--info::before    { background: #2f6fb3; }
+.status-toast--success::before {
+  background: var(--color-accent);
+}
+.status-toast--error::before {
+  background: var(--color-danger);
+}
+.status-toast--info::before {
+  background: #2f6fb3;
+}
 
 /* icon bubble */
 .status-toast__icon {
@@ -3661,7 +3672,9 @@ select:disabled {
   color: var(--color-text-muted);
   opacity: 0.55;
   cursor: pointer;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 
 .status-toast__close:hover {
@@ -3686,13 +3699,23 @@ select:disabled {
   animation: toast-progress-shrink linear forwards;
 }
 
-.status-toast--success .status-toast__progress { background: var(--color-accent-border); }
-.status-toast--error .status-toast__progress   { background: var(--color-danger-border); }
-.status-toast--info .status-toast__progress    { background: #c8dff1; }
+.status-toast--success .status-toast__progress {
+  background: var(--color-accent-border);
+}
+.status-toast--error .status-toast__progress {
+  background: var(--color-danger-border);
+}
+.status-toast--info .status-toast__progress {
+  background: #c8dff1;
+}
 
 @keyframes toast-progress-shrink {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3724,7 +3747,9 @@ select:disabled {
   background: var(--color-accent-soft);
   border: 1px solid var(--color-accent-border);
   border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .monitoring-trigger:hover {
@@ -3802,13 +3827,21 @@ select:disabled {
 }
 
 .monitoring-chart-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-deep, #2a7d5f));
+  background: linear-gradient(
+    135deg,
+    var(--color-accent),
+    var(--color-accent-deep, #2a7d5f)
+  );
   border-radius: 5px;
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .monitoring-chart-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, var(--color-accent-deep, #2a7d5f), var(--color-accent));
+  background: linear-gradient(
+    135deg,
+    var(--color-accent-deep, #2a7d5f),
+    var(--color-accent)
+  );
 }
 
 .monitoring-chart-scroll svg {
