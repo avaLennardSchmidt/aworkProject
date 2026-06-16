@@ -308,9 +308,11 @@ function App() {
           if (returnedFromLogin) {
             setStatusMessage("awork Login erfolgreich. Workflow wählen.");
             sessionRestoredRef.current = true;
-          } else if (!sessionRestoredRef.current) {
+            sessionStorage.setItem("awork_planner_session_restored", "1");
+          } else if (!sessionRestoredRef.current && !sessionStorage.getItem("awork_planner_session_restored")) {
             setStatusMessage("awork-Session wiederhergestellt.");
             sessionRestoredRef.current = true;
+            sessionStorage.setItem("awork_planner_session_restored", "1");
           }
           setIsConnecting(false);
           return;
