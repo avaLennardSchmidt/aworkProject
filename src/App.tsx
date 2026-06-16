@@ -153,11 +153,19 @@ function App() {
   const [isMultiEditAvailable] = useState(true);
   const isAnalysisRoute = isCapacityAnalysisRoute();
 
+  function consumeLoginRedirectFlag(): boolean {
+    const wasRedirect = sessionStorage.getItem("awork_planner_login_redirect") === "1";
+    if (wasRedirect) {
+      sessionStorage.removeItem("awork_planner_login_redirect");
+    }
+    return wasRedirect;
+  }
+
   useEffect(() => {
     // Session ID is captured from URL by inline script in index.html (before React loads).
     // Here we just check if we have a stored session and restore it.
     if (getStoredSessionId()) {
-      void restoreBackendSession(true);
+      void restoreBackendSession(consumeLoginRedirectFlag());
     }
   }, []);
 
