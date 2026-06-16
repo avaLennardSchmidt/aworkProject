@@ -9,8 +9,28 @@ const BACKEND_BASE_URL = (
   import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174"
 ).replace(/\/$/, "");
 
-// Session is managed via HttpOnly cookies set by the backend.
-// No token is stored client-side to prevent XSS attacks.
+const LOCAL_STORAGE_KEY = "awork_planner_session";
+
+/**
+ * Reads the session ID from localStorage (shared across all tabs).
+ * The session ID is an opaque random string — NOT a token.
+ * Actual OAuth tokens remain server-side only.
+ */
+export function getStoredSessionId(): string | null {
+  return localStorage.getItem(LOCAL_STORAGE_KEY);
+}
+
+export function storeSessionIdFromUrl(): void {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("session");
+  if (id) {
+    localStorage.setItem(LOCAL_STORAGE_KEY, id);
+  }
+}
+
+export function clearStoredSessionId(): void {
+  localStorage.removeItem(LOCAL_STORAGE_KEY);
+}
 
 interface AuthStatusResponse {
   authenticated: boolean;
@@ -82,6 +102,9 @@ export class BackendClient {
 
   async getAuthStatus(): Promise<{ authenticated: boolean; user?: AworkUser }> {
     const response = await this.request<AuthStatusResponse>("/auth/status");
+    if (!response.authenticated) {
+      clearStoredSessionId();
+    }
     return {
       authenticated: response.authenticated,
       user: response.user ? mapUser(response.user) : undefined,
@@ -90,6 +113,7 @@ export class BackendClient {
 
   async logout(): Promise<void> {
     await this.request("/auth/logout", { method: "POST" });
+    clearStoredSessionId();
   }
 
   async getCurrentUser(): Promise<AworkUser> {
@@ -243,6 +267,7 @@ export class BackendClient {
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const sessionId = getStoredSessionId();
     try {
       const response = await fetch(`${BACKEND_BASE_URL}${path}`, {
         ...init,
@@ -250,6 +275,7 @@ export class BackendClient {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
+          ...(sessionId ? { "X-Session-Token": sessionId } : {}),
           ...init.headers,
         },
       });
