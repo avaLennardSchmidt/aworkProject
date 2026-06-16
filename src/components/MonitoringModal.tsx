@@ -503,7 +503,7 @@ function UsageChart({
           />
 
           {/* Peak day outer ring */}
-          {maxVal > 1 && (
+          {points.length > 1 && (
             <>
               <circle
                 cx={points[peakIdx].x}
