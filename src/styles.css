@@ -2677,8 +2677,9 @@ select:disabled {
 }
 
 .capacity-week.is-current-week {
-  border-color: rgb(30 122 95 / 0.32);
-  background: rgb(30 122 95 / 0.045);
+  border-color: rgb(30 122 95 / 0.6);
+  box-shadow: 0 0 0 1px rgb(30 122 95 / 0.25);
+  background: rgb(30 122 95 / 0.06);
 }
 
 .capacity-week.is-current-week .capacity-week-label strong {
