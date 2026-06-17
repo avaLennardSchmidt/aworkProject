@@ -80,6 +80,7 @@ interface LoadSchedulesOptions {
 function App() {
   const lastSessionCheckRef = useRef(0);
   const sessionRestoredRef = useRef(false);
+  const sessionActivityTrackedRef = useRef(false);
   const [currentUser, setCurrentUser] = useState<AworkUser>();
   const [selectedPlannerUserId, setSelectedPlannerUserId] = useState("");
   const [workflow, setWorkflow] = useState<PlannerWorkflow>("manage");
@@ -301,8 +302,8 @@ function App() {
             .getMonitoringAccess()
             .then((r) => setHasMonitoringAccess(r.hasAccess))
             .catch(() => setHasMonitoringAccess(false));
-          if (!sessionStorage.getItem("awork_planner_session_tracked")) {
-            sessionStorage.setItem("awork_planner_session_tracked", "1");
+          if (!sessionActivityTrackedRef.current) {
+            sessionActivityTrackedRef.current = true;
             backendClient.trackActivity("session_start").catch(() => {});
           }
           if (returnedFromLogin) {
