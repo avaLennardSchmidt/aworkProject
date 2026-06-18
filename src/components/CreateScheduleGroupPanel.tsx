@@ -55,7 +55,16 @@ type TaskMode = "existing" | "new";
 const NEW_TASK_PLACEHOLDER_ID = "__new_task__";
 const PROJECT_FILTER_ACTIVE = "__active_projects__";
 const PROJECT_FILTER_ALL = "__all_projects__";
+const PROJECT_TYPE_FILTER_ALL = "__all_project_types__";
 const TASK_FILTER_ALL = "__all_task_statuses__";
+
+const STATUS_TYPE_LABELS: Record<string, string> = {
+  closed: "Abgeschlossen",
+  "not-started": "Nicht begonnen",
+  progress: "In Bearbeitung",
+  stuck: "Blockiert",
+  done: "Fertig",
+};
 
 const taskModeOptions = [
   {
@@ -146,6 +155,9 @@ export function CreateScheduleGroupPanel({
   const [weekday, setWeekday] = useState(defaults.weekday);
   const [startTime, setStartTime] = useState(defaults.startTime);
   const [endTime, setEndTime] = useState(defaults.endTime);
+  const [projectTypeFilter, setProjectTypeFilter] = useState(
+    PROJECT_TYPE_FILTER_ALL,
+  );
   const [projectStatusFilter, setProjectStatusFilter] = useState(
     PROJECT_FILTER_ACTIVE,
   );
@@ -168,13 +180,20 @@ export function CreateScheduleGroupPanel({
     taskMode === "existing"
       ? (selectedTask?.name ?? "Keine Aufgabe ausgewählt")
       : newTaskName.trim() || "Neue Aufgabe";
+  const projectTypeOptions = useMemo(
+    () => [
+      { value: PROJECT_TYPE_FILTER_ALL, label: "Alle Statustypen" },
+      ...buildTypeOptions(projects),
+    ],
+    [projects],
+  );
   const projectStatusOptions = useMemo(
     () => [
       { value: PROJECT_FILTER_ACTIVE, label: "Alle aktiven Projekte" },
       { value: PROJECT_FILTER_ALL, label: "Alle Projektstatus" },
-      ...buildStatusOptions(projects),
+      ...buildStatusOptions(projects, projectTypeFilter),
     ],
-    [projects],
+    [projects, projectTypeFilter],
   );
   const taskStatusOptions = useMemo(
     () => [
@@ -189,12 +208,15 @@ export function CreateScheduleGroupPanel({
         projects.filter(
           (project) =>
             matchesProjectStatus(project, projectStatusFilter) &&
+            (projectTypeFilter === PROJECT_TYPE_FILTER_ALL ||
+              project.statusType === projectTypeFilter) &&
             (!onlyMyProjects || myAssignedProjectIds.has(project.id)),
         ),
         selectedProject,
       ),
     [
       projectStatusFilter,
+      projectTypeFilter,
       projects,
       selectedProject,
       onlyMyProjects,
@@ -339,6 +361,29 @@ export function CreateScheduleGroupPanel({
       </div>
 
       <div className="create-grid project-selection-grid">
+        <div className="form-row">
+          <label htmlFor="create-project-type">Statustyp</label>
+          <SearchableSelect
+            buttonId="create-project-type"
+            value={projectTypeFilter}
+            disabled={isLoadingProjects}
+            options={projectTypeOptions}
+            placeholder="Statustyp auswählen"
+            searchPlaceholder={formatSearchPlaceholder(
+              "Typ filtern",
+              projectTypeOptions.length,
+            )}
+            emptyLabel="Keine Typen gefunden"
+            onChange={(value) => {
+              setProjectTypeFilter(value);
+              setProjectStatusFilter(PROJECT_FILTER_ACTIVE);
+              setProjectId("");
+              setTaskId("");
+              setTaskStatusFilter(TASK_FILTER_ALL);
+              setNewTaskName("");
+            }}
+          />
+        </div>
         <div className="form-row">
           <label htmlFor="create-project-status">Projektstatus</label>
           <SearchableSelect
@@ -594,9 +639,17 @@ function matchesTaskStatus(task: AworkProjectTask, filter: string): boolean {
 
 function buildStatusOptions(
   items: Array<AworkProject | AworkProjectTask>,
+  typeFilter?: string,
 ): Array<{ value: string; label: string }> {
   const statuses = new Map<string, string>();
   items.forEach((item) => {
+    if (
+      typeFilter &&
+      typeFilter !== PROJECT_TYPE_FILTER_ALL &&
+      "statusType" in item &&
+      item.statusType !== typeFilter
+    )
+      return;
     const value = statusFilterValue(item);
     const label = item.statusName ?? item.statusType ?? item.statusId;
     if (value && label) {
@@ -607,6 +660,20 @@ function buildStatusOptions(
   return Array.from(statuses.entries())
     .map(([value, label]) => ({ value, label }))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function buildTypeOptions(
+  projects: AworkProject[],
+): Array<{ value: string; label: string }> {
+  const types = new Set<string>();
+  projects.forEach((p) => {
+    if (p.statusType) types.add(p.statusType);
+  });
+  return Array.from(types)
+    .sort((a, b) =>
+      (STATUS_TYPE_LABELS[a] ?? a).localeCompare(STATUS_TYPE_LABELS[b] ?? b),
+    )
+    .map((t) => ({ value: t, label: STATUS_TYPE_LABELS[t] ?? t }));
 }
 
 function statusFilterValue(

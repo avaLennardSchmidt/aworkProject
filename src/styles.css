@@ -1081,7 +1081,11 @@ select:disabled {
 }
 
 .searchable-select-options button:hover,
-.searchable-select-options button.highlighted,
+.searchable-select-options button.highlighted {
+  color: var(--color-text-secondary);
+  background: rgba(41, 68, 92, 0.12);
+}
+
 .searchable-select-options button.active {
   color: var(--color-surface);
   background: linear-gradient(180deg, #35546f 0%, #29445c 100%);
