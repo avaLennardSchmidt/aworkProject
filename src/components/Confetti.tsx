@@ -8,7 +8,12 @@ interface ConfettiOptions {
   gravity?: number;
 }
 
-export function useConfetti(active: boolean, options: ConfettiOptions = {}) {
+/**
+ * Fires a confetti burst whenever `trigger` changes to a new positive value.
+ * Use a counter (incremented per click) rather than a boolean so repeated
+ * clicks on the same feature re-fire the burst instead of staying latched.
+ */
+export function useConfetti(trigger: number, options: ConfettiOptions = {}) {
   const {
     particleCount = 80,
     spread = 60,
@@ -18,7 +23,7 @@ export function useConfetti(active: boolean, options: ConfettiOptions = {}) {
   } = options;
 
   useEffect(() => {
-    if (!active) return;
+    if (trigger <= 0) return;
 
     const canvas = document.createElement("canvas");
     canvas.width = window.innerWidth;
@@ -124,5 +129,5 @@ export function useConfetti(active: boolean, options: ConfettiOptions = {}) {
         document.body.removeChild(canvas);
       }
     };
-  }, [active, particleCount, spread, startVelocity, decay, gravity]);
+  }, [trigger, particleCount, spread, startVelocity, decay, gravity]);
 }

@@ -73,10 +73,9 @@ import { MonitoringModal } from "./components/MonitoringModal";
 import { ModalShell } from "./components/ModalShell";
 import { useConfetti } from "./components/Confetti";
 import { clearFeatureAccessCache } from "./config/featureAccess";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 const backendClient = new BackendClient();
-const FEATURE_SEEN_STORAGE_PREFIX = "awork_feature_seen_";
 const APP_ANNOUNCEMENT_VERSION = "2026.06";
 const FEATURE_KEYS = {
   whatsNew: "whats-new-2026-06",
@@ -86,25 +85,21 @@ const FEATURE_KEYS = {
 
 type FeatureModalType = "whats-new" | "project-plan" | "auto-plan";
 
-function readLocalFeatureSeen(userId: string): string[] {
-  try {
-    const raw = localStorage.getItem(`${FEATURE_SEEN_STORAGE_PREFIX}${userId}`);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
+// Staggered entrance for the feature-announcement copy. Children fade up in
+// sequence on top of the modal's own entrance for a livelier reveal.
+const featureCopyContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.1 } },
+} as const;
 
-function writeLocalFeatureSeen(userId: string, keys: Set<string>): void {
-  localStorage.setItem(
-    `${FEATURE_SEEN_STORAGE_PREFIX}${userId}`,
-    JSON.stringify(Array.from(keys)),
-  );
-}
+const featureCopyItem = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 420, damping: 34, mass: 0.75 },
+  },
+} as const;
 
 interface LoadSchedulesOptions {
   refreshNotice?: string;
@@ -136,7 +131,8 @@ function App() {
   const [seenFeatureKeys, setSeenFeatureKeys] = useState<Set<string>>(
     new Set(),
   );
-  const [showConfetti, setShowConfetti] = useState(false);
+  const [featureKeysLoaded, setFeatureKeysLoaded] = useState(false);
+  const [confettiTick, setConfettiTick] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [createSuccess, setCreateSuccess] = useState<{
     count: number;
@@ -247,46 +243,35 @@ function App() {
   useEffect(() => {
     if (!currentUser) {
       setSeenFeatureKeys(new Set());
+      setFeatureKeysLoaded(false);
       return;
     }
 
-    const localKeys = new Set(readLocalFeatureSeen(currentUser.id));
-    setSeenFeatureKeys(localKeys);
+    let cancelled = false;
+    setFeatureKeysLoaded(false);
 
+    // The database is the single source of truth: removing a row there brings
+    // the feature notification (and confetti) back. No local cache, so we
+    // never have a stale "seen" flag to override a deleted server entry.
     void backendClient
       .getSeenFeatureKeys()
-      .then(async (remoteKeys) => {
-        const merged = new Set([...localKeys, ...remoteKeys]);
-        setSeenFeatureKeys(merged);
-        writeLocalFeatureSeen(currentUser.id, merged);
-
-        const missingRemoteKeys = Array.from(localKeys).filter(
-          (key) => !remoteKeys.includes(key),
-        );
-
-        if (missingRemoteKeys.length === 0) {
-          return;
-        }
-
-        const syncResults = await Promise.allSettled(
-          missingRemoteKeys.map((key) =>
-            backendClient.markFeatureSeen(key, APP_ANNOUNCEMENT_VERSION),
-          ),
-        );
-
-        if (syncResults.some((result) => result.status === "rejected")) {
-          setStatusMessage(
-            "Feature-Hinweise wurden nur lokal gespeichert und konnten noch nicht mit dem Server synchronisiert werden.",
-          );
-          return;
-        }
+      .then((remoteKeys) => {
+        if (cancelled) return;
+        setSeenFeatureKeys(new Set(remoteKeys));
       })
       .catch(() => {
-        // Fallback to local cache if backend/supabase is temporarily unavailable.
+        if (cancelled) return;
         setStatusMessage(
-          "Feature-Hinweise werden aktuell nur lokal gespeichert. Sobald das Backend wieder erreichbar ist, werden sie synchronisiert.",
+          "Feature-Hinweise konnten nicht geladen werden. Bitte lade die Seite neu.",
         );
+      })
+      .finally(() => {
+        if (!cancelled) setFeatureKeysLoaded(true);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentUser]);
 
   async function acknowledgeFeature(featureKey: string) {
@@ -294,33 +279,31 @@ function App() {
     setSeenFeatureKeys((current) => {
       const next = new Set(current);
       next.add(featureKey);
-      writeLocalFeatureSeen(currentUser.id, next);
       return next;
     });
 
     try {
-      console.log(
-        `[feature-announcement] Saving feature ${featureKey} to backend...`,
-      );
       await backendClient.markFeatureSeen(featureKey, APP_ANNOUNCEMENT_VERSION);
-      console.log(
-        `[feature-announcement] Successfully saved feature ${featureKey}`,
-      );
     } catch (err) {
       console.error(
         `[feature-announcement] Failed to save feature ${featureKey}:`,
         err,
       );
       setStatusMessage(
-        "Feature-Hinweis lokal gespeichert. Die Server-Synchronisierung wird automatisch nachgeholt.",
+        "Feature-Hinweis konnte nicht gespeichert werden. Bitte versuche es erneut.",
       );
     }
   }
 
+  function fireConfetti() {
+    setConfettiTick((tick) => tick + 1);
+  }
+
   function openWhatsNew() {
     setActiveFeatureModal("whats-new");
-    setShowConfetti(true);
-    if (!seenFeatureKeys.has(FEATURE_KEYS.whatsNew)) {
+    // Confetti only on the first open, while the "new" dot is still showing.
+    if (featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.whatsNew)) {
+      fireConfetti();
       void acknowledgeFeature(FEATURE_KEYS.whatsNew);
     }
   }
@@ -329,16 +312,17 @@ function App() {
     setWorkflow(nextWorkflow);
     if (
       nextWorkflow === "project" &&
+      featureKeysLoaded &&
       !seenFeatureKeys.has(FEATURE_KEYS.projectPlanIntro)
     ) {
-      setShowConfetti(true);
+      fireConfetti();
       setActiveFeatureModal("project-plan");
     }
   }
 
   function handleAutoPlanOpen() {
-    if (!seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro)) {
-      setShowConfetti(true);
+    if (featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro)) {
+      fireConfetti();
       setActiveFeatureModal("auto-plan");
     }
   }
@@ -348,14 +332,17 @@ function App() {
     setActiveFeatureModal(null);
   }
 
-  const pulseProjectWorkflow = !seenFeatureKeys.has(FEATURE_KEYS.projectPlanIntro);
-  const pulseAutoPlanMode = !seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro);
-  const showWhatsNewDot = !seenFeatureKeys.has(FEATURE_KEYS.whatsNew);
+  const pulseProjectWorkflow =
+    featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.projectPlanIntro);
+  const pulseAutoPlanMode =
+    featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro);
+  const showWhatsNewDot =
+    featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.whatsNew);
 
-  useConfetti(showConfetti, {
-    particleCount: 100,
-    startVelocity: 28,
-    spread: 70,
+  useConfetti(confettiTick, {
+    particleCount: 130,
+    startVelocity: 32,
+    spread: 80,
   });
 
   const plannerUser = useMemo(() => {
@@ -1363,56 +1350,83 @@ function App() {
           </div>
 
           {activeFeatureModal === "whats-new" ? (
-            <div className="feature-announcement-copy">
-              <h3 className="release-notes-headline">🎉 Projekt einplanen & Auto Plan sind da</h3>
-              <p className="release-notes-intro">
-                Zwei super Features, die dir dein Planungs-Leben massiv leichter machen. Die alte Realität: Task für Task einplanen. Die neue: Plan ein ganzes Projekt auf einmal. Oder lass den Computer arbeiten und platziere automatisch.
-              </p>
+            <motion.div
+              className="feature-announcement-copy"
+              variants={featureCopyContainer}
+              initial="hidden"
+              animate="visible"
+            >
+              <motion.h3 className="release-notes-headline" variants={featureCopyItem}>
+                🎉 Projekt einplanen und Auto Plan sind da
+              </motion.h3>
+              <motion.p className="release-notes-intro" variants={featureCopyItem}>
+                Zwei neue Funktionen, die deine Planung spürbar beschleunigen. Statt jede Aufgabe einzeln einzuplanen, planst du jetzt ein ganzes Projekt auf einmal oder lässt das Tool den passenden Zeitpunkt für dich finden.
+              </motion.p>
               <div className="feature-announcement-list">
-                <div className="feature-item">
+                <motion.div className="feature-item" variants={featureCopyItem}>
                   <h4>✨ Projekt einplanen</h4>
-                  <p>Verabschiede dich von Task für Task planen. Öffne ein Projekt, wähle die ungeplanten Tasks, die der Tool soll planen, definiere Wochentage und Arbeitszeiten — und der Tool verteilt sie automatisch intelligent über deinen Kalender, respektiert deine aktuelle Auslastung und findet immer den nächsten freien Slot. Und bevor du mittig speicherst, kannst du alles noch feinjustieren in der Vorschau.</p>
-                </div>
-                <div className="feature-item">
+                  <p>Schluss mit dem Planen Aufgabe für Aufgabe. Öffne ein Projekt, wähle die Aufgaben aus, die das Tool einplanen soll, lege Wochentage und Arbeitszeiten fest, und das Tool verteilt sie automatisch sinnvoll über deinen Kalender. Es berücksichtigt deine aktuelle Auslastung und findet den nächsten freien Slot. Das Tool plant dabei ausschließlich rund um deine awork Blocker. Termine aus Outlook und andere Kalendereinträge werden nicht einbezogen. Vor dem Speichern justierst du in der Vorschau alles nach.</p>
+                </motion.div>
+                <motion.div className="feature-item" variants={featureCopyItem}>
                   <h4>⚡ Auto Plan</h4>
-                  <p>Du hast ne Aufgabe, weißt aber nicht, wo du die sonst einbauen sollst? Auto Plan macht das für dich. Du gibst vor: Zeitraum, Arbeitszeiten, und wie lange die Task dauert — und der Tool durchsucht deinen Kalender, findet freie Slots, respektiert deine Kapazität und schlägt dir perfekte Zeiten vor. Kein Herumprobieren mehr.</p>
-                </div>
+                  <p>Du hast eine Aufgabe, weißt aber nicht, wann sie reinpasst? Das übernimmt Auto Plan. Du gibst Zeitraum, Arbeitszeiten und Dauer vor, und das Tool durchsucht deinen Kalender, findet freie Slots und schlägt dir passende Zeiten vor. Auto Plan bezieht dabei nur deine awork Aufgaben im Kalender ein. Kalendereinträge wie Meetings bleiben unberücksichtigt.</p>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           ) : activeFeatureModal === "project-plan" ? (
-            <div className="feature-announcement-copy">
-              <h3 className="release-notes-headline">🚀 Projekt einplanen — endlich!</h3>
-              <p className="release-notes-intro">
-                Die Problem ist real: Du hast ein Projekt in awork. Die Tasks sind definiert. Aber jetzt musst du Task um Task manuell planen. Das ist anstrengend, besonders wenn ne ganze Batch da ist.
-              </p>
-              <p className="release-notes-solution">
-                <strong>So läufts jetzt:</strong> Öffne "Projekt einplanen", wähle dein Projekt, hake die Tasks an, die geplant werden sollen — und der Tool macht den Rest.
-              </p>
+            <motion.div
+              className="feature-announcement-copy"
+              variants={featureCopyContainer}
+              initial="hidden"
+              animate="visible"
+            >
+              <motion.h3 className="release-notes-headline" variants={featureCopyItem}>
+                🚀 Endlich da: Projekt einplanen
+              </motion.h3>
+              <motion.p className="release-notes-intro" variants={featureCopyItem}>
+                Das Problem kennst du: Dein Projekt in awork steht, die Aufgaben sind definiert, aber jetzt musst du jede Aufgabe einzeln einplanen. Das kostet Zeit, vor allem bei einer ganzen Reihe von Aufgaben.
+              </motion.p>
+              <motion.p className="release-notes-solution" variants={featureCopyItem}>
+                <strong>So funktioniert es:</strong> Öffne „Projekt einplanen", wähle dein Projekt, hake die Aufgaben an, die eingeplant werden sollen, und das Tool übernimmt den Rest.
+              </motion.p>
               <ul className="feature-steps">
-                <li>💡 Tool liest die awork Zeitrahmen und die geplante Zeit jeder Task aus</li>
-                <li>📅 Du definierst: Welche Wochentage, Start/End-Zeit im Tag, wie verteilst du? (gleichmäßig oder gebündelt)</li>
-                <li>🎯 Der Tool plant alle Tasks intelligent um deine aktuellen Blocker herum</li>
-                <li>✏️ In der Vorschau kannst du noch jeden Blocker manuell verschieben oder löschen</li>
-                <li>✅ Ein Klick — alle Blocker angelegt.</li>
+                <motion.li variants={featureCopyItem}>💡 Das Tool liest die awork Zeitrahmen und die geplante Dauer jeder Aufgabe automatisch aus</motion.li>
+                <motion.li variants={featureCopyItem}>📅 Du legst fest: Wochentage, Startzeit und Endzeit pro Tag sowie die Verteilung (gleichmäßig oder gebündelt)</motion.li>
+                <motion.li variants={featureCopyItem}>🎯 Das Tool plant alle Aufgaben sinnvoll rund um deine bestehenden awork Blocker</motion.li>
+                <motion.li variants={featureCopyItem}>✏️ In der Vorschau verschiebst oder löschst du jeden Blocker noch nach Belieben</motion.li>
+                <motion.li variants={featureCopyItem}>✅ Ein Klick und alle Blocker sind angelegt</motion.li>
               </ul>
-            </div>
+              <motion.p className="feature-callout" variants={featureCopyItem}>
+                📌 <strong>Gut zu wissen:</strong> Das Tool plant ausschließlich rund um deine awork Blocker und findet dafür den passenden Slot. Termine aus Outlook und andere Kalendereinträge werden nicht einbezogen.
+              </motion.p>
+            </motion.div>
           ) : (
-            <div className="feature-announcement-copy">
-              <h3 className="release-notes-headline">⚡ Auto Plan — dein neuer Zeitmanager</h3>
-              <p className="release-notes-intro">
-                Du kennst das: "Ich muss die Task noch irgendwann einplanen, aber wo passt sie rein?" Das Rumprobieren im Kalender ist nervig. Blockers finden, Gaps suchen, probieren, verwirft — fertig. Das ist vorbei.
-              </p>
-              <p className="release-notes-solution">
-                <strong>Hier kommt Auto Plan:</strong> Gib der Aufgabe ne Dauer, einen Zeitraum und Arbeitszeiten vor — und der Tool durchsucht deinen Kalender automatisch, findet freie Slots, respektiert deine Kapazität und schlägt dir perfekte Zeitfenster vor.
-              </p>
+            <motion.div
+              className="feature-announcement-copy"
+              variants={featureCopyContainer}
+              initial="hidden"
+              animate="visible"
+            >
+              <motion.h3 className="release-notes-headline" variants={featureCopyItem}>
+                ⚡ Auto Plan: dein neuer Zeitmanager
+              </motion.h3>
+              <motion.p className="release-notes-intro" variants={featureCopyItem}>
+                Du kennst die Situation: „Diese Aufgabe muss noch irgendwann rein, aber wann passt sie?" Das ständige Ausprobieren im Kalender kostet Nerven: freie Lücken suchen, schieben, verwerfen. Damit ist jetzt Schluss.
+              </motion.p>
+              <motion.p className="release-notes-solution" variants={featureCopyItem}>
+                <strong>Das übernimmt Auto Plan:</strong> Gib der Aufgabe eine Dauer, einen Zeitraum und deine Arbeitszeiten vor, und das Tool durchsucht deinen Kalender automatisch, findet freie Slots und schlägt dir passende Zeitfenster vor.
+              </motion.p>
               <ul className="feature-steps">
-                <li>⏱️ Du gibst vor: Dauer (z.B. 8h), Zeitraum (z.B. diese Woche bis nächste), Wochentage (Mo-Fr), Arbeitszeiten (9-17 Uhr)</li>
-                <li>🔍 Der Tool scannt deinen aktuellen Kalender automatisch</li>
-                <li>📍 Er findet zusammenhängende freie Slots und berücksichtigt deine Kapazität</li>
-                <li>✅ Der Tool schlägt dir sinnvolle Blockers vor (z.B. Mo 2h, Di 2h, Mi 2h, Do 2h)</li>
-                <li>🎯 Du reviewst in der Vorschau und stellst noch was nach — oder speicherst direkt.</li>
+                <motion.li variants={featureCopyItem}>⏱️ Du gibst vor: Dauer (z.B. 8 Stunden), Zeitraum (z.B. diese und nächste Woche), Wochentage (Montag bis Freitag) und Arbeitszeiten (9 bis 17 Uhr)</motion.li>
+                <motion.li variants={featureCopyItem}>🔍 Das Tool scannt deinen aktuellen Kalender automatisch</motion.li>
+                <motion.li variants={featureCopyItem}>📍 Es findet zusammenhängende freie Slots und berücksichtigt deine Kapazität</motion.li>
+                <motion.li variants={featureCopyItem}>✅ Das Tool schlägt dir sinnvolle Blocker vor (z.B. Mo 2h, Di 2h, Mi 2h, Do 2h)</motion.li>
+                <motion.li variants={featureCopyItem}>🎯 Du prüfst alles in der Vorschau und passt es bei Bedarf an oder speicherst direkt</motion.li>
               </ul>
-            </div>
+              <motion.p className="feature-callout" variants={featureCopyItem}>
+                📌 <strong>Gut zu wissen:</strong> Auto Plan bezieht nur deine awork Aufgaben im Kalender ein. Kalendereinträge wie Meetings werden nicht berücksichtigt.
+              </motion.p>
+            </motion.div>
           )}
 
           <div className="modal-actions">
