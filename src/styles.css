@@ -1376,17 +1376,51 @@ select:disabled {
 }
 
 .auto-plan-week {
+  --auto-week-bg: #f3fbf7;
+  --auto-week-border: #b8d9cc;
+  --auto-week-accent: #2d7a5e;
   display: grid;
   gap: 8px;
   padding: 10px 12px;
-  background: rgb(255 255 255 / 0.54);
-  border: 1px solid var(--color-accent-border);
+  background: var(--auto-week-bg);
+  border: 1px solid var(--auto-week-border);
+  border-left: 5px solid var(--auto-week-accent);
   border-radius: 8px;
+  box-shadow: 0 1px 0 rgb(15 23 42 / 0.04);
+}
+
+.auto-plan-days .auto-plan-week:nth-child(4n + 1) {
+  --auto-week-bg: #f3fbf7;
+  --auto-week-border: #b8d9cc;
+  --auto-week-accent: #2d7a5e;
+}
+
+.auto-plan-days .auto-plan-week:nth-child(4n + 2) {
+  --auto-week-bg: #f3f8ff;
+  --auto-week-border: #c4d7f1;
+  --auto-week-accent: #2f5f9f;
+}
+
+.auto-plan-days .auto-plan-week:nth-child(4n + 3) {
+  --auto-week-bg: #fff8ef;
+  --auto-week-border: #e7d2b3;
+  --auto-week-accent: #9b6021;
+}
+
+.auto-plan-days .auto-plan-week:nth-child(4n + 4) {
+  --auto-week-bg: #f6f4ff;
+  --auto-week-border: #d4cdee;
+  --auto-week-accent: #5e4f8f;
 }
 
 .auto-plan-week-warning {
-  background: #fff9e8;
+  background:
+    linear-gradient(rgb(255 246 226 / 0.68), rgb(255 246 226 / 0.68)),
+    var(--auto-week-bg);
   border-color: #efcf7a;
+  box-shadow:
+    inset 0 0 0 1px rgb(185 120 16 / 0.18),
+    0 1px 0 rgb(15 23 42 / 0.04);
 }
 
 .auto-plan-week-head {
@@ -1407,10 +1441,73 @@ select:disabled {
   flex-wrap: wrap;
 }
 
-.auto-plan-week-meta > span:last-child {
+.auto-plan-week-hours {
   color: var(--color-text-muted);
   font-size: 0.82rem;
   font-weight: 900;
+}
+
+.auto-plan-week-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auto-plan-week-edited-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  color: var(--color-accent-deep);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-border);
+  border-radius: 999px;
+}
+
+.auto-plan-week-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 8px;
+  color: var(--color-accent);
+}
+
+.auto-plan-week-edit-btn:hover {
+  color: var(--color-accent-hover);
+}
+
+.auto-plan-week-edited-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.auto-plan-week-edited-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 12px;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-border);
+  border-radius: 7px;
+  font-size: 0.85rem;
+}
+
+.auto-plan-week-edited-date {
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+
+.auto-plan-week-edited-item strong {
+  color: var(--color-accent-deep);
 }
 
 .auto-plan-week-badge {
@@ -1491,8 +1588,8 @@ button.auto-plan-skipped-day:hover {
   display: grid;
   gap: 6px;
   padding: 8px 10px;
-  background: rgb(255 255 255 / 0.74);
-  border: 1px solid #dfe8ef;
+  background: rgb(255 255 255 / 0.9);
+  border: 1px solid #d5e0e8;
   border-radius: 6px;
 }
 

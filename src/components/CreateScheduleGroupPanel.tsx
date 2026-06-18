@@ -4,8 +4,10 @@ import {
   format,
   getDay,
   isAfter,
+  isValid,
   parseISO,
   set,
+  startOfWeek,
 } from "date-fns";
 import { de } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
@@ -44,6 +46,37 @@ import { StatusToast } from "./StatusToast";
 export interface CreateGroupOptions {
   projectId: string;
   newTaskName?: string;
+}
+
+/** ISO-week (Monday) key for a payload, matching how buildAutoPlan groups weeks. */
+function payloadWeekKey(payload: CreateTaskSchedulePayload): string {
+  return format(
+    startOfWeek(parseISO(payload.startDate), { weekStartsOn: 1 }),
+    "yyyy-MM-dd",
+  );
+}
+
+/**
+ * Merge per-week manual edits into the algorithm's payloads: any week present
+ * in `overrides` replaces that week's auto-planned blockers wholesale, all
+ * other weeks pass through untouched. Returns a chronologically sorted list.
+ */
+function combineWeekOverrides(
+  payloads: CreateTaskSchedulePayload[],
+  overrides: Map<string, CreateTaskSchedulePayload[]>,
+): CreateTaskSchedulePayload[] {
+  if (overrides.size === 0) return payloads;
+  const byWeek = new Map<string, CreateTaskSchedulePayload[]>();
+  for (const payload of payloads) {
+    const key = payloadWeekKey(payload);
+    byWeek.set(key, [...(byWeek.get(key) ?? []), payload]);
+  }
+  for (const [key, override] of overrides) {
+    byWeek.set(key, override);
+  }
+  return [...byWeek.values()]
+    .flat()
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
 }
 
 interface AbsenceRange {
@@ -258,6 +291,11 @@ export function CreateScheduleGroupPanel({
   const [createPreview, setCreatePreview] =
     useState<CreatePreviewSnapshot | null>(null);
   const [isAutoPlanInfoOpen, setIsAutoPlanInfoOpen] = useState(false);
+  // Per-week manual edits to the Auto Plan suggestion, keyed by ISO-week start.
+  const [weekOverrides, setWeekOverrides] = useState<
+    Map<string, CreateTaskSchedulePayload[]>
+  >(new Map());
+  const [editingWeek, setEditingWeek] = useState<AutoPlanWeek | null>(null);
   const [projectStatusFilter, setProjectStatusFilter] = useState(
     PROJECT_FILTER_ACTIVE,
   );
@@ -400,9 +438,29 @@ export function CreateScheduleGroupPanel({
       userCapacity,
     ],
   );
+  // Auto Plan payloads after applying any per-week manual edits.
+  const effectiveAutoPayloads = useMemo(
+    () => combineWeekOverrides(autoPlanResult.payloads, weekOverrides),
+    [autoPlanResult.payloads, weekOverrides],
+  );
+
+  // Manual week edits are tied to a specific suggestion. When the inputs that
+  // define the plan change, the suggestion is recomputed, so drop stale edits.
+  useEffect(() => {
+    setWeekOverrides((current) => (current.size === 0 ? current : new Map()));
+  }, [
+    autoRequestedMinutes,
+    effectiveTaskId,
+    from,
+    to,
+    selectedAutoWeekdays,
+    startTime,
+    endTime,
+  ]);
+
   const previewPayloads = useMemo(() => {
     if (taskMode === "auto") {
-      return autoPlanResult.payloads;
+      return effectiveAutoPayloads;
     }
 
     return buildPayloads({
@@ -415,7 +473,7 @@ export function CreateScheduleGroupPanel({
       endTime,
     });
   }, [
-    autoPlanResult.payloads,
+    effectiveAutoPayloads,
     currentUser,
     effectiveTaskId,
     from,
@@ -534,17 +592,39 @@ export function CreateScheduleGroupPanel({
               userCapacity: context.capacity,
             })
           : undefined;
-      const nextPreviewPayloads =
-        nextAutoPlanResult?.payloads ??
-        buildPayloads({
-          currentUser,
-          taskId: effectiveTaskId,
-          from,
-          to,
-          weekday,
-          startTime,
-          endTime,
-        });
+      const nextPreviewPayloads = nextAutoPlanResult
+        ? combineWeekOverrides(nextAutoPlanResult.payloads, weekOverrides)
+        : buildPayloads({
+            currentUser,
+            taskId: effectiveTaskId,
+            from,
+            to,
+            weekday,
+            startTime,
+            endTime,
+          });
+      // Reconcile the summary with manual edits so the confirm step does not
+      // show a stale "X offen" warning after gaps were filled by hand.
+      const reconciledAutoPlanResult =
+        nextAutoPlanResult && weekOverrides.size > 0
+          ? (() => {
+              const planned = Math.round(
+                nextPreviewPayloads.reduce(
+                  (sum, p) => sum + p.plannedDuration,
+                  0,
+                ) / 60,
+              );
+              return {
+                ...nextAutoPlanResult,
+                payloads: nextPreviewPayloads,
+                plannedMinutes: planned,
+                remainingMinutes: Math.max(
+                  0,
+                  nextAutoPlanResult.requestedMinutes - planned,
+                ),
+              };
+            })()
+          : nextAutoPlanResult;
       const validation = validate(nextPreviewPayloads);
       if (validation) {
         setError(validation);
@@ -573,7 +653,7 @@ export function CreateScheduleGroupPanel({
           taskMode === "auto"
             ? []
             : findPayloadOverlaps(nextPreviewPayloads, context.schedules),
-        autoPlanResult: nextAutoPlanResult,
+        autoPlanResult: reconciledAutoPlanResult,
         actionLabel: getCreateActionLabel(taskMode, autoTaskSource),
       });
     } finally {
@@ -604,7 +684,21 @@ export function CreateScheduleGroupPanel({
     setStartTime(nextDefaults.startTime);
     setEndTime(nextDefaults.endTime);
     setAutoPlanHours(nextDefaults.autoPlanHours);
+    setWeekOverrides(new Map());
     setError("");
+  }
+
+  function saveWeekOverride(
+    week: AutoPlanWeek,
+    payloads: CreateTaskSchedulePayload[],
+  ) {
+    const key = format(week.weekStart, "yyyy-MM-dd");
+    setWeekOverrides((current) => {
+      const next = new Map(current);
+      next.set(key, payloads);
+      return next;
+    });
+    setEditingWeek(null);
   }
 
   function validate(payloads = previewPayloads): string {
@@ -1054,6 +1148,9 @@ export function CreateScheduleGroupPanel({
             taskName={effectiveTaskName}
             userName={formatUserName(currentUser)}
             result={autoPlanResult}
+            effectivePayloads={effectiveAutoPayloads}
+            overrides={weekOverrides}
+            onEditWeek={setEditingWeek}
             isLoading={isLoadingContext}
           />
         ) : (
@@ -1091,6 +1188,29 @@ export function CreateScheduleGroupPanel({
           onCreate={() => void handleConfirmCreate()}
         />
       ) : null}
+      {editingWeek
+        ? (() => {
+            const weekStartKey = format(editingWeek.weekStart, "yyyy-MM-dd");
+            const weekEndKey = format(editingWeek.weekEnd, "yyyy-MM-dd");
+            const initial =
+              weekOverrides.get(weekStartKey) ??
+              editingWeek.days.flatMap((day) => day.plannedPayloads);
+            return (
+              <AutoPlanWeekEditModal
+                weekLabel={`${format(editingWeek.weekStart, "dd.MM.", { locale: de })}-${format(editingWeek.weekEnd, "dd.MM.yyyy", { locale: de })}`}
+                minDate={weekStartKey > from ? weekStartKey : from}
+                maxDate={weekEndKey < to ? weekEndKey : to}
+                defaultStart={startTime}
+                defaultEnd={endTime}
+                userId={initial[0]?.userId ?? currentUser.id}
+                taskId={initial[0]?.taskId ?? effectiveTaskId}
+                initialPayloads={initial}
+                onClose={() => setEditingWeek(null)}
+                onSave={(payloads) => saveWeekOverride(editingWeek, payloads)}
+              />
+            );
+          })()
+        : null}
       {isAutoPlanInfoOpen ? (
         <AutoPlanInfoModal onClose={() => setIsAutoPlanInfoOpen(false)} />
       ) : null}
@@ -1402,17 +1522,35 @@ function AutoPlanPreview({
   taskName,
   userName,
   result,
+  effectivePayloads,
+  overrides,
+  onEditWeek,
   isLoading,
 }: {
   projectName?: string;
   taskName: string;
   userName: string;
   result: AutoPlanResult;
+  effectivePayloads: CreateTaskSchedulePayload[];
+  overrides: Map<string, CreateTaskSchedulePayload[]>;
+  onEditWeek: (week: AutoPlanWeek) => void;
   isLoading: boolean;
 }) {
   const [showAllSkippedDays, setShowAllSkippedDays] = useState(false);
-  const isPartial = result.remainingMinutes > 0 && result.plannedMinutes > 0;
-  const isEmpty = result.requestedMinutes > 0 && result.plannedMinutes === 0;
+  // Summary reflects manual edits: recompute from the effective payloads so the
+  // "geplant"/"Blocker"/"offen" figures stay in sync with what will be saved.
+  const hasOverrides = overrides.size > 0;
+  const plannedMinutes = hasOverrides
+    ? Math.round(
+        effectivePayloads.reduce((sum, p) => sum + p.plannedDuration, 0) / 60,
+      )
+    : result.plannedMinutes;
+  const blockerCount = hasOverrides
+    ? effectivePayloads.length
+    : result.payloads.length;
+  const remainingMinutes = Math.max(0, result.requestedMinutes - plannedMinutes);
+  const isPartial = remainingMinutes > 0 && plannedMinutes > 0;
+  const isEmpty = result.requestedMinutes > 0 && plannedMinutes === 0;
   const visibleSkippedDays = showAllSkippedDays
     ? result.skippedDays
     : result.skippedDays.slice(0, 12);
@@ -1460,11 +1598,12 @@ function AutoPlanPreview({
         <span>
           {formatMinutesAsHours(result.requestedMinutes)} gesamt gewünscht
         </span>
-        <span>{formatMinutesAsHours(result.plannedMinutes)} geplant</span>
-        <span>{result.payloads.length} Blocker</span>
-        {result.remainingMinutes > 0 ? (
-          <span>{formatMinutesAsHours(result.remainingMinutes)} offen</span>
+        <span>{formatMinutesAsHours(plannedMinutes)} geplant</span>
+        <span>{blockerCount} Blocker</span>
+        {remainingMinutes > 0 ? (
+          <span>{formatMinutesAsHours(remainingMinutes)} offen</span>
         ) : null}
+        {hasOverrides ? <span>manuell angepasst</span> : null}
         {isLoading ? <span>bestehende Blocker werden geprüft...</span> : null}
       </div>
       {isEmpty ? (
@@ -1472,15 +1611,20 @@ function AutoPlanPreview({
           Im ausgewählten Zeitraum wurde kein freier Slot ab 30 Minuten
           gefunden.
         </p>
-      ) : isPartial ? (
+      ) : isPartial && !hasOverrides ? (
         <p className="auto-plan-status-copy">
-          {formatMinutesAsHours(result.remainingMinutes)} konnten insgesamt
-          nicht eingeplant werden, {describeUnplannedReason(result)}.
+          {formatMinutesAsHours(remainingMinutes)} konnten insgesamt nicht
+          eingeplant werden, {describeUnplannedReason(result)}.
         </p>
       ) : null}
       <div className="auto-plan-days">
         {result.weeks.map((week) => (
-          <AutoPlanWeekPreview key={week.weekStart.toISOString()} week={week} />
+          <AutoPlanWeekPreview
+            key={week.weekStart.toISOString()}
+            week={week}
+            override={overrides.get(format(week.weekStart, "yyyy-MM-dd"))}
+            onEdit={() => onEditWeek(week)}
+          />
         ))}
         {result.weeks.length === 0 || result.days.length === 0 ? (
           <div className="preview-row preview-row-warning">
@@ -1527,20 +1671,38 @@ function AutoPlanPreview({
   );
 }
 
-function AutoPlanWeekPreview({ week }: { week: AutoPlanWeek }) {
-  const isPartial = week.remainingMinutes > 0 && week.plannedMinutes > 0;
-  const isEmpty = week.remainingMinutes > 0 && week.plannedMinutes === 0;
+function AutoPlanWeekPreview({
+  week,
+  override,
+  onEdit,
+}: {
+  week: AutoPlanWeek;
+  override?: CreateTaskSchedulePayload[];
+  onEdit: () => void;
+}) {
+  const isEdited = override !== undefined;
+  const editedMinutes = isEdited
+    ? Math.round(override.reduce((sum, p) => sum + p.plannedDuration, 0) / 60)
+    : week.plannedMinutes;
+  const remainingMinutes = isEdited
+    ? Math.max(0, week.requestedMinutes - editedMinutes)
+    : week.remainingMinutes;
+  const isPartial = remainingMinutes > 0 && editedMinutes > 0;
+  const isEmpty = remainingMinutes > 0 && editedMinutes === 0;
 
   return (
     <div
       className={`auto-plan-week${isPartial || isEmpty ? " auto-plan-week-warning" : ""}`}
     >
       <div className="auto-plan-week-head">
-        <div>
+        <div className="auto-plan-week-title">
           <strong>
             Woche {format(week.weekStart, "dd.MM.", { locale: de })}-
             {format(week.weekEnd, "dd.MM.yyyy", { locale: de })}
           </strong>
+          {isEdited ? (
+            <span className="auto-plan-week-edited-badge">Bearbeitet</span>
+          ) : null}
         </div>
         <div className="auto-plan-week-meta">
           <span
@@ -1549,28 +1711,346 @@ function AutoPlanWeekPreview({ week }: { week: AutoPlanWeek }) {
             {isEmpty
               ? "0 geplant"
               : isPartial
-                ? `${formatMinutesAsHours(week.remainingMinutes)} offen`
+                ? `${formatMinutesAsHours(remainingMinutes)} offen`
                 : "OK"}
           </span>
-          <span>
-            {formatMinutesAsHours(week.plannedMinutes)} /{" "}
+          <span className="auto-plan-week-hours">
+            {formatMinutesAsHours(editedMinutes)} /{" "}
             {formatMinutesAsHours(week.requestedMinutes)}
           </span>
+          <button
+            type="button"
+            className="ghost-button auto-plan-week-edit-btn"
+            aria-label="Blocker dieser Woche bearbeiten"
+            title="Blocker dieser Woche bearbeiten"
+            onClick={onEdit}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M10.9 2.1a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1l-6.7 6.7-2.8.7.7-2.8 6.7-6.7Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+              <path d="M9.6 3.4l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
       </div>
-      {week.remainingMinutes > 0 ? (
+      {remainingMinutes > 0 && !isEdited ? (
         <p className="auto-plan-week-copy">
           {formatMinutesAsHours(week.requestedMinutes)} sollten geplant werden,
-          aber nur {formatMinutesAsHours(week.plannedMinutes)} konnten geplant
-          werden.
+          aber nur {formatMinutesAsHours(editedMinutes)} konnten geplant werden.
         </p>
       ) : null}
-      <div className="auto-plan-week-days">
-        {week.days.map((day) => (
-          <AutoPlanDayPreview key={day.date.toISOString()} day={day} />
-        ))}
-      </div>
+      {isEdited ? (
+        override.length > 0 ? (
+          <ul className="auto-plan-week-edited-list">
+            {override.map((payload, i) => (
+              <li
+                key={`${payload.startDate}-${i}`}
+                className="auto-plan-week-edited-item"
+              >
+                <span className="auto-plan-week-edited-date">
+                  {format(parseISO(payload.startDate), "EEE, dd.MM.", {
+                    locale: de,
+                  })}
+                </span>
+                <strong>{formatPayloadTimeWindow(payload)}</strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="auto-plan-week-copy">
+            Keine Blocker für diese Woche. Über den Stift kannst du wieder
+            Blocker hinzufügen.
+          </p>
+        )
+      ) : (
+        <div className="auto-plan-week-days">
+          {week.days.map((day) => (
+            <AutoPlanDayPreview key={day.date.toISOString()} day={day} />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function AutoPlanWeekEditModal({
+  weekLabel,
+  minDate,
+  maxDate,
+  defaultStart,
+  defaultEnd,
+  userId,
+  taskId,
+  initialPayloads,
+  onClose,
+  onSave,
+}: {
+  weekLabel: string;
+  minDate: string;
+  maxDate: string;
+  defaultStart: string;
+  defaultEnd: string;
+  userId: string;
+  taskId: string;
+  initialPayloads: CreateTaskSchedulePayload[];
+  onClose: () => void;
+  onSave: (payloads: CreateTaskSchedulePayload[]) => void;
+}) {
+  const [allPayloads, setAllPayloads] =
+    useState<CreateTaskSchedulePayload[]>(initialPayloads);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+  const [formDate, setFormDate] = useState(minDate);
+  const [formStart, setFormStart] = useState(defaultStart);
+  const [formEnd, setFormEnd] = useState(defaultEnd);
+
+  const sortByStart = (list: CreateTaskSchedulePayload[]) =>
+    [...list].sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  function startEditRow(i: number, payload: CreateTaskSchedulePayload) {
+    setEditingIdx(i);
+    setEditDate(format(parseISO(payload.startDate), "yyyy-MM-dd"));
+    setEditStart(format(parseISO(payload.startDate), "HH:mm"));
+    setEditEnd(format(parseISO(payload.endDate), "HH:mm"));
+  }
+
+  function saveEditRow() {
+    if (editingIdx === null) return;
+    const s = parseISO(`${editDate}T${editStart}:00`);
+    const e = parseISO(`${editDate}T${editEnd}:00`);
+    if (!isValid(s) || !isValid(e) || !isAfter(e, s)) return;
+    setAllPayloads((prev) => {
+      const updated = [...prev];
+      updated[editingIdx] = {
+        ...updated[editingIdx],
+        startDate: format(s, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+        endDate: format(e, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+        plannedDuration: Math.round((e.getTime() - s.getTime()) / 1000),
+      };
+      return updated;
+    });
+    setEditingIdx(null);
+  }
+
+  function removeRow(i: number) {
+    setAllPayloads((prev) => prev.filter((_, idx) => idx !== i));
+    setEditingIdx(null);
+  }
+
+  const formStartDt = isValid(parseISO(`${formDate}T${formStart}:00`))
+    ? parseISO(`${formDate}T${formStart}:00`)
+    : null;
+  const formEndDt = isValid(parseISO(`${formDate}T${formEnd}:00`))
+    ? parseISO(`${formDate}T${formEnd}:00`)
+    : null;
+  const formMinutes =
+    formStartDt && formEndDt && isAfter(formEndDt, formStartDt)
+      ? Math.round((formEndDt.getTime() - formStartDt.getTime()) / 60000)
+      : 0;
+
+  function handleAddBlocker() {
+    if (!formStartDt || !formEndDt || !isAfter(formEndDt, formStartDt)) return;
+    const newPayload: CreateTaskSchedulePayload = {
+      taskId,
+      userId,
+      startDate: format(formStartDt, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+      endDate: format(formEndDt, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+      plannedDuration: Math.round(
+        (formEndDt.getTime() - formStartDt.getTime()) / 1000,
+      ),
+    };
+    setAllPayloads((prev) => sortByStart([...prev, newPayload]));
+    setFormStart(defaultStart);
+    setFormEnd(defaultEnd);
+  }
+
+  const totalMinutes = allPayloads.reduce(
+    (sum, p) => sum + Math.round(p.plannedDuration / 60),
+    0,
+  );
+  const canAdd = editingIdx === null && formDate.length > 0 && formMinutes > 0;
+
+  return (
+    <ModalShell labelledBy="auto-plan-week-edit-title" onClose={onClose}>
+      <div className="modal-header">
+        <div>
+          <p className="eyebrow">Blocker bearbeiten</p>
+          <h2 id="auto-plan-week-edit-title">Woche {weekLabel}</h2>
+        </div>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Schließen"
+          onClick={onClose}
+        >
+          x
+        </button>
+      </div>
+
+      <div className="manual-resolve-context">
+        <span className="manual-resolve-context-window">
+          {allPayloads.length} Blocker · {formatMinutesAsHours(totalMinutes)} ·
+          Zeitraum {format(parseISO(minDate), "dd.MM.", { locale: de })} bis{" "}
+          {format(parseISO(maxDate), "dd.MM.yyyy", { locale: de })}
+        </span>
+      </div>
+
+      {allPayloads.length > 0 ? (
+        <div className="manual-resolve-planned">
+          <p className="manual-resolve-planned-label">
+            Alle Blocker ({allPayloads.length}):
+          </p>
+          <ul className="manual-resolve-planned-list">
+            {allPayloads.map((payload, i) => (
+              <li
+                key={`${payload.startDate}-${payload.endDate}-${i}`}
+                className={`manual-resolve-planned-item${editingIdx === i ? " is-editing" : ""}`}
+              >
+                {editingIdx === i ? (
+                  <div className="manual-resolve-planned-edit-row">
+                    <DatePickerInput
+                      value={editDate}
+                      minDate={minDate}
+                      maxDate={maxDate}
+                      onChange={setEditDate}
+                    />
+                    <input
+                      type="time"
+                      value={editStart}
+                      className="manual-resolve-planned-edit-input"
+                      onChange={(e) => setEditStart(e.target.value)}
+                    />
+                    <input
+                      type="time"
+                      value={editEnd}
+                      className="manual-resolve-planned-edit-input"
+                      onChange={(e) => setEditEnd(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="manual-resolve-planned-save"
+                      title="Speichern"
+                      onClick={saveEditRow}
+                    >
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      className="manual-resolve-planned-cancel"
+                      title="Abbrechen"
+                      onClick={() => setEditingIdx(null)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="manual-resolve-planned-row-btn"
+                    onClick={() => startEditRow(i, payload)}
+                    title="Bearbeiten"
+                  >
+                    <span className="manual-resolve-planned-date">
+                      {format(parseISO(payload.startDate), "dd.MM.", {
+                        locale: de,
+                      })}
+                    </span>
+                    <span className="manual-resolve-planned-window">
+                      {formatPayloadTimeWindow(payload)}
+                    </span>
+                    <span className="manual-resolve-planned-duration">
+                      {formatMinutesAsHours(
+                        Math.round(payload.plannedDuration / 60),
+                      )}
+                    </span>
+                    <span
+                      className="manual-resolve-planned-edit-icon"
+                      aria-hidden="true"
+                    >
+                      ✎
+                    </span>
+                    <button
+                      type="button"
+                      className="manual-resolve-planned-remove"
+                      title="Entfernen"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeRow(i);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="manual-resolve-context-window">
+          Noch keine Blocker für diese Woche. Füge unten welche hinzu.
+        </p>
+      )}
+
+      <div className="manual-resolve-add-section">
+        <p className="manual-resolve-planned-label">
+          Weiteren Blocker hinzufügen:
+        </p>
+        <div className="create-grid manual-resolve-add-grid">
+          <div className="form-row">
+            <label htmlFor="auto-week-add-date">Datum</label>
+            <DatePickerInput
+              id="auto-week-add-date"
+              value={formDate}
+              minDate={minDate}
+              maxDate={maxDate}
+              onChange={setFormDate}
+            />
+          </div>
+          <div className="form-row">
+            <label htmlFor="auto-week-add-start">Start</label>
+            <input
+              id="auto-week-add-start"
+              type="time"
+              value={formStart}
+              onChange={(e) => setFormStart(e.target.value)}
+            />
+          </div>
+          <div className="form-row">
+            <label htmlFor="auto-week-add-end">Ende</label>
+            <input
+              id="auto-week-add-end"
+              type="time"
+              value={formEnd}
+              onChange={(e) => setFormEnd(e.target.value)}
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={!canAdd}
+          onClick={handleAddBlocker}
+        >
+          Blocker hinzufügen
+          {formMinutes > 0 ? ` (${formatMinutesAsHours(formMinutes)})` : ""}
+        </button>
+      </div>
+
+      <div className="modal-actions">
+        <button type="button" className="ghost-button" onClick={onClose}>
+          Abbrechen
+        </button>
+        <button
+          type="button"
+          className="primary-button"
+          onClick={() => onSave(sortByStart(allPayloads))}
+        >
+          Übernehmen
+        </button>
+      </div>
+    </ModalShell>
   );
 }
 
