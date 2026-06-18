@@ -26,6 +26,11 @@ export interface AworkProjectTask {
   statusName?: string;
   statusType?: string;
   statusIcon?: string;
+  startOn?: string;
+  dueOn?: string;
+  plannedDurationSeconds?: number;
+  scheduledCount?: number;
+  listName?: string;
   raw: unknown;
 }
 

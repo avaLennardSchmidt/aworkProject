@@ -26,6 +26,8 @@ export interface PayloadOverlap {
   overlaps: AworkTaskSchedule[];
 }
 
+export type AutoPlanDistributionMode = "packed" | "even";
+
 export interface AutoPlanInput {
   currentUser: AworkUser;
   taskId: string;
@@ -37,6 +39,8 @@ export interface AutoPlanInput {
   requestedMinutes: number;
   existingSchedules: AworkTaskSchedule[];
   userCapacity?: AworkUserCapacity;
+  distributionMode?: AutoPlanDistributionMode;
+  allowOverbooking?: boolean;
 }
 
 export interface AutoPlanDay {
@@ -109,6 +113,7 @@ export function findPayloadOverlaps(
 export function buildAutoPlan(input: AutoPlanInput): AutoPlanResult {
   const selectedWeekdays = new Set(input.weekdayValues);
   const weeklyRequestedMinutes = Math.max(0, Math.round(input.requestedMinutes));
+  const distributionMode = input.distributionMode ?? "packed";
   const startDate = parseISO(input.from);
   const endDate = parseISO(input.to);
 
@@ -137,6 +142,7 @@ export function buildAutoPlan(input: AutoPlanInput): AutoPlanResult {
         input.endTime,
         input.existingSchedules,
         input.userCapacity,
+        input.allowOverbooking,
       ),
     );
   const weeksByKey = new Map<string, AutoPlanDay[]>();
@@ -153,20 +159,28 @@ export function buildAutoPlan(input: AutoPlanInput): AutoPlanResult {
       let weekRemainingMinutes = weeklyRequestedMinutes;
       const candidateDays = weekDays
         .filter((day) => day.availableMinutes > 0)
-        .sort(
-          (first, second) =>
-            second.availableMinutes - first.availableMinutes ||
-            second.largestFreeSlotMinutes - first.largestFreeSlotMinutes ||
-            first.date.getTime() - second.date.getTime(),
+        .sort((first, second) =>
+          distributionMode === "even"
+            ? first.date.getTime() - second.date.getTime()
+            : second.availableMinutes - first.availableMinutes ||
+              second.largestFreeSlotMinutes - first.largestFreeSlotMinutes ||
+              first.date.getTime() - second.date.getTime(),
         );
 
+      let remainingCandidateDays = candidateDays.length;
       const days = candidateDays.map((day) => {
         const plannedForDay: CreateTaskSchedulePayload[] = [];
-        let dayRemaining = Math.min(weekRemainingMinutes, day.availableMinutes);
+        const targetMinutes =
+          distributionMode === "even" && remainingCandidateDays > 0
+            ? Math.ceil(weekRemainingMinutes / remainingCandidateDays)
+            : weekRemainingMinutes;
+        let dayRemaining = Math.min(targetMinutes, day.availableMinutes);
         const freeSlots = [...day.freeSlots].sort(
           (first, second) =>
-            getSlotMinutes(second) - getSlotMinutes(first) ||
-            first.start.getTime() - second.start.getTime(),
+            distributionMode === "even"
+              ? first.start.getTime() - second.start.getTime()
+              : getSlotMinutes(second) - getSlotMinutes(first) ||
+                first.start.getTime() - second.start.getTime(),
         );
 
         for (const slot of freeSlots) {
@@ -191,6 +205,7 @@ export function buildAutoPlan(input: AutoPlanInput): AutoPlanResult {
           dayRemaining -= plannedMinutes;
           weekRemainingMinutes -= plannedMinutes;
         }
+        remainingCandidateDays -= 1;
 
         return {
           ...day,
@@ -267,6 +282,214 @@ export function buildAutoPlan(input: AutoPlanInput): AutoPlanResult {
   };
 }
 
+export interface ProjectPlanTask {
+  id: string;
+  name?: string;
+  startOn?: string;
+  dueOn?: string;
+  plannedDurationSeconds?: number;
+  weeklyBudgetSeconds?: number;
+}
+
+export interface ProjectTaskPlanInput {
+  currentUser: AworkUser;
+  task: ProjectPlanTask;
+  weekdayValues: number[];
+  startTime: string;
+  endTime: string;
+  existingSchedules: AworkTaskSchedule[];
+  userCapacity?: AworkUserCapacity;
+  distributionMode?: AutoPlanDistributionMode;
+  allowOverbooking?: boolean;
+  /** yyyy-MM-dd fallback day when the task has neither start nor due date. */
+  fallbackDate: string;
+}
+
+export interface ProjectTaskPlanResult {
+  taskId: string;
+  taskName?: string;
+  requestedMinutes: number;
+  plannedMinutes: number;
+  remainingMinutes: number;
+  payloads: CreateTaskSchedulePayload[];
+  isSingleDay: boolean;
+  rangeStart: Date;
+  rangeEnd: Date;
+  overlaps: PayloadOverlap[];
+  reason?: "no-duration";
+}
+
+/**
+ * Plans a single project task across its due window. plannedDuration is treated
+ * as a total budget. If weeklyBudgetSeconds is present, multi-day tasks receive
+ * that amount per ISO week instead. A single-day task gets one block at the
+ * window start; a multi-day total budget is filled front-loaded respecting
+ * existing blockers and capacity.
+ */
+export function buildProjectTaskPlan(
+  input: ProjectTaskPlanInput,
+): ProjectTaskPlanResult {
+  const startParsed = input.task.startOn ? parseISO(input.task.startOn) : null;
+  const dueParsed = input.task.dueOn ? parseISO(input.task.dueOn) : null;
+  const hasStart = !!startParsed && !Number.isNaN(startParsed.getTime());
+  const hasDue = !!dueParsed && !Number.isNaN(dueParsed.getTime());
+  const fallback = parseISO(input.fallbackDate);
+  const distributionMode = input.distributionMode ?? "packed";
+
+  const startSrc = hasStart ? startParsed! : hasDue ? dueParsed! : fallback;
+  const dueSrc = hasDue ? dueParsed! : hasStart ? startParsed! : fallback;
+  let rangeStart = startOfDay(startSrc);
+  let rangeEnd = startOfDay(dueSrc);
+  if (isAfter(rangeStart, rangeEnd)) {
+    const swap = rangeStart;
+    rangeStart = rangeEnd;
+    rangeEnd = swap;
+  }
+  const isSingleDay =
+    !(hasStart && hasDue) || rangeStart.getTime() === rangeEnd.getTime();
+  const weeklyBudgetMinutes = Math.max(
+    0,
+    Math.round((input.task.weeklyBudgetSeconds ?? 0) / 60),
+  );
+  const usesWeeklyBudget = weeklyBudgetMinutes > 0;
+  const requestedMinutes = usesWeeklyBudget
+    ? weeklyBudgetMinutes * countIsoWeeksInRange(rangeStart, rangeEnd)
+    : Math.max(0, Math.round((input.task.plannedDurationSeconds ?? 0) / 60));
+
+  const base = {
+    taskId: input.task.id,
+    taskName: input.task.name,
+    requestedMinutes,
+    isSingleDay,
+    rangeStart,
+    rangeEnd,
+  };
+
+  if (requestedMinutes <= 0) {
+    return {
+      ...base,
+      plannedMinutes: 0,
+      remainingMinutes: 0,
+      payloads: [],
+      overlaps: [],
+      reason: "no-duration",
+    };
+  }
+
+  if (!isSingleDay && usesWeeklyBudget) {
+    const result = buildAutoPlan({
+      currentUser: input.currentUser,
+      taskId: input.task.id,
+      from: format(rangeStart, "yyyy-MM-dd"),
+      to: format(rangeEnd, "yyyy-MM-dd"),
+      weekdayValues: input.weekdayValues,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      requestedMinutes: weeklyBudgetMinutes,
+      existingSchedules: input.existingSchedules,
+      userCapacity: input.userCapacity,
+      distributionMode,
+      allowOverbooking: input.allowOverbooking,
+    });
+
+    return {
+      ...base,
+      requestedMinutes: result.requestedMinutes,
+      plannedMinutes: result.plannedMinutes,
+      remainingMinutes: result.remainingMinutes,
+      payloads: result.payloads,
+      overlaps: findPayloadOverlaps(result.payloads, input.existingSchedules),
+    };
+  }
+
+  if (isSingleDay) {
+    // One block on the due day (or the only known date), at the window start.
+    const day = hasDue ? rangeEnd : rangeStart;
+    const blockStart = setTime(day, input.startTime);
+    const blockEnd = addMinutes(blockStart, requestedMinutes);
+    const payload = buildPayload(
+      input.currentUser,
+      input.task.id,
+      blockStart,
+      blockEnd,
+    );
+    return {
+      ...base,
+      plannedMinutes: requestedMinutes,
+      remainingMinutes: 0,
+      payloads: [payload],
+      overlaps: findPayloadOverlaps([payload], input.existingSchedules),
+    };
+  }
+
+  // Multi-day window: fill chronologically, front-loaded.
+  const selectedWeekdays = new Set(input.weekdayValues);
+  const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd })
+    .filter((date) => selectedWeekdays.has(getDay(date)))
+    .map((date) =>
+      buildAutoPlanDay(
+        input.currentUser,
+        input.task.id,
+        date,
+        input.startTime,
+        input.endTime,
+        input.existingSchedules,
+        input.userCapacity,
+        input.allowOverbooking,
+      ),
+    )
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  const payloads: CreateTaskSchedulePayload[] = [];
+  let remaining = requestedMinutes;
+  let remainingCandidateDays = days.filter((day) => day.availableMinutes > 0).length;
+  for (const day of days) {
+    if (remaining <= 0) break;
+    if (day.availableMinutes <= 0) continue;
+    const targetMinutes =
+      distributionMode === "even" && remainingCandidateDays > 0
+        ? Math.ceil(remaining / remainingCandidateDays)
+        : remaining;
+    let dayRemaining = Math.min(targetMinutes, day.availableMinutes);
+    const slots = [...day.freeSlots].sort(
+      (first, second) =>
+        distributionMode === "even"
+          ? first.start.getTime() - second.start.getTime()
+          : getSlotMinutes(second) - getSlotMinutes(first) ||
+            first.start.getTime() - second.start.getTime(),
+    );
+    for (const slot of slots) {
+      if (dayRemaining <= 0) break;
+      const slotMinutes = getSlotMinutes(slot);
+      const plannedMinutes = Math.min(slotMinutes, dayRemaining);
+      if (plannedMinutes < MIN_AUTO_PLAN_BLOCKER_MINUTES) continue;
+      payloads.push(
+        buildPayload(
+          input.currentUser,
+          input.task.id,
+          slot.start,
+          addMinutes(slot.start, plannedMinutes),
+        ),
+      );
+      dayRemaining -= plannedMinutes;
+      remaining -= plannedMinutes;
+    }
+    remainingCandidateDays -= 1;
+  }
+
+  return {
+    ...base,
+    plannedMinutes: requestedMinutes - remaining,
+    remainingMinutes: remaining,
+    payloads: payloads.sort(
+      (first, second) =>
+        parseISO(first.startDate).getTime() -
+        parseISO(second.startDate).getTime(),
+    ),
+    overlaps: findPayloadOverlaps(payloads, input.existingSchedules),
+  };
+}
+
 export function getDailyCapacityMinutes(
   capacity: AworkUserCapacity | undefined,
   weekday: number,
@@ -293,6 +516,7 @@ function buildAutoPlanDay(
   endTime: string,
   existingSchedules: AworkTaskSchedule[],
   userCapacity: AworkUserCapacity | undefined,
+  allowOverbooking = false,
 ): AutoPlanDay {
   const windowStart = setTime(date, startTime);
   const windowEnd = setTime(date, endTime);
@@ -318,16 +542,18 @@ function buildAutoPlanDay(
     )
     .sort((a, b) => parseISO(a.start).getTime() - parseISO(b.start).getTime());
 
-  const blockerSlots = existingSchedules
-    .filter((schedule) =>
-      intervalsOverlap(dayStart, dayEnd, parseISO(schedule.start), parseISO(schedule.end)),
-    )
-    .map((schedule) => ({
-      start: maxDate(parseISO(schedule.start), windowStart),
-      end: minDate(parseISO(schedule.end), windowEnd),
-    }))
-    .filter((slot) => isAfter(slot.end, slot.start))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  const blockerSlots = allowOverbooking
+    ? []
+    : existingSchedules
+        .filter((schedule) =>
+          intervalsOverlap(dayStart, dayEnd, parseISO(schedule.start), parseISO(schedule.end)),
+        )
+        .map((schedule) => ({
+          start: maxDate(parseISO(schedule.start), windowStart),
+          end: minDate(parseISO(schedule.end), windowEnd),
+        }))
+        .filter((slot) => isAfter(slot.end, slot.start))
+        .sort((a, b) => a.start.getTime() - b.start.getTime());
 
   const freeSlots = subtractSlots({ start: windowStart, end: windowEnd }, blockerSlots)
     .filter((slot) => getSlotMinutes(slot) >= MIN_AUTO_PLAN_BLOCKER_MINUTES);
@@ -346,7 +572,7 @@ function buildAutoPlanDay(
       0,
     );
   const capacityRemainingMinutes =
-    capacityMinutes === undefined
+    allowOverbooking || capacityMinutes === undefined
       ? slotMinutes
       : Math.max(0, capacityMinutes - existingPlannedMinutes);
   const cappedAvailableMinutes = Math.min(slotMinutes, capacityRemainingMinutes);
@@ -448,6 +674,20 @@ function emptyAutoPlanDay(date: Date): AutoPlanDay {
 
 function getIsoWeekStart(date: Date): Date {
   return startOfWeek(date, { weekStartsOn: 1 });
+}
+
+export function countIsoWeeksInRange(start: Date, end: Date): number {
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 1;
+  const firstDay = start < end ? start : end;
+  const lastDay = start < end ? end : start;
+  let weekStart = getIsoWeekStart(startOfDay(firstDay));
+  const lastWeekStart = getIsoWeekStart(startOfDay(lastDay));
+  let count = 1;
+  while (weekStart < lastWeekStart) {
+    weekStart = addDays(weekStart, 7);
+    count += 1;
+  }
+  return count;
 }
 
 function getSlotMinutes(slot: TimeSlot): number {

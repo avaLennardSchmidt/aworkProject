@@ -49,13 +49,8 @@ interface CapacityAnalysisQuery {
   to: string;
 }
 
-export interface MonitoringLogEntry {
-  id: number;
-  timestamp: string;
-  user_id: string;
-  user_name: string;
-  action: string;
-  details: string | null;
+export interface FeatureSeenResponse {
+  keys: string[];
 }
 
 export interface MonitoringDailyStats {
@@ -68,6 +63,16 @@ export interface MonitoringDailyStats {
   blockers_edited: number;
   blockers_deleted: number;
   analysis_views: number;
+}
+
+export interface MonitoringUserStats {
+  user_id: string;
+  user_name: string;
+  logins: number;
+  visits: number;
+  actions: string[];
+  last_login: string | null;
+  last_visit: string | null;
 }
 
 type BackendStatusListener = (status: "ok" | "starting") => void;
@@ -250,17 +255,14 @@ export class BackendClient {
     return this.request<{ hasAccess: boolean }>("/api/monitoring/access");
   }
 
-  async getMonitoringLogs(options?: {
-    from?: string;
-    to?: string;
-    limit?: number;
-  }): Promise<MonitoringLogEntry[]> {
-    const params = new URLSearchParams();
-    if (options?.from) params.set("from", options.from);
-    if (options?.to) params.set("to", options.to);
-    if (options?.limit) params.set("limit", String(options.limit));
-    const query = params.size ? `?${params.toString()}` : "";
-    return this.request<MonitoringLogEntry[]>(`/api/monitoring/logs${query}`);
+  async getMonitoringUserStats(
+    from: string,
+    to: string,
+  ): Promise<MonitoringUserStats[]> {
+    const params = new URLSearchParams({ from, to });
+    return this.request<MonitoringUserStats[]>(
+      `/api/monitoring/user-stats?${params.toString()}`,
+    );
   }
 
   async getMonitoringStats(
@@ -277,6 +279,20 @@ export class BackendClient {
     await this.request("/api/monitoring/track", {
       method: "POST",
       body: JSON.stringify({ action, details }),
+    });
+  }
+
+  async getSeenFeatureKeys(): Promise<string[]> {
+    const response = await this.request<FeatureSeenResponse>("/api/feature-seen");
+    return Array.isArray(response.keys)
+      ? response.keys.filter((key): key is string => typeof key === "string")
+      : [];
+  }
+
+  async markFeatureSeen(featureKey: string, appVersion?: string): Promise<void> {
+    await this.request(`/api/feature-seen/${encodeURIComponent(featureKey)}`, {
+      method: "POST",
+      body: JSON.stringify(appVersion ? { appVersion } : {}),
     });
   }
 

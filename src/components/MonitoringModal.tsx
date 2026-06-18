@@ -7,9 +7,9 @@ import {
   endOfWeek,
 } from "date-fns";
 import { de } from "date-fns/locale";
-import type { BackendClient } from "../services/backendClient";
 import type {
-  MonitoringLogEntry,
+  BackendClient,
+  MonitoringUserStats,
   MonitoringDailyStats,
 } from "../services/backendClient";
 import { DatePickerInput } from "./DatePickerInput";
@@ -33,11 +33,11 @@ export function MonitoringModal({
     format(endOfWeek(new Date(), { locale: de }), "yyyy-MM-dd"),
   );
   const [stats, setStats] = useState<MonitoringDailyStats[]>([]);
-  const [logs, setLogs] = useState<MonitoringLogEntry[]>([]);
+  const [users, setUsers] = useState<MonitoringUserStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [dayLogs, setDayLogs] = useState<MonitoringLogEntry[]>([]);
+  const [dayUsers, setDayUsers] = useState<MonitoringUserStats[]>([]);
   const [isDayLoading, setIsDayLoading] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<Metric>("nutzer");
 
@@ -48,15 +48,11 @@ export function MonitoringModal({
       setSelectedDay(null);
       Promise.all([
         backendClient.getMonitoringStats(fromDate, toDate),
-        backendClient.getMonitoringLogs({
-          from: fromDate,
-          to: toDate,
-          limit: 500,
-        }),
+        backendClient.getMonitoringUserStats(fromDate, toDate),
       ])
-        .then(([statsData, logsData]) => {
+        .then(([statsData, usersData]) => {
           setStats(statsData);
-          setLogs(logsData);
+          setUsers(usersData);
         })
         .catch((err) => {
           setError(
@@ -82,9 +78,9 @@ export function MonitoringModal({
     setSelectedDay(date);
     setIsDayLoading(true);
     backendClient
-      .getMonitoringLogs({ from: date, to: date, limit: 100 })
-      .then(setDayLogs)
-      .catch(() => setDayLogs([]))
+      .getMonitoringUserStats(date, date)
+      .then(setDayUsers)
+      .catch(() => setDayUsers([]))
       .finally(() => setIsDayLoading(false));
   }
 
@@ -104,9 +100,7 @@ export function MonitoringModal({
 
   const totalLogins = chartStats.reduce((s, d) => s + d.logins, 0);
   const totalVisits = chartStats.reduce((s, d) => s + d.session_starts, 0);
-  const uniqueUserIds = new Set(logs.map((l) => l.user_id));
-
-  const userSummary = buildUserSummary(logs);
+  const userSummary = users.map((u) => toSummaryRow(u));
 
   return (
     <ModalShell
@@ -156,7 +150,7 @@ export function MonitoringModal({
               className={`monitoring-stat-card monitoring-stat-card--nutzer${selectedMetric === "nutzer" ? " active" : ""}`}
               onClick={() => setSelectedMetric("nutzer")}
             >
-              <strong>{uniqueUserIds.size}</strong>
+              <strong>{users.length}</strong>
               <span>Nutzer</span>
             </button>
             <button
@@ -194,7 +188,7 @@ export function MonitoringModal({
           {selectedDay ? (
             <DayDetail
               date={selectedDay}
-              logs={dayLogs}
+              rows={dayUsers.map((u) => toDayRow(u))}
               isLoading={isDayLoading}
               onClose={() => setSelectedDay(null)}
             />
@@ -217,42 +211,15 @@ interface UserSummaryRow {
   lastVisitTimestamp: string | null;
 }
 
-function buildUserSummary(logs: MonitoringLogEntry[]): UserSummaryRow[] {
-  const map = new Map<
-    string,
-    {
-      userName: string;
-      logins: number;
-      visits: number;
-      lastLoginTimestamp: string | null;
-      lastVisitTimestamp: string | null;
-    }
-  >();
-  for (const log of logs) {
-    const existing = map.get(log.user_id);
-    if (existing) {
-      if (log.action === "login") {
-        existing.logins++;
-        existing.lastLoginTimestamp = log.timestamp;
-      }
-      if (log.action === "session_start") {
-        existing.visits++;
-        existing.lastVisitTimestamp = log.timestamp;
-      }
-    } else {
-      map.set(log.user_id, {
-        userName: log.user_name,
-        logins: log.action === "login" ? 1 : 0,
-        visits: log.action === "session_start" ? 1 : 0,
-        lastLoginTimestamp: log.action === "login" ? log.timestamp : null,
-        lastVisitTimestamp:
-          log.action === "session_start" ? log.timestamp : null,
-      });
-    }
-  }
-  return Array.from(map.entries())
-    .map(([userId, data]) => ({ userId, ...data }))
-    .sort((a, b) => b.logins - a.logins || b.visits - a.visits);
+function toSummaryRow(user: MonitoringUserStats): UserSummaryRow {
+  return {
+    userId: user.user_id,
+    userName: user.user_name,
+    logins: user.logins,
+    visits: user.visits,
+    lastLoginTimestamp: user.last_login,
+    lastVisitTimestamp: user.last_visit,
+  };
 }
 
 function UserTable({ users }: { users: UserSummaryRow[] }) {
@@ -307,20 +274,18 @@ function UserTable({ users }: { users: UserSummaryRow[] }) {
 
 function DayDetail({
   date,
-  logs,
+  rows,
   isLoading,
   onClose,
 }: {
   date: string;
-  logs: MonitoringLogEntry[];
+  rows: DayUserRow[];
   isLoading: boolean;
   onClose: () => void;
 }) {
   const formatted = format(new Date(date), "EEEE, dd. MMMM yyyy", {
     locale: de,
   });
-
-  const userRows = buildDayUserRows(logs);
 
   return (
     <div className="monitoring-day-detail">
@@ -332,7 +297,7 @@ function DayDetail({
       </div>
       {isLoading ? (
         <p style={{ color: "#5c6874", fontSize: "0.85rem" }}>Lade...</p>
-      ) : userRows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <p style={{ color: "#5c6874", fontSize: "0.85rem" }}>
           Keine Aktivität an diesem Tag.
         </p>
@@ -344,7 +309,7 @@ function DayDetail({
             <span>Besuche</span>
             <span>Aktionen</span>
           </div>
-          {userRows.map((row) => (
+          {rows.map((row) => (
             <div key={row.userId} className="monitoring-user-row">
               <span>{row.userName}</span>
               <span className="monitoring-stat-compact">
@@ -386,54 +351,16 @@ interface DayUserRow {
   lastVisitTimestamp: string | null;
 }
 
-function buildDayUserRows(logs: MonitoringLogEntry[]): DayUserRow[] {
-  const map = new Map<
-    string,
-    {
-      userName: string;
-      logins: number;
-      visits: number;
-      actions: Set<string>;
-      lastLoginTimestamp: string | null;
-      lastVisitTimestamp: string | null;
-    }
-  >();
-  for (const log of logs) {
-    const existing = map.get(log.user_id);
-    if (existing) {
-      if (log.action === "login") {
-        existing.logins++;
-        existing.lastLoginTimestamp = log.timestamp;
-      } else if (log.action === "session_start") {
-        existing.visits++;
-        existing.lastVisitTimestamp = log.timestamp;
-      } else existing.actions.add(log.action);
-    } else {
-      map.set(log.user_id, {
-        userName: log.user_name,
-        logins: log.action === "login" ? 1 : 0,
-        visits: log.action === "session_start" ? 1 : 0,
-        actions:
-          log.action !== "login" && log.action !== "session_start"
-            ? new Set([log.action])
-            : new Set(),
-        lastLoginTimestamp: log.action === "login" ? log.timestamp : null,
-        lastVisitTimestamp:
-          log.action === "session_start" ? log.timestamp : null,
-      });
-    }
-  }
-  return Array.from(map.entries())
-    .map(([userId, data]) => ({
-      userId,
-      userName: data.userName,
-      logins: data.logins,
-      visits: data.visits,
-      actions: [...data.actions],
-      lastLoginTimestamp: data.lastLoginTimestamp,
-      lastVisitTimestamp: data.lastVisitTimestamp,
-    }))
-    .sort((a, b) => b.logins - a.logins || b.visits - a.visits);
+function toDayRow(user: MonitoringUserStats): DayUserRow {
+  return {
+    userId: user.user_id,
+    userName: user.user_name,
+    logins: user.logins,
+    visits: user.visits,
+    actions: user.actions,
+    lastLoginTimestamp: user.last_login,
+    lastVisitTimestamp: user.last_visit,
+  };
 }
 
 function UsageChart({

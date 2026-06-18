@@ -26,6 +26,8 @@ interface DatePickerInputProps {
   value: string; // YYYY-MM-DD or ""
   placeholder?: string;
   disabled?: boolean;
+  minDate?: string; // YYYY-MM-DD — days before this are disabled
+  maxDate?: string; // YYYY-MM-DD — days after this are disabled
   absenceRanges?: AbsenceRange[];
   onChange: (value: string) => void;
 }
@@ -64,6 +66,8 @@ export function DatePickerInput({
   value,
   placeholder = "Datum wählen",
   disabled,
+  minDate,
+  maxDate,
   absenceRanges,
   onChange,
 }: DatePickerInputProps) {
@@ -91,6 +95,11 @@ export function DatePickerInput({
     return (iso: string) =>
       absenceRanges.some((r) => iso >= r.startOn && iso <= r.endOn);
   }, [absenceRanges]);
+  const isOutOfRange = (iso: string) =>
+    (minDate !== undefined && iso < minDate) ||
+    (maxDate !== undefined && iso > maxDate);
+  const todayIso = toIso(new Date());
+  const isTodayDisabled = isOutOfRange(todayIso);
 
   function open() {
     const parsed = parseValue(value);
@@ -314,6 +323,7 @@ export function DatePickerInput({
                         const isSelected = value === isoStr;
                         const isCurrentDay = isToday(date);
                         const isAbsent = isAbsentDate(isoStr);
+                        const isDisabled = isOutOfRange(isoStr);
                         return (
                           <button
                             key={isoStr}
@@ -324,6 +334,7 @@ export function DatePickerInput({
                               isSelected ? "date-picker-cell--selected" : "",
                               isCurrentDay ? "date-picker-cell--today" : "",
                               isAbsent ? "date-picker-cell--absent" : "",
+                              isDisabled ? "date-picker-cell--disabled" : "",
                             ]
                               .filter(Boolean)
                               .join(" ")}
@@ -332,6 +343,7 @@ export function DatePickerInput({
                               locale: de,
                             })}
                             aria-pressed={isSelected}
+                            disabled={isDisabled}
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => selectDay(date)}
                           >
@@ -346,6 +358,7 @@ export function DatePickerInput({
                 <button
                   type="button"
                   className="date-picker-today-btn"
+                  disabled={isTodayDisabled}
                   onClick={() => selectDay(new Date())}
                 >
                   Heute

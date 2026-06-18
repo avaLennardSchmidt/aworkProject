@@ -33,6 +33,11 @@ function mapOneProjectTask(raw: unknown): AworkProjectTask | null {
     statusName: firstString(raw, ["taskStatus.name", "status.name", "task.taskStatus.name", "task.status.name", "statusName", "taskStatusName"]),
     statusType: firstString(raw, ["taskStatus.type", "status.type", "task.taskStatus.type", "task.status.type", "statusType", "taskStatusType"]),
     statusIcon: firstString(raw, ["taskStatus.icon", "status.icon", "task.taskStatus.icon", "task.status.icon", "statusIcon", "taskStatusIcon"]),
+    startOn: firstString(raw, ["startOn", "startDate", "task.startOn"]),
+    dueOn: firstString(raw, ["dueOn", "dueDate", "task.dueOn"]),
+    plannedDurationSeconds: firstNumber(raw, ["plannedDuration", "totalPlannedDuration", "task.plannedDuration"]),
+    scheduledCount: firstNumber(raw, ["taskSchedulesCount", "task.taskSchedulesCount"]),
+    listName: extractListName(raw),
     raw,
   };
 }
@@ -67,6 +72,40 @@ function firstString(record: UnknownRecord, paths: string[]): string | undefined
     if (typeof value === "string" && value.trim()) {
       return value;
     }
+  }
+
+  return undefined;
+}
+
+function firstNumber(record: UnknownRecord, paths: string[]): number | undefined {
+  for (const path of paths) {
+    const value = getPath(record, path);
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * awork embeds the task's list memberships under `lists` (each with a `name`).
+ * Prefer the entry matching `primaryTaskListId`, else the first list. Tasks with
+ * no list belong to "Ohne Liste" (handled by the caller via undefined).
+ */
+function extractListName(record: UnknownRecord): string | undefined {
+  const lists = record.lists;
+  if (!Array.isArray(lists) || lists.length === 0) {
+    return undefined;
+  }
+
+  const primaryId = getPath(record, "primaryTaskListId");
+  const primary = lists.find(
+    (entry) => isRecord(entry) && entry.id === primaryId,
+  );
+  const chosen = isRecord(primary) ? primary : lists[0];
+  if (isRecord(chosen) && typeof chosen.name === "string" && chosen.name.trim()) {
+    return chosen.name;
   }
 
   return undefined;

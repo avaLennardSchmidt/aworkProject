@@ -166,6 +166,12 @@ const PROJECT_COLORS = [
   "#226f7a",
   "#9c4f2f",
 ];
+const ANALYSIS_LOADING_MESSAGES = [
+  "Analyse wird vorbereitet...",
+  "Stunden werden analysiert...",
+  "Kapazitäten werden berechnet...",
+  "Teamübersicht wird aufgebaut...",
+];
 
 export function CapacityAnalysisPage({
   backendClient,
@@ -220,10 +226,29 @@ export function CapacityAnalysisPage({
   >({});
   const [absenceLoadFailed, setAbsenceLoadFailed] = useState(false);
   const [error, setError] = useState("");
+  const [analysisLoadingMessageIndex, setAnalysisLoadingMessageIndex] =
+    useState(0);
 
   useEffect(() => {
     saveCapacityInputs(capacityInputs);
   }, [capacityInputs]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setAnalysisLoadingMessageIndex(0);
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setAnalysisLoadingMessageIndex((current) =>
+        current >= ANALYSIS_LOADING_MESSAGES.length - 1 ? 0 : current + 1,
+      );
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isLoading]);
 
   useEffect(() => {
     if (!currentUser || !isAuthorized || isCheckingAccess) {
@@ -898,7 +923,23 @@ export function CapacityAnalysisPage({
           ) : null}
 
           {isLoading ? (
-            <LoadingState label="Team-Kapazität wird geladen..." />
+            <section className="panel analysis-loading-panel" aria-live="polite">
+              <div className="analysis-loading-content">
+                <p
+                  key={analysisLoadingMessageIndex}
+                  className="analysis-loading-message"
+                >
+                  {
+                    ANALYSIS_LOADING_MESSAGES[
+                      analysisLoadingMessageIndex
+                    ]
+                  }
+                </p>
+                <div className="analysis-loading-bar" aria-hidden="true">
+                  <span className="analysis-loading-bar-indicator" />
+                </div>
+              </div>
+            </section>
           ) : null}
 
           {!hasLoaded && !isLoading ? (

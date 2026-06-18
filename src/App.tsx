@@ -51,6 +51,7 @@ import {
   CreateScheduleGroupPanel,
   type CreateGroupOptions,
 } from "./components/CreateScheduleGroupPanel";
+import { ProjectPlanPanel } from "./components/ProjectPlanPanel";
 import { DeleteGroupModal } from "./components/DeleteGroupModal";
 import { StatusToast } from "./components/StatusToast";
 import { FilterPanel } from "./components/FilterPanel";
@@ -69,10 +70,41 @@ import {
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
 import { MonitoringModal } from "./components/MonitoringModal";
+import { ModalShell } from "./components/ModalShell";
+import { useConfetti } from "./components/Confetti";
 import { clearFeatureAccessCache } from "./config/featureAccess";
 import { AnimatePresence } from "motion/react";
 
 const backendClient = new BackendClient();
+const FEATURE_SEEN_STORAGE_PREFIX = "awork_feature_seen_";
+const APP_ANNOUNCEMENT_VERSION = "2026.06";
+const FEATURE_KEYS = {
+  whatsNew: "whats-new-2026-06",
+  projectPlanIntro: "feature-project-einplanen-v1",
+  autoPlanIntro: "feature-auto-plan-v1",
+} as const;
+
+type FeatureModalType = "whats-new" | "project-plan" | "auto-plan";
+
+function readLocalFeatureSeen(userId: string): string[] {
+  try {
+    const raw = localStorage.getItem(`${FEATURE_SEEN_STORAGE_PREFIX}${userId}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalFeatureSeen(userId: string, keys: Set<string>): void {
+  localStorage.setItem(
+    `${FEATURE_SEEN_STORAGE_PREFIX}${userId}`,
+    JSON.stringify(Array.from(keys)),
+  );
+}
 
 interface LoadSchedulesOptions {
   refreshNotice?: string;
@@ -99,6 +131,12 @@ function App() {
   const [error, setError] = useState("");
   const [hasMonitoringAccess, setHasMonitoringAccess] = useState(false);
   const [showMonitoringModal, setShowMonitoringModal] = useState(false);
+  const [activeFeatureModal, setActiveFeatureModal] =
+    useState<FeatureModalType | null>(null);
+  const [seenFeatureKeys, setSeenFeatureKeys] = useState<Set<string>>(
+    new Set(),
+  );
+  const [showConfetti, setShowConfetti] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [createSuccess, setCreateSuccess] = useState<{
     count: number;
@@ -205,6 +243,120 @@ function App() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [currentUser, isConnecting]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setSeenFeatureKeys(new Set());
+      return;
+    }
+
+    const localKeys = new Set(readLocalFeatureSeen(currentUser.id));
+    setSeenFeatureKeys(localKeys);
+
+    void backendClient
+      .getSeenFeatureKeys()
+      .then(async (remoteKeys) => {
+        const merged = new Set([...localKeys, ...remoteKeys]);
+        setSeenFeatureKeys(merged);
+        writeLocalFeatureSeen(currentUser.id, merged);
+
+        const missingRemoteKeys = Array.from(localKeys).filter(
+          (key) => !remoteKeys.includes(key),
+        );
+
+        if (missingRemoteKeys.length === 0) {
+          return;
+        }
+
+        const syncResults = await Promise.allSettled(
+          missingRemoteKeys.map((key) =>
+            backendClient.markFeatureSeen(key, APP_ANNOUNCEMENT_VERSION),
+          ),
+        );
+
+        if (syncResults.some((result) => result.status === "rejected")) {
+          setStatusMessage(
+            "Feature-Hinweise wurden nur lokal gespeichert und konnten noch nicht mit dem Server synchronisiert werden.",
+          );
+          return;
+        }
+      })
+      .catch(() => {
+        // Fallback to local cache if backend/supabase is temporarily unavailable.
+        setStatusMessage(
+          "Feature-Hinweise werden aktuell nur lokal gespeichert. Sobald das Backend wieder erreichbar ist, werden sie synchronisiert.",
+        );
+      });
+  }, [currentUser]);
+
+  async function acknowledgeFeature(featureKey: string) {
+    if (!currentUser) return;
+    setSeenFeatureKeys((current) => {
+      const next = new Set(current);
+      next.add(featureKey);
+      writeLocalFeatureSeen(currentUser.id, next);
+      return next;
+    });
+
+    try {
+      console.log(
+        `[feature-announcement] Saving feature ${featureKey} to backend...`,
+      );
+      await backendClient.markFeatureSeen(featureKey, APP_ANNOUNCEMENT_VERSION);
+      console.log(
+        `[feature-announcement] Successfully saved feature ${featureKey}`,
+      );
+    } catch (err) {
+      console.error(
+        `[feature-announcement] Failed to save feature ${featureKey}:`,
+        err,
+      );
+      setStatusMessage(
+        "Feature-Hinweis lokal gespeichert. Die Server-Synchronisierung wird automatisch nachgeholt.",
+      );
+    }
+  }
+
+  function openWhatsNew() {
+    setActiveFeatureModal("whats-new");
+    setShowConfetti(true);
+    if (!seenFeatureKeys.has(FEATURE_KEYS.whatsNew)) {
+      void acknowledgeFeature(FEATURE_KEYS.whatsNew);
+    }
+  }
+
+  function handleWorkflowChange(nextWorkflow: PlannerWorkflow) {
+    setWorkflow(nextWorkflow);
+    if (
+      nextWorkflow === "project" &&
+      !seenFeatureKeys.has(FEATURE_KEYS.projectPlanIntro)
+    ) {
+      setShowConfetti(true);
+      setActiveFeatureModal("project-plan");
+    }
+  }
+
+  function handleAutoPlanOpen() {
+    if (!seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro)) {
+      setShowConfetti(true);
+      setActiveFeatureModal("auto-plan");
+    }
+  }
+
+  async function confirmFeatureModal(featureKey: string) {
+    await acknowledgeFeature(featureKey);
+    setActiveFeatureModal(null);
+  }
+
+  const pulseProjectWorkflow = !seenFeatureKeys.has(FEATURE_KEYS.projectPlanIntro);
+  const pulseAutoPlanMode = !seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro);
+  const showWhatsNewDot = !seenFeatureKeys.has(FEATURE_KEYS.whatsNew);
+
+  useConfetti(showConfetti, {
+    particleCount: 100,
+    startVelocity: 28,
+    spread: 70,
+  });
 
   const plannerUser = useMemo(() => {
     if (!currentUser) return undefined;
@@ -621,6 +773,64 @@ function App() {
     }
   }
 
+  async function loadProjectTasksList(
+    projectId: string,
+  ): Promise<AworkProjectTask[]> {
+    const response = await backendClient.getProjectTasks(projectId);
+    return mapProjectTasksResponse(response);
+  }
+
+  async function createProjectSchedules(
+    payloads: CreateTaskSchedulePayload[],
+  ): Promise<boolean> {
+    if (!plannerUser) {
+      setError("Bitte Planner-Nutzer auswählen.");
+      return false;
+    }
+    if (payloads.length === 0) return false;
+
+    setIsCreatingSchedules(true);
+    setError("");
+    let successCount = 0;
+    const failures: string[] = [];
+
+    try {
+      for (const payload of payloads) {
+        try {
+          await backendClient.createTaskSchedule({
+            ...payload,
+            userId: plannerUser.id,
+          });
+          successCount += 1;
+        } catch (createError) {
+          failures.push(
+            createError instanceof Error
+              ? createError.message
+              : "Anlegen fehlgeschlagen.",
+          );
+        }
+      }
+
+      setStatusMessage(
+        `${successCount} Blocker angelegt. ${failures.length} fehlgeschlagen.`,
+      );
+      if (successCount > 0) {
+        setCreateSuccess({ count: successCount, failed: failures.length });
+      }
+      if (failures.length > 0) setError(failures.slice(0, 3).join(" | "));
+      if (successCount > 0 && hasLoadedSchedules) {
+        await loadSchedules({
+          refreshNotice:
+            "Projekt-Blocker nach dem Anlegen werden aktualisiert. Du kannst weiterarbeiten, neue awork-Daten erscheinen gleich.",
+        });
+      }
+
+      return successCount > 0;
+    } finally {
+      setIsCreatingSchedules(false);
+    }
+  }
+
   async function loadCreateSchedules(
     from: string,
     to: string,
@@ -968,6 +1178,24 @@ function App() {
           Geplante Aufgaben-Blocker für den ausgewählten Planner-Nutzer
           bearbeiten.
         </p>
+        <div
+          className="whats-new-teaser"
+          role="button"
+          tabIndex={0}
+          aria-label="What's New öffnen"
+          onClick={openWhatsNew}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              openWhatsNew();
+            }
+          }}
+        >
+          <span className="whats-new-teaser-label">What&apos;s new</span>
+          {showWhatsNewDot ? (
+            <span className="whats-new-teaser-dot" aria-hidden="true" />
+          ) : null}
+        </div>
       </header>
 
       <ConnectionPanel
@@ -1001,7 +1229,8 @@ function App() {
               <WorkflowChooser
                 value={workflow}
                 disabled={!currentUser}
-                onChange={setWorkflow}
+                pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
+                onChange={handleWorkflowChange}
               />
             }
             onChange={setFilters}
@@ -1057,29 +1286,161 @@ function App() {
             <WorkflowChooser
               value={workflow}
               disabled={!currentUser}
-              onChange={setWorkflow}
+              pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
+              onChange={handleWorkflowChange}
             />
           }
           onLoadProjects={loadProjects}
           onProjectChange={loadProjectTasks}
           onLoadExistingSchedules={loadCreateSchedules}
           onLoadUserCapacity={loadPlannerUserCapacity}
+          pulseAutoPlan={pulseAutoPlanMode}
+          onOpenAutoPlan={handleAutoPlanOpen}
           onCreate={createTaskSchedules}
         />
-      ) : workflow === "create" ? (
+      ) : workflow === "project" && plannerUser ? (
+        <ProjectPlanPanel
+          currentUser={plannerUser}
+          projects={availableProjects}
+          isLoadingProjects={isLoadingProjects}
+          isCreating={isCreatingSchedules}
+          myAssignedProjectIds={myAssignedProjectIds}
+          workflowToggle={
+            <WorkflowChooser
+              value={workflow}
+              disabled={!currentUser}
+              pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
+              onChange={handleWorkflowChange}
+            />
+          }
+          onLoadProjects={loadProjects}
+          onLoadProjectTasks={loadProjectTasksList}
+          onLoadExistingSchedules={loadCreateSchedules}
+          onLoadUserCapacity={loadPlannerUserCapacity}
+          onCreate={createProjectSchedules}
+        />
+      ) : workflow === "create" || workflow === "project" ? (
         <section className="panel">
           <div className="panel-header">
             <div>
               <p className="eyebrow">Workflow</p>
-              <h2>Blocker anlegen</h2>
+              <h2>
+                {workflow === "project" ? "Projekt einplanen" : "Blocker anlegen"}
+              </h2>
             </div>
             <WorkflowChooser
               value={workflow}
               disabled={!currentUser}
-              onChange={setWorkflow}
+              pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
+              onChange={handleWorkflowChange}
             />
           </div>
         </section>
+      ) : null}
+
+      {activeFeatureModal ? (
+        <ModalShell
+          labelledBy="feature-announcement-title"
+          dialogClassName="modal feature-announcement-modal"
+          onClose={() => setActiveFeatureModal(null)}
+        >
+          <div className="modal-header feature-announcement-header">
+            <h2 id="feature-announcement-title">
+              {activeFeatureModal === "whats-new"
+                ? "What's New"
+                : activeFeatureModal === "project-plan"
+                  ? "Neu: Projekt einplanen"
+                  : "Neu: Auto Plan"}
+            </h2>
+            <button
+              type="button"
+              className="ghost-button feature-announcement-close"
+              onClick={() => setActiveFeatureModal(null)}
+              aria-label="Popup schließen"
+            >
+              ×
+            </button>
+          </div>
+
+          {activeFeatureModal === "whats-new" ? (
+            <div className="feature-announcement-copy">
+              <h3 className="release-notes-headline">🎉 Projekt einplanen & Auto Plan sind da</h3>
+              <p className="release-notes-intro">
+                Zwei super Features, die dir dein Planungs-Leben massiv leichter machen. Die alte Realität: Task für Task einplanen. Die neue: Plan ein ganzes Projekt auf einmal. Oder lass den Computer arbeiten und platziere automatisch.
+              </p>
+              <div className="feature-announcement-list">
+                <div className="feature-item">
+                  <h4>✨ Projekt einplanen</h4>
+                  <p>Verabschiede dich von Task für Task planen. Öffne ein Projekt, wähle die ungeplanten Tasks, die der Tool soll planen, definiere Wochentage und Arbeitszeiten — und der Tool verteilt sie automatisch intelligent über deinen Kalender, respektiert deine aktuelle Auslastung und findet immer den nächsten freien Slot. Und bevor du mittig speicherst, kannst du alles noch feinjustieren in der Vorschau.</p>
+                </div>
+                <div className="feature-item">
+                  <h4>⚡ Auto Plan</h4>
+                  <p>Du hast ne Aufgabe, weißt aber nicht, wo du die sonst einbauen sollst? Auto Plan macht das für dich. Du gibst vor: Zeitraum, Arbeitszeiten, und wie lange die Task dauert — und der Tool durchsucht deinen Kalender, findet freie Slots, respektiert deine Kapazität und schlägt dir perfekte Zeiten vor. Kein Herumprobieren mehr.</p>
+                </div>
+              </div>
+            </div>
+          ) : activeFeatureModal === "project-plan" ? (
+            <div className="feature-announcement-copy">
+              <h3 className="release-notes-headline">🚀 Projekt einplanen — endlich!</h3>
+              <p className="release-notes-intro">
+                Die Problem ist real: Du hast ein Projekt in awork. Die Tasks sind definiert. Aber jetzt musst du Task um Task manuell planen. Das ist anstrengend, besonders wenn ne ganze Batch da ist.
+              </p>
+              <p className="release-notes-solution">
+                <strong>So läufts jetzt:</strong> Öffne "Projekt einplanen", wähle dein Projekt, hake die Tasks an, die geplant werden sollen — und der Tool macht den Rest.
+              </p>
+              <ul className="feature-steps">
+                <li>💡 Tool liest die awork Zeitrahmen und die geplante Zeit jeder Task aus</li>
+                <li>📅 Du definierst: Welche Wochentage, Start/End-Zeit im Tag, wie verteilst du? (gleichmäßig oder gebündelt)</li>
+                <li>🎯 Der Tool plant alle Tasks intelligent um deine aktuellen Blocker herum</li>
+                <li>✏️ In der Vorschau kannst du noch jeden Blocker manuell verschieben oder löschen</li>
+                <li>✅ Ein Klick — alle Blocker angelegt.</li>
+              </ul>
+            </div>
+          ) : (
+            <div className="feature-announcement-copy">
+              <h3 className="release-notes-headline">⚡ Auto Plan — dein neuer Zeitmanager</h3>
+              <p className="release-notes-intro">
+                Du kennst das: "Ich muss die Task noch irgendwann einplanen, aber wo passt sie rein?" Das Rumprobieren im Kalender ist nervig. Blockers finden, Gaps suchen, probieren, verwirft — fertig. Das ist vorbei.
+              </p>
+              <p className="release-notes-solution">
+                <strong>Hier kommt Auto Plan:</strong> Gib der Aufgabe ne Dauer, einen Zeitraum und Arbeitszeiten vor — und der Tool durchsucht deinen Kalender automatisch, findet freie Slots, respektiert deine Kapazität und schlägt dir perfekte Zeitfenster vor.
+              </p>
+              <ul className="feature-steps">
+                <li>⏱️ Du gibst vor: Dauer (z.B. 8h), Zeitraum (z.B. diese Woche bis nächste), Wochentage (Mo-Fr), Arbeitszeiten (9-17 Uhr)</li>
+                <li>🔍 Der Tool scannt deinen aktuellen Kalender automatisch</li>
+                <li>📍 Er findet zusammenhängende freie Slots und berücksichtigt deine Kapazität</li>
+                <li>✅ Der Tool schlägt dir sinnvolle Blockers vor (z.B. Mo 2h, Di 2h, Mi 2h, Do 2h)</li>
+                <li>🎯 Du reviewst in der Vorschau und stellst noch was nach — oder speicherst direkt.</li>
+              </ul>
+            </div>
+          )}
+
+          <div className="modal-actions">
+            {activeFeatureModal !== "whats-new" ? (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() =>
+                  void confirmFeatureModal(
+                    activeFeatureModal === "project-plan"
+                      ? FEATURE_KEYS.projectPlanIntro
+                      : FEATURE_KEYS.autoPlanIntro,
+                  )
+                }
+              >
+                OK, nicht mehr anzeigen
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => setActiveFeatureModal(null)}
+              >
+                Schließen
+              </button>
+            )}
+          </div>
+        </ModalShell>
       ) : null}
 
       {selectedGroup && plannerUser && !previewChanges ? (

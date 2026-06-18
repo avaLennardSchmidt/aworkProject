@@ -28,6 +28,15 @@ Read `AGENTS.md` first. If this file and `AGENTS.md` differ, follow `AGENTS.md`.
 - Use `npm run build` for frontend changes.
 - If a change affects mapper or grouping logic, prefer one focused check over broad rewrites.
 
+## Projekt einplanen — quick reference
+
+Full documentation is in `AGENTS.md` under "Feature: Projekt einplanen". Key things to know before touching that feature:
+
+- **Duration semantics**: "awork Zeit" and "manuell" = total hours for the task's full duration, divided by `countIsoWeeksInRange` to get the weekly cap. "Wochenbudget" = hours per week directly. Never treat awork `plannedDurationSeconds` as a weekly figure.
+- **Pending payloads**: the manual-blocker modal does not create immediately — payloads accumulate in `pendingManualPayloads` and are only sent to `onCreate` at confirm. Always inject pending payloads into `accumulated` before any `buildProjectTaskPlan` call.
+- **Week-counting alignment**: `aworkWeeklyBudgetSeconds` divides by `countIsoWeeksInRange`; the scheduler multiplies by `countIsoWeeksInRange`. These must use the same function or total scheduled hours drift.
+- **Overlap prevention**: pending payloads injected as occupied schedules before the algo prevents false "Überschneidung" warnings in the preview.
+
 ## Useful awork docs
 
 - Append `.md` to `developers.awork.com` pages for clean Markdown.

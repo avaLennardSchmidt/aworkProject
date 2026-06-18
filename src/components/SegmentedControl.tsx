@@ -10,6 +10,8 @@ export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
   icon?: ReactNode;
+  className?: string;
+  badgeText?: string;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -96,7 +98,9 @@ export function SegmentedControl<T extends string>({
             }}
             type="button"
             role="tab"
-            className={isActive ? "active" : ""}
+            className={[isActive ? "active" : "", option.className ?? ""]
+              .filter(Boolean)
+              .join(" ")}
             disabled={disabled}
             aria-selected={isActive}
             onClick={() => onChange(option.value)}
@@ -104,6 +108,11 @@ export function SegmentedControl<T extends string>({
             <span className="segmented-label">
               {option.icon}
               {option.label}
+              {option.badgeText ? (
+                <span className="segmented-badge" aria-hidden="true">
+                  {option.badgeText}
+                </span>
+              ) : null}
             </span>
           </button>
         );

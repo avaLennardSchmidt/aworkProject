@@ -62,6 +62,8 @@ interface CreateScheduleGroupPanelProps {
   myAssignedProjectIds: Set<string>;
   absenceRanges?: AbsenceRange[];
   workflowToggle?: ReactNode;
+  pulseAutoPlan?: boolean;
+  onOpenAutoPlan?: () => void;
   onLoadProjects: () => Promise<void>;
   onProjectChange: (projectId: string) => Promise<void>;
   onLoadExistingSchedules: (
@@ -104,7 +106,7 @@ const STATUS_TYPE_LABELS: Record<string, string> = {
   done: "Fertig",
 };
 
-const taskModeOptions = [
+const baseTaskModeOptions = [
   {
     value: "existing" as const,
     label: "Bestehend",
@@ -208,6 +210,8 @@ export function CreateScheduleGroupPanel({
   myAssignedProjectIds,
   absenceRanges,
   workflowToggle,
+  pulseAutoPlan,
+  onOpenAutoPlan,
   onLoadProjects,
   onProjectChange,
   onLoadExistingSchedules,
@@ -215,6 +219,19 @@ export function CreateScheduleGroupPanel({
   onCreate,
 }: CreateScheduleGroupPanelProps) {
   const defaults = getDefaultScheduleFields();
+  const taskModeOptions = useMemo(
+    () =>
+      baseTaskModeOptions.map((option) => ({
+        ...option,
+        className:
+          pulseAutoPlan && option.value === "auto"
+            ? "workflow-option-pulse"
+            : undefined,
+        badgeText:
+          pulseAutoPlan && option.value === "auto" ? "NEU" : undefined,
+      })),
+    [pulseAutoPlan],
+  );
   const [projectId, setProjectId] = useState("");
   const [taskMode, setTaskMode] = useState<TaskMode>("existing");
   const [autoTaskSource, setAutoTaskSource] = useState<AutoTaskSource>("new");
@@ -479,6 +496,9 @@ export function CreateScheduleGroupPanel({
   }
 
   function handleTaskModeChange(nextMode: TaskMode) {
+    if (nextMode === "auto") {
+      onOpenAutoPlan?.();
+    }
     setTaskMode(nextMode);
     setTaskId("");
     setCreatePreview(null);
