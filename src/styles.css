@@ -3726,6 +3726,11 @@ button.auto-plan-skipped-day:hover {
     min-width: 0;
   }
 
+  .planner-user-refresh {
+    width: 100%;
+    white-space: normal;
+  }
+
   .connection-heading {
     align-items: stretch;
   }

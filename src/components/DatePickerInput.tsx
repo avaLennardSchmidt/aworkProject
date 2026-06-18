@@ -111,16 +111,20 @@ export function DatePickerInput({
       const spaceAbove = rect.top - MARGIN;
       const openDown = spaceBelow >= MENU_HEIGHT || spaceBelow >= spaceAbove;
 
-      let top = openDown
-        ? rect.bottom + GAP
-        : rect.top - MENU_HEIGHT - GAP;
+      let top = openDown ? rect.bottom + GAP : rect.top - MENU_HEIGHT - GAP;
 
       // Clamp vertical so popup never leaves the viewport
-      top = Math.max(MARGIN, Math.min(top, window.innerHeight - MENU_HEIGHT - MARGIN));
+      top = Math.max(
+        MARGIN,
+        Math.min(top, window.innerHeight - MENU_HEIGHT - MARGIN),
+      );
 
       // Clamp horizontal so popup never overflows left or right
       let left = rect.left;
-      left = Math.max(MARGIN, Math.min(left, window.innerWidth - MENU_WIDTH - MARGIN));
+      left = Math.max(
+        MARGIN,
+        Math.min(left, window.innerWidth - MENU_WIDTH - MARGIN),
+      );
 
       setDirection(openDown ? "down" : "up");
       setMenuPos({ top, left });
