@@ -70,6 +70,14 @@ export interface AworkAbsence {
   isHalfDayOnEnd: boolean;
 }
 
+export interface AworkUserCapacity {
+  userId: string;
+  weeklyCapacity?: Partial<
+    Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", number>
+  >;
+  capacityPerWeek?: number;
+}
+
 export interface CreateProjectTaskPayload {
   name: string;
   plannedDuration?: number;

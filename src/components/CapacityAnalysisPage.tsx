@@ -37,6 +37,7 @@ import type {
   AworkProjectTask,
   AworkTaskSchedule,
   AworkUser,
+  AworkUserCapacity,
 } from "../types/awork";
 import { ConnectionPanel } from "./ConnectionPanel";
 import { ErrorAlert } from "./ErrorAlert";
@@ -111,6 +112,7 @@ interface ChartTooltip {
 
 interface CapacityResponse {
   users: unknown[];
+  userCapacities?: Record<string, unknown>;
   userSchedules?: Array<{
     userId?: string;
     schedules?: unknown[];
@@ -175,6 +177,7 @@ export function CapacityAnalysisPage({
   onDisconnect,
 }: CapacityAnalysisPageProps) {
   const hasInitializedDefaultSelectionRef = useRef(false);
+  const appliedCapacityDefaultUserIdsRef = useRef<Set<string>>(new Set());
   const [from, setFrom] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const [to, setTo] = useState(() =>
     format(endOfYear(new Date()), "yyyy-MM-dd"),
@@ -193,6 +196,9 @@ export function CapacityAnalysisPage({
   const [capacityInputs, setCapacityInputs] = useState<
     Record<string, CapacityInputs>
   >(() => loadCapacityInputs());
+  const [capacityDefaultsByUser, setCapacityDefaultsByUser] = useState<
+    Record<string, number>
+  >({});
   const [chartUserSearch, setChartUserSearch] = useState("");
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(
     new Set(),
@@ -222,8 +228,10 @@ export function CapacityAnalysisPage({
   useEffect(() => {
     if (!currentUser || !isAuthorized || isCheckingAccess) {
       hasInitializedDefaultSelectionRef.current = false;
+      appliedCapacityDefaultUserIdsRef.current = new Set();
       setAvailableUsers([]);
       setUsers([]);
+      setCapacityDefaultsByUser({});
       setSelectedUserIds(new Set());
       setSelectedTeamNames(new Set());
       return;
@@ -282,7 +290,11 @@ export function CapacityAnalysisPage({
       return {
         user,
         schedules,
-        inputs: getInputsForUser(capacityInputs, user.id),
+        inputs: getInputsForUser(
+          capacityInputs,
+          user.id,
+          capacityDefaultsByUser[user.id],
+        ),
         plannedMinutes,
         blockerCount: schedules.length,
         projectTotals: Array.from(projectTotalsByKey.values()).sort(
@@ -290,7 +302,7 @@ export function CapacityAnalysisPage({
         ),
       };
     });
-  }, [capacityInputs, schedulesByUser, users]);
+  }, [capacityDefaultsByUser, capacityInputs, schedulesByUser, users]);
 
   const selectedRows = useMemo(
     () => rows.filter((row) => selectedUserIds.has(row.user.id)),
@@ -442,6 +454,9 @@ export function CapacityAnalysisPage({
       const mappedUsers = mapCapacityUsers(response).sort((a, b) =>
         formatUserName(a).localeCompare(formatUserName(b)),
       );
+      const capacityDefaults = mapCapacityDefaults(response);
+      setCapacityDefaultsByUser(capacityDefaults);
+      applyAworkCapacityDefaults(capacityDefaults);
       const mappedUserIds = new Set(mappedUsers.map((user) => user.id));
       const availableTeamNames = new Set(
         mappedUsers.flatMap((user) =>
@@ -492,6 +507,7 @@ export function CapacityAnalysisPage({
       });
     } catch (loadError) {
       setAvailableUsers([]);
+      setCapacityDefaultsByUser({});
       setSelectedUserIds(new Set());
       setSelectedTeamNames(new Set());
       setError(
@@ -540,10 +556,42 @@ export function CapacityAnalysisPage({
     setCapacityInputs((current) => ({
       ...current,
       [userId]: {
-        ...getInputsForUser(current, userId),
+        ...getInputsForUser(current, userId, capacityDefaultsByUser[userId]),
         [field]: value,
       },
     }));
+  }
+
+  function applyAworkCapacityDefaults(defaults: Record<string, number>) {
+    const entriesToApply = Object.entries(defaults).filter(
+      ([userId]) => !appliedCapacityDefaultUserIdsRef.current.has(userId),
+    );
+
+    if (entriesToApply.length === 0) {
+      return;
+    }
+
+    setCapacityInputs((current) => {
+      let didChange = false;
+      const next = { ...current };
+
+      entriesToApply.forEach(([userId, weeklyHours]) => {
+        appliedCapacityDefaultUserIdsRef.current.add(userId);
+        const existing = current[userId];
+        if (existing && existing.weeklyHours !== DEFAULT_WEEKLY_HOURS) {
+          return;
+        }
+
+        next[userId] = {
+          ...defaultInputs(weeklyHours),
+          ...existing,
+          weeklyHours,
+        };
+        didChange = true;
+      });
+
+      return didChange ? next : current;
+    });
   }
 
   function toggleUserExpansion(userId: string) {
@@ -1186,27 +1234,33 @@ function SummaryCards({
   overloadedUsers: number;
 }) {
   return (
-    <section className="analysis-summary-grid">
-      <SummaryCard
-        label="Stunden"
-        value={`${formatHours(totalPlannedHours)} / ${formatHours(totalCapacityHours)}`}
-        title="Geplante Stunden geteilt durch die verfügbare Kapazität (nach Abwesenheiten) aller ausgewählten Nutzer im Zeitraum."
-      />
-      <SummaryCard
-        label="Durchschnittliche Auslastung"
-        value={`${formatDecimal(averageWorkload)}%`}
-        title="Geplante Stunden geteilt durch Gesamtkapazität der ausgewählten Nutzer."
-      />
-      <SummaryCard
-        label="Urlaub"
-        value={formatHours(totalAbsentHours)}
-        title="Summe aller Abwesenheitsstunden (Urlaub, Feiertage) aller ausgewählten Nutzer im Zeitraum."
-      />
-      <SummaryCard
-        label="Überlastete Nutzer"
-        value={String(overloadedUsers)}
-        title="Nutzer, deren geplante Stunden die Gesamtkapazität übersteigen."
-      />
+    <section className="panel analysis-summary-panel">
+      <div className="analysis-summary-heading">
+        <p className="eyebrow">Kapazitätszusammenfassung</p>
+        <h2>Zahlen, Daten, Fakten</h2>
+      </div>
+      <div className="analysis-summary-grid">
+        <SummaryCard
+          label="Stunden"
+          value={`${formatHours(totalPlannedHours)} / ${formatHours(totalCapacityHours)}`}
+          title="Geplante Stunden geteilt durch die verfügbare Kapazität (nach Abwesenheiten) aller ausgewählten Nutzer im Zeitraum."
+        />
+        <SummaryCard
+          label="Durchschnittliche Auslastung"
+          value={`${formatDecimal(averageWorkload)}%`}
+          title="Geplante Stunden geteilt durch Gesamtkapazität der ausgewählten Nutzer."
+        />
+        <SummaryCard
+          label="Urlaub"
+          value={formatHours(totalAbsentHours)}
+          title="Summe aller Abwesenheitsstunden (Urlaub, Feiertage) aller ausgewählten Nutzer im Zeitraum."
+        />
+        <SummaryCard
+          label="Überlastete Nutzer"
+          value={String(overloadedUsers)}
+          title="Nutzer, deren geplante Stunden die Gesamtkapazität übersteigen."
+        />
+      </div>
     </section>
   );
 }
@@ -1710,6 +1764,57 @@ function mapCapacityUsers(response: unknown): AworkUser[] {
       }
     })
     .filter((user): user is AworkUser => Boolean(user));
+}
+
+function mapCapacityDefaults(response: unknown): Record<string, number> {
+  if (!isCapacityResponse(response) || !isRecord(response.userCapacities)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(response.userCapacities).flatMap(([userId, rawCapacity]) => {
+      const capacity = mapUserCapacity(rawCapacity);
+      const weeklyHours = capacity ? getWeeklyCapacityHours(capacity) : null;
+      return typeof weeklyHours === "number" ? [[userId, weeklyHours]] : [];
+    }),
+  );
+}
+
+function mapUserCapacity(rawCapacity: unknown): AworkUserCapacity | null {
+  if (!isRecord(rawCapacity)) {
+    return null;
+  }
+
+  const userId = typeof rawCapacity.userId === "string" ? rawCapacity.userId : "";
+  const weeklyCapacity = isRecord(rawCapacity.weeklyCapacity)
+    ? Object.fromEntries(
+        Object.entries(rawCapacity.weeklyCapacity).filter(
+          ([, value]) => typeof value === "number",
+        ),
+      )
+    : undefined;
+  const capacityPerWeek =
+    typeof rawCapacity.capacityPerWeek === "number"
+      ? rawCapacity.capacityPerWeek
+      : undefined;
+
+  return { userId, weeklyCapacity, capacityPerWeek };
+}
+
+function getWeeklyCapacityHours(capacity: AworkUserCapacity): number | null {
+  if (typeof capacity.capacityPerWeek === "number") {
+    return capacity.capacityPerWeek / 3600;
+  }
+
+  if (capacity.weeklyCapacity) {
+    const seconds = Object.values(capacity.weeklyCapacity).reduce(
+      (sum, value) => sum + (typeof value === "number" ? value : 0),
+      0,
+    );
+    return seconds > 0 ? seconds / 3600 : null;
+  }
+
+  return null;
 }
 
 function getUserTeamNames(user: AworkUser): string[] {
@@ -2243,13 +2348,14 @@ function normalizeInputs(value: unknown): CapacityInputs {
 function getInputsForUser(
   inputs: Record<string, CapacityInputs>,
   userId: string,
+  defaultWeeklyHours = DEFAULT_WEEKLY_HOURS,
 ): CapacityInputs {
-  return inputs[userId] ?? defaultInputs();
+  return inputs[userId] ?? defaultInputs(defaultWeeklyHours);
 }
 
-function defaultInputs(): CapacityInputs {
+function defaultInputs(weeklyHours = DEFAULT_WEEKLY_HOURS): CapacityInputs {
   return {
-    weeklyHours: DEFAULT_WEEKLY_HOURS,
+    weeklyHours,
     customerPercent: DEFAULT_CUSTOMER_PERCENT,
   };
 }
