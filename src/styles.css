@@ -1017,6 +1017,7 @@ select:disabled {
 /* Checkbox-Zeilen unter den Selects brauchen keine volle Feldhöhe. */
 .create-grid .form-row-col2 {
   margin-top: -2px;
+  align-self: end;
 }
 
 .create-grid .checkbox-row {
@@ -1038,6 +1039,12 @@ select:disabled {
 
 .task-mode-grid {
   grid-template-columns: 1fr;
+  margin-top: 10px;
+}
+
+.project-toggle-row {
+  grid-column: 1;
+  margin-top: -2px;
 }
 
 .task-mode-row {

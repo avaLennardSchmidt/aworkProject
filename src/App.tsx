@@ -156,7 +156,8 @@ function App() {
   const isAnalysisRoute = isCapacityAnalysisRoute();
 
   function consumeLoginRedirectFlag(): boolean {
-    const wasRedirect = sessionStorage.getItem("awork_planner_login_redirect") === "1";
+    const wasRedirect =
+      sessionStorage.getItem("awork_planner_login_redirect") === "1";
     if (wasRedirect) {
       sessionStorage.removeItem("awork_planner_login_redirect");
     }
@@ -311,7 +312,10 @@ function App() {
             setStatusMessage("awork Login erfolgreich. Workflow wählen.");
             sessionRestoredRef.current = true;
             sessionStorage.setItem("awork_planner_session_restored", "1");
-          } else if (!sessionRestoredRef.current && !sessionStorage.getItem("awork_planner_session_restored")) {
+          } else if (
+            !sessionRestoredRef.current &&
+            !sessionStorage.getItem("awork_planner_session_restored")
+          ) {
             setStatusMessage("awork-Session wiederhergestellt.");
             sessionRestoredRef.current = true;
             sessionStorage.setItem("awork_planner_session_restored", "1");
@@ -645,7 +649,9 @@ function App() {
     );
   }
 
-  async function loadPlannerUserCapacity(): Promise<AworkUserCapacity | undefined> {
+  async function loadPlannerUserCapacity(): Promise<
+    AworkUserCapacity | undefined
+  > {
     if (!plannerUser) {
       return undefined;
     }
@@ -1003,7 +1009,9 @@ function App() {
           />
 
           {isLoadingSchedules ? (
-            <p className="loading-text-hint">Geplante Aufgaben werden geladen...</p>
+            <p className="loading-text-hint">
+              Geplante Aufgaben werden geladen...
+            </p>
           ) : null}
           {scheduleRefreshNotice ? (
             <div className="refresh-notice" aria-live="polite">

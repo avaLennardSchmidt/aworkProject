@@ -27,9 +27,11 @@ export function MonitoringModal({
   onClose,
 }: MonitoringModalProps) {
   const [from, setFrom] = useState(() =>
-    format(startOfMonth(new Date()), "yyyy-MM-dd"),
+    format(startOfWeek(new Date(), { locale: de }), "yyyy-MM-dd"),
   );
-  const [to, setTo] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const [to, setTo] = useState(() =>
+    format(endOfWeek(new Date(), { locale: de }), "yyyy-MM-dd"),
+  );
   const [stats, setStats] = useState<MonitoringDailyStats[]>([]);
   const [logs, setLogs] = useState<MonitoringLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);

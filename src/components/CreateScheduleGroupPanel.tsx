@@ -217,8 +217,7 @@ export function CreateScheduleGroupPanel({
   const defaults = getDefaultScheduleFields();
   const [projectId, setProjectId] = useState("");
   const [taskMode, setTaskMode] = useState<TaskMode>("existing");
-  const [autoTaskSource, setAutoTaskSource] =
-    useState<AutoTaskSource>("new");
+  const [autoTaskSource, setAutoTaskSource] = useState<AutoTaskSource>("new");
   const [taskId, setTaskId] = useState("");
   const [newTaskName, setNewTaskName] = useState("");
   const [from, setFrom] = useState(defaults.from);
@@ -418,7 +417,9 @@ export function CreateScheduleGroupPanel({
     [existingSchedules, previewPayloads],
   );
   const overlapDateCount = new Set(
-    overlapEntries.map((entry) => format(parseISO(entry.payload.startDate), "yyyy-MM-dd")),
+    overlapEntries.map((entry) =>
+      format(parseISO(entry.payload.startDate), "yyyy-MM-dd"),
+    ),
   ).size;
 
   async function refreshPreviewContext() {
@@ -563,7 +564,10 @@ export function CreateScheduleGroupPanel({
   async function handleConfirmCreate() {
     if (!createPreview) return;
 
-    const created = await onCreate(createPreview.payloads, createPreview.options);
+    const created = await onCreate(
+      createPreview.payloads,
+      createPreview.options,
+    );
 
     if (created) {
       resetScheduleFields();
@@ -586,11 +590,7 @@ export function CreateScheduleGroupPanel({
   function validate(payloads = previewPayloads): string {
     if (!projectId) return "Bitte Projekt auswählen.";
     if (taskMode === "existing" && !taskId) return "Bitte Aufgabe auswählen.";
-    if (
-      taskMode === "auto" &&
-      autoTaskSource === "existing" &&
-      !taskId
-    )
+    if (taskMode === "auto" && autoTaskSource === "existing" && !taskId)
       return "Bitte Aufgabe für Auto Plan auswählen.";
     if (
       (taskMode === "new" ||
@@ -620,436 +620,448 @@ export function CreateScheduleGroupPanel({
 
   return (
     <>
-    <form
-      className="panel create-panel"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void handlePreviewRequest();
-      }}
-    >
-      <div className="panel-header">
-        <div>
-          <p className="eyebrow">Workflow</p>
-          <h2>Blocker anlegen</h2>
-        </div>
-        {workflowToggle}
-      </div>
-
-      <div className="create-grid project-selection-grid">
-        <div className="form-row">
-          <label htmlFor="create-project-type">Statustyp</label>
-          <SearchableSelect
-            buttonId="create-project-type"
-            value={projectTypeFilter}
-            disabled={isLoadingProjects}
-            options={projectTypeOptions}
-            placeholder="Statustyp auswählen"
-            searchPlaceholder={formatSearchPlaceholder(
-              "Typ filtern",
-              projectTypeOptions.length,
-            )}
-            emptyLabel="Keine Typen gefunden"
-            onChange={(value) => {
-              setProjectTypeFilter(value);
-              setProjectStatusFilter(PROJECT_FILTER_ACTIVE);
-              setProjectId("");
-              setTaskId("");
-              setTaskStatusFilter(TASK_FILTER_ALL);
-              setNewTaskName("");
-            }}
-          />
-        </div>
-        <div className="form-row">
-          <label htmlFor="create-project-status">Projektstatus</label>
-          <SearchableSelect
-            buttonId="create-project-status"
-            value={projectStatusFilter}
-            disabled={isLoadingProjects}
-            options={projectStatusOptions}
-            placeholder="Projektstatus auswählen"
-            searchPlaceholder={formatSearchPlaceholder(
-              "Status filtern",
-              projectStatusOptions.length,
-            )}
-            emptyLabel="Keine Status gefunden"
-            onChange={(value) => {
-              setProjectStatusFilter(value);
-              setProjectId("");
-              setTaskId("");
-              setTaskStatusFilter(TASK_FILTER_ALL);
-              setNewTaskName("");
-            }}
-          />
+      <form
+        className="panel create-panel"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handlePreviewRequest();
+        }}
+      >
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Workflow</p>
+            <h2>Blocker anlegen</h2>
+          </div>
+          {workflowToggle}
         </div>
 
-        <div className="form-row">
-          <label htmlFor="create-project">Projekt</label>
-          <SearchableSelect
-            buttonId="create-project"
-            value={projectId}
-            disabled={isLoadingProjects}
-            options={projectOptions}
-            placeholder={
-              isLoadingProjects
-                ? "Projekte werden geladen..."
-                : "Projekt auswählen"
-            }
-            searchPlaceholder={formatSearchPlaceholder(
-              "Projekte filtern",
-              projectOptions.length,
-            )}
-            emptyLabel="Keine Projekte gefunden"
-            onChange={(value) => void handleProjectChange(value)}
-          />
-        </div>
-        <div className="form-row form-row-col2">
-          <label htmlFor="create-only-my-projects" className="checkbox-row">
-            <input
-              id="create-only-my-projects"
-              type="checkbox"
-              checked={onlyMyProjects}
-              disabled={myAssignedProjectIds.size === 0}
-              onChange={(event) =>
-                handleOnlyMyProjectsChange(event.target.checked)
-              }
+        <div className="create-grid project-selection-grid">
+          <div className="form-row">
+            <label htmlFor="create-project-type">Statustyp</label>
+            <SearchableSelect
+              buttonId="create-project-type"
+              value={projectTypeFilter}
+              disabled={isLoadingProjects}
+              options={projectTypeOptions}
+              placeholder="Statustyp auswählen"
+              searchPlaceholder={formatSearchPlaceholder(
+                "Typ filtern",
+                projectTypeOptions.length,
+              )}
+              emptyLabel="Keine Typen gefunden"
+              onChange={(value) => {
+                setProjectTypeFilter(value);
+                setProjectStatusFilter(PROJECT_FILTER_ACTIVE);
+                setProjectId("");
+                setTaskId("");
+                setTaskStatusFilter(TASK_FILTER_ALL);
+                setNewTaskName("");
+              }}
             />
-            <span>Nur mir zugewiesene Projekte</span>
-          </label>
-        </div>
-      </div>
+          </div>
+          <div className="form-row">
+            <label htmlFor="create-project-status">Projektstatus</label>
+            <SearchableSelect
+              buttonId="create-project-status"
+              value={projectStatusFilter}
+              disabled={isLoadingProjects}
+              options={projectStatusOptions}
+              placeholder="Projektstatus auswählen"
+              searchPlaceholder={formatSearchPlaceholder(
+                "Status filtern",
+                projectStatusOptions.length,
+              )}
+              emptyLabel="Keine Status gefunden"
+              onChange={(value) => {
+                setProjectStatusFilter(value);
+                setProjectId("");
+                setTaskId("");
+                setTaskStatusFilter(TASK_FILTER_ALL);
+                setNewTaskName("");
+              }}
+            />
+          </div>
 
-      <div className="create-grid task-mode-grid">
-        <div className="form-row task-mode-row">
-          <label>Aufgabe</label>
-          <SegmentedControl
-            value={taskMode}
-            options={taskModeOptions}
-            ariaLabel="Aufgabenmodus"
-            disabled={!projectId}
-            onChange={handleTaskModeChange}
-          />
-        </div>
-      </div>
-
-      <div className="create-grid task-details-grid">
-        {taskMode === "existing" ? (
-          <>
-            <div className="form-row">
-              <label htmlFor="create-task-status">Aufgabenstatus</label>
-              <SearchableSelect
-                buttonId="create-task-status"
-                value={taskStatusFilter}
-                disabled={!projectId || isLoadingTasks}
-                options={taskStatusOptions}
-                placeholder="Aufgabenstatus auswählen"
-                searchPlaceholder={formatSearchPlaceholder(
-                  "Status filtern",
-                  taskStatusOptions.length,
-                )}
-                emptyLabel="Keine Status gefunden"
-                onChange={(value) => {
-                  setTaskStatusFilter(value);
-                  setTaskId("");
-                }}
-              />
-            </div>
-
-            <div className="form-row">
-              <label htmlFor="create-task">Aufgabe</label>
-              <SearchableSelect
-                buttonId="create-task"
-                value={taskId}
-                disabled={!projectId || isLoadingTasks}
-                options={taskOptions}
-                placeholder={
-                  isLoadingTasks
-                    ? "Aufgaben werden geladen..."
-                    : "Aufgabe auswählen"
+          <div className="form-row">
+            <label htmlFor="create-project">Projekt</label>
+            <SearchableSelect
+              buttonId="create-project"
+              value={projectId}
+              disabled={isLoadingProjects}
+              options={projectOptions}
+              placeholder={
+                isLoadingProjects
+                  ? "Projekte werden geladen..."
+                  : "Projekt auswählen"
+              }
+              searchPlaceholder={formatSearchPlaceholder(
+                "Projekte filtern",
+                projectOptions.length,
+              )}
+              emptyLabel="Keine Projekte gefunden"
+              onChange={(value) => void handleProjectChange(value)}
+            />
+          </div>
+          <div className="form-row project-toggle-row">
+            <label htmlFor="create-only-my-projects" className="checkbox-row">
+              <input
+                id="create-only-my-projects"
+                type="checkbox"
+                checked={onlyMyProjects}
+                disabled={myAssignedProjectIds.size === 0}
+                onChange={(event) =>
+                  handleOnlyMyProjectsChange(event.target.checked)
                 }
-                searchPlaceholder={formatSearchPlaceholder(
-                  "Aufgaben filtern",
-                  taskOptions.length,
-                )}
-                emptyLabel="Keine Aufgaben gefunden"
-                onChange={setTaskId}
               />
-            </div>
-            <div className="form-row form-row-col2">
-              <label
-                htmlFor="create-only-my-assigned-tasks"
-                className="checkbox-row"
-              >
-                <input
-                  id="create-only-my-assigned-tasks"
-                  type="checkbox"
-                  checked={onlyMyAssignedTasks}
-                  disabled={myAssignedTaskIds.size === 0 || !projectId}
-                  onChange={(event) =>
-                    handleOnlyMyAssignedTasksChange(event.target.checked)
-                  }
-                />
-                <span>Nur mir zugewiesene Aufgaben</span>
-              </label>
-            </div>
-          </>
-        ) : taskMode === "auto" ? (
-          <>
-            <div className="form-row task-mode-row form-row-full auto-task-source-row">
-              <label>Auto-Plan Aufgabe</label>
-              <SegmentedControl
-                value={autoTaskSource}
-                options={autoTaskSourceOptions}
-                ariaLabel="Auto-Plan Aufgabe"
-                disabled={!projectId}
-                onChange={(value) => {
-                  setAutoTaskSource(value);
-                  setTaskId("");
-                  setNewTaskName("");
-                  setError("");
-                }}
-              />
-            </div>
-            <div className="form-row form-row-full auto-plan-info-inline-row">
-              <button
-                type="button"
-                className="auto-plan-info-link"
-                onClick={() => setIsAutoPlanInfoOpen(true)}
-              >
-                <span className="auto-plan-info-link-icon" aria-hidden="true">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <circle
-                      cx="7"
-                      cy="7"
-                      r="5.25"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    />
-                    <path
-                      d="M7 6.1v3M7 4.45h.01"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </span>
-                <span>Was ist Auto Plan?</span>
-              </button>
-            </div>
-            {autoTaskSource === "existing" ? (
-              <>
-                <div className="form-row">
-                  <label htmlFor="create-auto-task-status">Aufgabenstatus</label>
-                  <SearchableSelect
-                    buttonId="create-auto-task-status"
-                    value={taskStatusFilter}
-                    disabled={!projectId || isLoadingTasks}
-                    options={taskStatusOptions}
-                    placeholder="Aufgabenstatus auswählen"
-                    searchPlaceholder={formatSearchPlaceholder(
-                      "Status filtern",
-                      taskStatusOptions.length,
-                    )}
-                    emptyLabel="Keine Status gefunden"
-                    onChange={(value) => {
-                      setTaskStatusFilter(value);
-                      setTaskId("");
-                    }}
-                  />
-                </div>
+              <span>Nur mir zugewiesene Projekte</span>
+            </label>
+          </div>
+        </div>
 
-                <div className="form-row">
-                  <label htmlFor="create-auto-task">Aufgabe</label>
-                  <SearchableSelect
-                    buttonId="create-auto-task"
-                    value={taskId}
-                    disabled={!projectId || isLoadingTasks}
-                    options={taskOptions}
-                    placeholder={
-                      isLoadingTasks
-                        ? "Aufgaben werden geladen..."
-                        : "Aufgabe auswählen"
-                    }
-                    searchPlaceholder={formatSearchPlaceholder(
-                      "Aufgaben filtern",
-                      taskOptions.length,
-                    )}
-                    emptyLabel="Keine Aufgaben gefunden"
-                    onChange={setTaskId}
-                  />
-                </div>
-                <div className="form-row form-row-col2">
-                  <label
-                    htmlFor="create-auto-only-my-assigned-tasks"
-                    className="checkbox-row"
-                  >
-                    <input
-                      id="create-auto-only-my-assigned-tasks"
-                      type="checkbox"
-                      checked={onlyMyAssignedTasks}
-                      disabled={myAssignedTaskIds.size === 0 || !projectId}
-                      onChange={(event) =>
-                        handleOnlyMyAssignedTasksChange(event.target.checked)
-                      }
-                    />
-                    <span>Nur mir zugewiesene Aufgaben</span>
-                  </label>
-                </div>
-              </>
-            ) : (
-              <div className="form-row form-row-full">
-                <label htmlFor="create-auto-new-task-name">
-                  Neuer Aufgabenname
-                </label>
-                <input
-                  id="create-auto-new-task-name"
-                  type="text"
-                  value={newTaskName}
-                  disabled={!projectId}
-                  placeholder="z.B. Implementierungs-Blocker"
-                  onChange={(event) => setNewTaskName(event.target.value)}
+        <div className="create-grid task-mode-grid">
+          <div className="form-row task-mode-row">
+            <label>Aufgabe</label>
+            <SegmentedControl
+              value={taskMode}
+              options={taskModeOptions}
+              ariaLabel="Aufgabenmodus"
+              disabled={!projectId}
+              onChange={handleTaskModeChange}
+            />
+          </div>
+        </div>
+
+        <div className="create-grid task-details-grid">
+          {taskMode === "existing" ? (
+            <>
+              <div className="form-row">
+                <label htmlFor="create-task-status">Aufgabenstatus</label>
+                <SearchableSelect
+                  buttonId="create-task-status"
+                  value={taskStatusFilter}
+                  disabled={!projectId || isLoadingTasks}
+                  options={taskStatusOptions}
+                  placeholder="Aufgabenstatus auswählen"
+                  searchPlaceholder={formatSearchPlaceholder(
+                    "Status filtern",
+                    taskStatusOptions.length,
+                  )}
+                  emptyLabel="Keine Status gefunden"
+                  onChange={(value) => {
+                    setTaskStatusFilter(value);
+                    setTaskId("");
+                  }}
                 />
               </div>
-            )}
-          </>
-        ) : (
-          <div className="form-row form-row-full">
-            <label htmlFor="create-new-task-name">Neuer Aufgabenname</label>
-            <input
-              id="create-new-task-name"
-              type="text"
-              value={newTaskName}
-              disabled={!projectId}
-              placeholder="z.B. Implementierungs-Blocker"
-              onChange={(event) => setNewTaskName(event.target.value)}
-            />
-          </div>
-        )}
-      </div>
 
-      <div className="create-grid schedule-fields-grid">
-        {taskMode === "auto" ? (
-          <>
+              <div className="form-row">
+                <label htmlFor="create-task">Aufgabe</label>
+                <SearchableSelect
+                  buttonId="create-task"
+                  value={taskId}
+                  disabled={!projectId || isLoadingTasks}
+                  options={taskOptions}
+                  placeholder={
+                    isLoadingTasks
+                      ? "Aufgaben werden geladen..."
+                      : "Aufgabe auswählen"
+                  }
+                  searchPlaceholder={formatSearchPlaceholder(
+                    "Aufgaben filtern",
+                    taskOptions.length,
+                  )}
+                  emptyLabel="Keine Aufgaben gefunden"
+                  onChange={setTaskId}
+                />
+              </div>
+              <div className="form-row form-row-col2">
+                <label
+                  htmlFor="create-only-my-assigned-tasks"
+                  className="checkbox-row"
+                >
+                  <input
+                    id="create-only-my-assigned-tasks"
+                    type="checkbox"
+                    checked={onlyMyAssignedTasks}
+                    disabled={myAssignedTaskIds.size === 0 || !projectId}
+                    onChange={(event) =>
+                      handleOnlyMyAssignedTasksChange(event.target.checked)
+                    }
+                  />
+                  <span>Nur mir zugewiesene Aufgaben</span>
+                </label>
+              </div>
+            </>
+          ) : taskMode === "auto" ? (
+            <>
+              <div className="form-row task-mode-row form-row-full auto-task-source-row">
+                <label>Auto-Plan Aufgabe</label>
+                <SegmentedControl
+                  value={autoTaskSource}
+                  options={autoTaskSourceOptions}
+                  ariaLabel="Auto-Plan Aufgabe"
+                  disabled={!projectId}
+                  onChange={(value) => {
+                    setAutoTaskSource(value);
+                    setTaskId("");
+                    setNewTaskName("");
+                    setError("");
+                  }}
+                />
+              </div>
+              <div className="form-row form-row-full auto-plan-info-inline-row">
+                <button
+                  type="button"
+                  className="auto-plan-info-link"
+                  onClick={() => setIsAutoPlanInfoOpen(true)}
+                >
+                  <span className="auto-plan-info-link-icon" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle
+                        cx="7"
+                        cy="7"
+                        r="5.25"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <path
+                        d="M7 6.1v3M7 4.45h.01"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </span>
+                  <span>Was ist Auto Plan?</span>
+                </button>
+              </div>
+              {autoTaskSource === "existing" ? (
+                <>
+                  <div className="form-row">
+                    <label htmlFor="create-auto-task-status">
+                      Aufgabenstatus
+                    </label>
+                    <SearchableSelect
+                      buttonId="create-auto-task-status"
+                      value={taskStatusFilter}
+                      disabled={!projectId || isLoadingTasks}
+                      options={taskStatusOptions}
+                      placeholder="Aufgabenstatus auswählen"
+                      searchPlaceholder={formatSearchPlaceholder(
+                        "Status filtern",
+                        taskStatusOptions.length,
+                      )}
+                      emptyLabel="Keine Status gefunden"
+                      onChange={(value) => {
+                        setTaskStatusFilter(value);
+                        setTaskId("");
+                      }}
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <label htmlFor="create-auto-task">Aufgabe</label>
+                    <SearchableSelect
+                      buttonId="create-auto-task"
+                      value={taskId}
+                      disabled={!projectId || isLoadingTasks}
+                      options={taskOptions}
+                      placeholder={
+                        isLoadingTasks
+                          ? "Aufgaben werden geladen..."
+                          : "Aufgabe auswählen"
+                      }
+                      searchPlaceholder={formatSearchPlaceholder(
+                        "Aufgaben filtern",
+                        taskOptions.length,
+                      )}
+                      emptyLabel="Keine Aufgaben gefunden"
+                      onChange={setTaskId}
+                    />
+                  </div>
+                  <div className="form-row form-row-col2">
+                    <label
+                      htmlFor="create-auto-only-my-assigned-tasks"
+                      className="checkbox-row"
+                    >
+                      <input
+                        id="create-auto-only-my-assigned-tasks"
+                        type="checkbox"
+                        checked={onlyMyAssignedTasks}
+                        disabled={myAssignedTaskIds.size === 0 || !projectId}
+                        onChange={(event) =>
+                          handleOnlyMyAssignedTasksChange(event.target.checked)
+                        }
+                      />
+                      <span>Nur mir zugewiesene Aufgaben</span>
+                    </label>
+                  </div>
+                </>
+              ) : (
+                <div className="form-row form-row-full">
+                  <label htmlFor="create-auto-new-task-name">
+                    Neuer Aufgabenname
+                  </label>
+                  <input
+                    id="create-auto-new-task-name"
+                    type="text"
+                    value={newTaskName}
+                    disabled={!projectId}
+                    placeholder="z.B. Implementierungs-Blocker"
+                    onChange={(event) => setNewTaskName(event.target.value)}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="form-row form-row-full">
+              <label htmlFor="create-new-task-name">Neuer Aufgabenname</label>
+              <input
+                id="create-new-task-name"
+                type="text"
+                value={newTaskName}
+                disabled={!projectId}
+                placeholder="z.B. Implementierungs-Blocker"
+                onChange={(event) => setNewTaskName(event.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="create-grid schedule-fields-grid">
+          {taskMode === "auto" ? (
+            <>
+              <div className="form-row">
+                <label htmlFor="create-auto-weekdays">Wochentage</label>
+                <MultiSearchableSelect
+                  buttonId="create-auto-weekdays"
+                  values={selectedAutoWeekdays}
+                  options={weekdays
+                    .filter((day) => day.value >= 1 && day.value <= 5)
+                    .map((day) => ({
+                      value: String(day.value),
+                      label: day.label,
+                    }))}
+                  placeholder="Wochentage auswählen"
+                  searchPlaceholder="Wochentage filtern (5 gefunden)"
+                  emptyLabel="Kein Wochentag gefunden."
+                  menuWidth="compact"
+                  selectedLabel={(count) =>
+                    `${count} Wochentag${count === 1 ? "" : "e"} ausgewählt`
+                  }
+                  onChange={setSelectedAutoWeekdays}
+                />
+              </div>
+              <div className="form-row">
+                <label htmlFor="create-auto-hours">Stunden pro Woche</label>
+                <input
+                  id="create-auto-hours"
+                  type="text"
+                  inputMode="decimal"
+                  value={autoPlanHours}
+                  placeholder="z.B. 5,5"
+                  onChange={(event) => setAutoPlanHours(event.target.value)}
+                />
+              </div>
+            </>
+          ) : (
             <div className="form-row">
-              <label htmlFor="create-auto-weekdays">Wochentage</label>
-              <MultiSearchableSelect
-                buttonId="create-auto-weekdays"
-                values={selectedAutoWeekdays}
-                options={weekdays
-                  .filter((day) => day.value >= 1 && day.value <= 5)
-                  .map((day) => ({
-                    value: String(day.value),
-                    label: day.label,
-                  }))}
-                placeholder="Wochentage auswählen"
-                searchPlaceholder="Wochentage filtern (5 gefunden)"
+              <label htmlFor="create-weekday">Wochentag</label>
+              <SearchableSelect
+                buttonId="create-weekday"
+                value={String(weekday)}
+                options={weekdays.map((day) => ({
+                  value: String(day.value),
+                  label: day.label,
+                }))}
+                placeholder="Wochentag auswählen"
+                searchPlaceholder="Wochentage filtern (7 gefunden)"
                 emptyLabel="Kein Wochentag gefunden."
                 menuWidth="compact"
-                selectedLabel={(count) =>
-                  `${count} Wochentag${count === 1 ? "" : "e"} ausgewählt`
-                }
-                onChange={setSelectedAutoWeekdays}
+                onChange={(value) => setWeekday(Number(value))}
               />
             </div>
-            <div className="form-row">
-              <label htmlFor="create-auto-hours">Stunden pro Woche</label>
-              <input
-                id="create-auto-hours"
-                type="text"
-                inputMode="decimal"
-                value={autoPlanHours}
-                placeholder="z.B. 5,5"
-                onChange={(event) => setAutoPlanHours(event.target.value)}
-              />
-            </div>
-          </>
-        ) : (
+          )}
           <div className="form-row">
-            <label htmlFor="create-weekday">Wochentag</label>
-            <SearchableSelect
-              buttonId="create-weekday"
-              value={String(weekday)}
-              options={weekdays.map((day) => ({
-                value: String(day.value),
-                label: day.label,
-              }))}
-              placeholder="Wochentag auswählen"
-              searchPlaceholder="Wochentage filtern (7 gefunden)"
-              emptyLabel="Kein Wochentag gefunden."
-              menuWidth="compact"
-              onChange={(value) => setWeekday(Number(value))}
+            <label htmlFor="create-from">Von</label>
+            <DatePickerInput
+              id="create-from"
+              value={from}
+              absenceRanges={absenceRanges}
+              onChange={setFrom}
             />
           </div>
-        )}
-        <div className="form-row">
-          <label htmlFor="create-from">Von</label>
-          <DatePickerInput id="create-from" value={from} absenceRanges={absenceRanges} onChange={setFrom} />
+          <div className="form-row">
+            <label htmlFor="create-to">Bis</label>
+            <DatePickerInput
+              id="create-to"
+              value={to}
+              absenceRanges={absenceRanges}
+              onChange={setTo}
+            />
+          </div>
+          <div className="form-row">
+            <label htmlFor="create-start">Start</label>
+            <input
+              id="create-start"
+              type="time"
+              value={startTime}
+              onChange={(event) => setStartTime(event.target.value)}
+            />
+          </div>
+          <div className="form-row">
+            <label htmlFor="create-end">Ende</label>
+            <input
+              id="create-end"
+              type="time"
+              value={endTime}
+              onChange={(event) => setEndTime(event.target.value)}
+            />
+          </div>
         </div>
-        <div className="form-row">
-          <label htmlFor="create-to">Bis</label>
-          <DatePickerInput id="create-to" value={to} absenceRanges={absenceRanges} onChange={setTo} />
-        </div>
-        <div className="form-row">
-          <label htmlFor="create-start">Start</label>
-          <input
-            id="create-start"
-            type="time"
-            value={startTime}
-            onChange={(event) => setStartTime(event.target.value)}
+
+        {overlapEntries.length > 0 && taskMode !== "auto" ? (
+          <div className="alert alert-warning">
+            {overlapEntries.length} Blocker überschneiden sich mit bestehenden
+            Blockern an {overlapDateCount} Tag
+            {overlapDateCount === 1 ? "" : "en"}. Anlegen bleibt möglich.
+          </div>
+        ) : null}
+
+        {taskMode === "auto" ? (
+          <AutoPlanPreview
+            projectName={selectedProject?.name}
+            taskName={effectiveTaskName}
+            userName={formatUserName(currentUser)}
+            result={autoPlanResult}
+            isLoading={isLoadingContext}
           />
-        </div>
-        <div className="form-row">
-          <label htmlFor="create-end">Ende</label>
-          <input
-            id="create-end"
-            type="time"
-            value={endTime}
-            onChange={(event) => setEndTime(event.target.value)}
-          />
-        </div>
-      </div>
-
-      {overlapEntries.length > 0 && taskMode !== "auto" ? (
-        <div className="alert alert-warning">
-          {overlapEntries.length} Blocker überschneiden sich mit bestehenden
-          Blockern an {overlapDateCount} Tag{overlapDateCount === 1 ? "" : "en"}.
-          Anlegen bleibt möglich.
-        </div>
-      ) : null}
-
-      {taskMode === "auto" ? (
-        <AutoPlanPreview
-          projectName={selectedProject?.name}
-          taskName={effectiveTaskName}
-          userName={formatUserName(currentUser)}
-              result={autoPlanResult}
-              isLoading={isLoadingContext}
-        />
-      ) : (
-        <RegularPreview
-          projectName={selectedProject?.name}
-          taskName={effectiveTaskName}
-          payloads={previewPayloads}
-          totalMinutes={totalMinutes}
-          overlaps={overlapEntries}
-          isLoading={isLoadingContext}
-        />
-      )}
-
-      <button
-        type="submit"
-        className="primary-button"
-        disabled={isCreating || isPreparingPreview}
-      >
-        {isPreparingPreview ? (
-          <>
-            <span className="button-spinner" aria-hidden="true" />
-            Vorschau wird erstellt...
-          </>
         ) : (
-          "Vorschau anzeigen"
+          <RegularPreview
+            projectName={selectedProject?.name}
+            taskName={effectiveTaskName}
+            payloads={previewPayloads}
+            totalMinutes={totalMinutes}
+            overlaps={overlapEntries}
+            isLoading={isLoadingContext}
+          />
         )}
-      </button>
-    </form>
+
+        <button
+          type="submit"
+          className="primary-button"
+          disabled={isCreating || isPreparingPreview}
+        >
+          {isPreparingPreview ? (
+            <>
+              <span className="button-spinner" aria-hidden="true" />
+              Vorschau wird erstellt...
+            </>
+          ) : (
+            "Vorschau anzeigen"
+          )}
+        </button>
+      </form>
       {createPreview ? (
         <CreateSubmitPreviewModal
           preview={createPreview}
@@ -1080,8 +1092,7 @@ function getCreateActionLabel(
   taskMode: TaskMode,
   autoTaskSource: AutoTaskSource,
 ): string {
-  return taskMode === "new" ||
-    (taskMode === "auto" && autoTaskSource === "new")
+  return taskMode === "new" || (taskMode === "auto" && autoTaskSource === "new")
     ? "Aufgabe und Blocker anlegen"
     : "Blocker anlegen";
 }
@@ -1202,7 +1213,9 @@ function CreateSubmitPreviewModal({
         <span>{formatMinutesAsHours(preview.totalMinutes)} geplant</span>
         {preview.autoPlanResult ? (
           <span>
-            {formatMinutesAsHours(preview.autoPlanResult.weeklyRequestedMinutes)}{" "}
+            {formatMinutesAsHours(
+              preview.autoPlanResult.weeklyRequestedMinutes,
+            )}{" "}
             pro Woche
           </span>
         ) : null}
@@ -1385,11 +1398,7 @@ function AutoPlanPreview({
     : result.skippedDays.slice(0, 12);
   const hiddenSkippedDayCount =
     result.skippedDays.length - visibleSkippedDays.length;
-  const overallState = isEmpty
-    ? "empty"
-    : isPartial
-      ? "partial"
-      : "success";
+  const overallState = isEmpty ? "empty" : isPartial ? "partial" : "success";
 
   useEffect(() => {
     setShowAllSkippedDays(false);
@@ -1425,8 +1434,12 @@ function AutoPlanPreview({
         <span>
           {formatMinutesAsHours(result.weeklyRequestedMinutes)} pro Woche
         </span>
-        <span>{result.weeks.length} Woche{result.weeks.length === 1 ? "" : "n"}</span>
-        <span>{formatMinutesAsHours(result.requestedMinutes)} gesamt gewünscht</span>
+        <span>
+          {result.weeks.length} Woche{result.weeks.length === 1 ? "" : "n"}
+        </span>
+        <span>
+          {formatMinutesAsHours(result.requestedMinutes)} gesamt gewünscht
+        </span>
         <span>{formatMinutesAsHours(result.plannedMinutes)} geplant</span>
         <span>{result.payloads.length} Blocker</span>
         {result.remainingMinutes > 0 ? (
@@ -1447,10 +1460,7 @@ function AutoPlanPreview({
       ) : null}
       <div className="auto-plan-days">
         {result.weeks.map((week) => (
-          <AutoPlanWeekPreview
-            key={week.weekStart.toISOString()}
-            week={week}
-          />
+          <AutoPlanWeekPreview key={week.weekStart.toISOString()} week={week} />
         ))}
         {result.weeks.length === 0 || result.days.length === 0 ? (
           <div className="preview-row preview-row-warning">
@@ -1551,7 +1561,9 @@ function AutoPlanDayPreview({ day }: { day: AutoPlanDay }) {
     <div className="auto-plan-day">
       <div className="auto-plan-day-head">
         <div className="auto-plan-day-title">
-          <strong>{format(day.date, "EEEE, dd.MM.yyyy", { locale: de })}</strong>
+          <strong>
+            {format(day.date, "EEEE, dd.MM.yyyy", { locale: de })}
+          </strong>
           <div className="auto-plan-day-metrics">
             {day.capacityMinutes !== undefined ? (
               <span>{formatMinutesAsHours(day.capacityMinutes)} Kapazität</span>
@@ -1566,7 +1578,10 @@ function AutoPlanDayPreview({ day }: { day: AutoPlanDay }) {
           <span>{formatMinutesAsHours(day.plannedMinutes)} geplant</span>
           <div className="auto-plan-payloads">
             {day.plannedPayloads.map((payload) => (
-              <strong key={payload.startDate} className="auto-plan-payload-chip">
+              <strong
+                key={payload.startDate}
+                className="auto-plan-payload-chip"
+              >
                 {formatPayloadTimeWindow(payload)}
               </strong>
             ))}
@@ -1584,7 +1599,9 @@ function AutoPlanDayPreview({ day }: { day: AutoPlanDay }) {
             </em>
           ))}
           {day.existingSchedules.length > existingPreview.length ? (
-            <em>+{day.existingSchedules.length - existingPreview.length} weitere</em>
+            <em>
+              +{day.existingSchedules.length - existingPreview.length} weitere
+            </em>
           ) : null}
         </div>
       ) : null}
