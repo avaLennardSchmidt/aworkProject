@@ -140,7 +140,6 @@ export function DatePickerInput({
   function selectDay(date: Date) {
     onChange(toIso(date));
     setViewMonth(startOfMonth(date));
-    close();
   }
 
   function selectMonthYear(month: number, year: number) {
