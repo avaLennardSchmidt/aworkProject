@@ -934,8 +934,15 @@ select:disabled {
 .analysis-absence-warning,
 .empty-state-hint,
 .field-hint,
-.loading-state {
+.loading-state,
+.loading-text-hint {
   animation: pop-in 0.2s ease-out;
+}
+
+.loading-text-hint {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  margin: 8px 0;
 }
 
 .analysis-summary-card,

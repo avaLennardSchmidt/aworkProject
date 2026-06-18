@@ -1665,7 +1665,6 @@ function buildTaskStatusOptions(tasks: AworkProjectTask[]): SelectOption[] {
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
-}
 
 function statusFilterValue(
   item: AworkProject | AworkProjectTask,

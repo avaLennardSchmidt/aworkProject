@@ -1003,7 +1003,7 @@ function App() {
           />
 
           {isLoadingSchedules ? (
-            <LoadingState label="Geplante Aufgaben werden geladen..." />
+            <p className="loading-text-hint">Geplante Aufgaben werden geladen...</p>
           ) : null}
           {scheduleRefreshNotice ? (
             <div className="refresh-notice" aria-live="polite">
