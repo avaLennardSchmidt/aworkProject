@@ -1,4 +1,9 @@
-import { useId, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { motion } from "motion/react";
 
 export interface SegmentedOption<T extends string> {
@@ -22,15 +27,73 @@ export function SegmentedControl<T extends string>({
   disabled,
   onChange,
 }: SegmentedControlProps<T>) {
-  const id = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef(new Map<T, HTMLButtonElement | null>());
+  const [indicator, setIndicator] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    function updateIndicator() {
+      const activeButton = buttonRefs.current.get(value);
+      if (!activeButton) {
+        setIndicator(null);
+        return;
+      }
+
+      setIndicator({
+        left: activeButton.offsetLeft,
+        top: activeButton.offsetTop,
+        width: activeButton.offsetWidth,
+        height: activeButton.offsetHeight,
+      });
+    }
+
+    updateIndicator();
+
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => updateIndicator());
+    resizeObserver.observe(container);
+    buttonRefs.current.forEach((button) => {
+      if (button) {
+        resizeObserver.observe(button);
+      }
+    });
+
+    return () => resizeObserver.disconnect();
+  }, [options, value]);
 
   return (
-    <div className="segmented-control" role="tablist" aria-label={ariaLabel}>
+    <div
+      ref={containerRef}
+      className="segmented-control"
+      role="tablist"
+      aria-label={ariaLabel}
+    >
+      {indicator ? (
+        <motion.span
+          className="segmented-indicator"
+          initial={false}
+          animate={indicator}
+          transition={{ type: "spring", stiffness: 520, damping: 40, mass: 0.8 }}
+          aria-hidden="true"
+        />
+      ) : null}
       {options.map((option) => {
         const isActive = option.value === value;
         return (
           <button
             key={option.value}
+            ref={(node) => {
+              buttonRefs.current.set(option.value, node);
+            }}
             type="button"
             role="tab"
             className={isActive ? "active" : ""}
@@ -38,14 +101,6 @@ export function SegmentedControl<T extends string>({
             aria-selected={isActive}
             onClick={() => onChange(option.value)}
           >
-            {isActive ? (
-              <motion.span
-                className="segmented-indicator"
-                layoutId={`${id}-indicator`}
-                transition={{ type: "spring", stiffness: 500, damping: 38 }}
-                aria-hidden="true"
-              />
-            ) : null}
             <span className="segmented-label">
               {option.icon}
               {option.label}

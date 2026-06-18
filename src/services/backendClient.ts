@@ -1,4 +1,5 @@
 import type {
+  AworkUserCapacity,
   AworkUser,
   CreateProjectTaskPayload,
   CreateTaskSchedulePayload,
@@ -163,6 +164,15 @@ export class BackendClient {
   async getUserAssignedTasks(userId: string): Promise<unknown> {
     return this.request<unknown>(
       `/api/users/${encodeURIComponent(userId)}/assignedtasks`,
+    );
+  }
+
+  async getUserCapacity(userId: string): Promise<AworkUserCapacity> {
+    return mapUserCapacity(
+      await this.request<unknown>(
+        `/api/users/${encodeURIComponent(userId)}/capacity`,
+      ),
+      userId,
     );
   }
 
@@ -381,6 +391,32 @@ function mapNullableUser(rawUser: unknown): AworkUser | undefined {
   } catch {
     return undefined;
   }
+}
+
+function mapUserCapacity(
+  rawCapacity: unknown,
+  fallbackUserId: string,
+): AworkUserCapacity {
+  const record = unwrapRecord(rawCapacity);
+  const weeklyCapacity = isRecord(record?.weeklyCapacity)
+    ? Object.fromEntries(
+        Object.entries(record.weeklyCapacity).filter(
+          ([, value]) => typeof value === "number",
+        ),
+      )
+    : undefined;
+
+  return {
+    userId:
+      record && typeof record.userId === "string"
+        ? record.userId
+        : fallbackUserId,
+    weeklyCapacity,
+    capacityPerWeek:
+      record && typeof record.capacityPerWeek === "number"
+        ? record.capacityPerWeek
+        : undefined,
+  };
 }
 
 function formatUserName(user: AworkUser): string {

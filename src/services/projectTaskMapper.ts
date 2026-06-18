@@ -32,6 +32,7 @@ function mapOneProjectTask(raw: unknown): AworkProjectTask | null {
     statusId: firstString(raw, ["taskStatusId", "statusId", "task.statusId", "task.taskStatusId", "taskStatus.id", "status.id"]),
     statusName: firstString(raw, ["taskStatus.name", "status.name", "task.taskStatus.name", "task.status.name", "statusName", "taskStatusName"]),
     statusType: firstString(raw, ["taskStatus.type", "status.type", "task.taskStatus.type", "task.status.type", "statusType", "taskStatusType"]),
+    statusIcon: firstString(raw, ["taskStatus.icon", "status.icon", "task.taskStatus.icon", "task.status.icon", "statusIcon", "taskStatusIcon"]),
     raw,
   };
 }

@@ -25,6 +25,7 @@ export interface AworkProjectTask {
   statusId?: string;
   statusName?: string;
   statusType?: string;
+  statusIcon?: string;
   raw: unknown;
 }
 

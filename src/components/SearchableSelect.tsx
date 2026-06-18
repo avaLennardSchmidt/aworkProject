@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
   type RefObject,
   type WheelEvent,
 } from "react";
@@ -14,6 +15,8 @@ import { fuzzyMatches } from "../services/fuzzySearch";
 export interface SelectOption {
   value: string;
   label: string;
+  /** Optional leading element (e.g. a status icon) shown before the label in the option list. */
+  icon?: ReactNode;
 }
 
 interface SearchableSelectProps {
@@ -37,6 +40,7 @@ interface MultiSearchableSelectProps {
   searchPlaceholder: string;
   emptyLabel: string;
   menuWidth?: "default" | "compact";
+  selectedLabel?: (count: number) => string;
   disabled?: boolean;
   onChange: (values: string[]) => void;
 }
@@ -196,6 +200,9 @@ export function SearchableSelect({
                 onMouseMove={() => setHighlightedIndex(index)}
                 onClick={() => selectOption(option.value)}
               >
+                {option.icon ? (
+                  <span className="select-option-icon">{option.icon}</span>
+                ) : null}
                 {option.label}
               </button>
             ))}
@@ -217,6 +224,7 @@ export function MultiSearchableSelect({
   searchPlaceholder,
   emptyLabel,
   menuWidth = "default",
+  selectedLabel,
   disabled,
   onChange,
 }: MultiSearchableSelectProps) {
@@ -317,7 +325,9 @@ export function MultiSearchableSelect({
       >
         <span>
           {selectedCount > 0
-            ? `${selectedCount} Team${selectedCount === 1 ? "" : "s"} ausgewählt`
+            ? selectedLabel
+              ? selectedLabel(selectedCount)
+              : `${selectedCount} Team${selectedCount === 1 ? "" : "s"} ausgewählt`
             : placeholder}
         </span>
       </button>

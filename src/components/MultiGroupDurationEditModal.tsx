@@ -9,6 +9,7 @@ import type {
 import { isOwnSchedule } from "../services/scheduleMapper";
 import { ModalShell } from "./ModalShell";
 import { SearchableSelect } from "./SearchableSelect";
+import { SegmentedControl } from "./SegmentedControl";
 import {
   calculateDurationMinutes,
   formatMinutesAsHours,
@@ -30,19 +31,19 @@ type Direction = "add" | "remove";
 type EditMode = "delta" | "shift" | "set-window";
 
 const editModeOptions = [
-  { value: "delta", label: "Zeit hinzufügen oder entfernen" },
-  { value: "shift", label: "Blocker verschieben" },
+  { value: "delta", label: "Dauer anpassen" },
+  { value: "shift", label: "Datum verschieben" },
   { value: "set-window", label: "Zeitfenster setzen" },
 ] as const;
 
 const durationDirectionOptions = [
-  { value: "add", label: "Zeit hinzufügen" },
-  { value: "remove", label: "Zeit entfernen" },
+  { value: "add", label: "Verlängern" },
+  { value: "remove", label: "Verkürzen" },
 ] as const;
 
 const moveDirectionOptions = [
   { value: "add", label: "Vorziehen" },
-  { value: "remove", label: "Nach hinten verschieben" },
+  { value: "remove", label: "Später legen" },
 ] as const;
 
 const weekdayOptions = [
@@ -267,47 +268,39 @@ export function MultiGroupDurationEditModal({
           <span>{formatMinutesAsHours(totalAfterMinutes)} nachher</span>
         </div>
 
+        <div className="multi-edit-mode-switch">
+          <label>Modus</label>
+          <SegmentedControl
+            value={editMode}
+            options={[...editModeOptions]}
+            ariaLabel="Mehrfach-Bearbeitungsmodus"
+            onChange={(value) => setEditMode(value as EditMode)}
+          />
+        </div>
+
         <div className="multi-edit-grid">
           <div className="multi-edit-row multi-edit-row-top">
-            <div className="form-row">
-              <label htmlFor="multi-mode">Modus</label>
-              <SearchableSelect
-                buttonId="multi-mode"
-                value={editMode}
-                options={[...editModeOptions]}
-                placeholder="Modus auswählen"
-                searchPlaceholder="Modus filtern (3 gefunden)"
-                emptyLabel="Kein Modus gefunden."
-                menuWidth="compact"
-                onChange={(value) => setEditMode(value as EditMode)}
-              />
-            </div>
-
             {isDurationEditMode ? (
-              <div className="form-row">
-                <label htmlFor="multi-direction">Änderung</label>
-                <SearchableSelect
-                  buttonId="multi-direction"
+              <div className="form-row form-row-full multi-edit-panel">
+                <label>
+                  {editMode === "shift"
+                    ? "Wie sollen die Blocker verschoben werden?"
+                    : "Wie soll die Dauer geändert werden?"}
+                </label>
+                <SegmentedControl
                   value={direction}
                   options={[
                     ...(editMode === "shift"
                       ? moveDirectionOptions
                       : durationDirectionOptions),
                   ]}
-                  placeholder="Änderung auswählen"
-                  searchPlaceholder={
-                    editMode === "shift"
-                      ? "Verschiebungen filtern (2 gefunden)"
-                      : "Änderungen filtern (2 gefunden)"
-                  }
-                  emptyLabel="Keine Änderung gefunden."
-                  menuWidth="compact"
+                  ariaLabel="Art der Änderung"
                   onChange={(value) => setDirection(value as Direction)}
                 />
               </div>
             ) : (
               <>
-                <div className="form-row">
+                <div className="form-row multi-edit-panel">
                   <label htmlFor="multi-window-start">Startzeit</label>
                   <input
                     id="multi-window-start"
@@ -316,7 +309,7 @@ export function MultiGroupDurationEditModal({
                     onChange={(event) => setWindowStartTime(event.target.value)}
                   />
                 </div>
-                <div className="form-row">
+                <div className="form-row multi-edit-panel">
                   <label htmlFor="multi-window-end">Endzeit</label>
                   <input
                     id="multi-window-end"
@@ -331,46 +324,61 @@ export function MultiGroupDurationEditModal({
 
           {isDurationEditMode ? (
             <div className="multi-edit-row multi-edit-row-duration">
-              <div className="form-row">
-                <label htmlFor="multi-days">Tage</label>
-                <input
-                  id="multi-days"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={days}
-                  onChange={(event) => setDays(event.target.value)}
-                />
+              <div className="form-row multi-edit-panel">
+                <label htmlFor="multi-days">
+                  {editMode === "shift"
+                    ? "Kalendertage"
+                    : "Tage"}
+                </label>
+                <div className="multi-edit-input-box">
+                  <input
+                    id="multi-days"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={days}
+                    onChange={(event) => setDays(event.target.value)}
+                  />
+                </div>
+                <p className="multi-edit-helper">
+                  {editMode === "shift"
+                    ? "Ändert das Datum um ganze Kalendertage, nicht einfach plus 24 Stunden."
+                    : "Optionaler Tagesanteil fuer die Aenderung pro Blocker."}
+                </p>
               </div>
-              <div className="form-row">
+              <div className="form-row multi-edit-panel">
                 <label htmlFor="multi-hours">Stunden</label>
-                <input
-                  id="multi-hours"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={hours}
-                  onChange={(event) => setHours(event.target.value)}
-                />
+                <div className="multi-edit-input-box">
+                  <input
+                    id="multi-hours"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={hours}
+                    onChange={(event) => setHours(event.target.value)}
+                  />
+                </div>
               </div>
-              <div className="form-row">
+              <div className="form-row multi-edit-panel">
                 <label htmlFor="multi-minutes">Minuten</label>
-                <input
-                  id="multi-minutes"
-                  type="number"
-                  min="0"
-                  max="59"
-                  step="5"
-                  value={minutes}
-                  onChange={(event) => setMinutes(event.target.value)}
-                />
+                <div className="multi-edit-input-box">
+                  <input
+                    id="multi-minutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    step="5"
+                    value={minutes}
+                    onChange={(event) => setMinutes(event.target.value)}
+                  />
+                </div>
               </div>
             </div>
           ) : null}
 
           {editMode !== "shift" ? (
             <div className="multi-edit-row multi-edit-row-weekday">
-              <div className="form-row">
+              <div className="form-row multi-edit-panel">
                 <label htmlFor="multi-weekday">Neuer Wochentag</label>
                 <SearchableSelect
                   buttonId="multi-weekday"
@@ -388,6 +396,9 @@ export function MultiGroupDurationEditModal({
                   menuWidth="compact"
                   onChange={setWeekdayOverride}
                 />
+                <p className="multi-edit-helper">
+                  Wenn gesetzt, werden die Blocker auf diesen Wochentag gelegt.
+                </p>
               </div>
             </div>
           ) : null}

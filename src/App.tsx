@@ -32,6 +32,7 @@ import type {
   AworkProject,
   AworkProjectTask,
   AworkTaskSchedule,
+  AworkUserCapacity,
   AworkUser,
   CreateTaskSchedulePayload,
 } from "./types/awork";
@@ -616,6 +617,42 @@ function App() {
     }
   }
 
+  async function loadCreateSchedules(
+    from: string,
+    to: string,
+  ): Promise<AworkTaskSchedule[]> {
+    if (!plannerUser) {
+      return [];
+    }
+
+    const response = await backendClient.getTaskSchedules({
+      from,
+      to,
+      userId: plannerUser.id,
+    });
+    const mapped = mapTaskSchedulesResponse(response);
+    const projectTasks = await loadMissingProjectTasks(
+      projectTasksForCreate,
+      mapped.schedules,
+    );
+
+    return enrichSchedulesWithProjectTasks(
+      mapped.schedules.map((schedule) => ({
+        ...schedule,
+        userId: plannerUser.id,
+      })),
+      projectTasks,
+    );
+  }
+
+  async function loadPlannerUserCapacity(): Promise<AworkUserCapacity | undefined> {
+    if (!plannerUser) {
+      return undefined;
+    }
+
+    return backendClient.getUserCapacity(plannerUser.id);
+  }
+
   async function createTaskSchedules(
     payloads: CreateTaskSchedulePayload[],
     options: CreateGroupOptions,
@@ -1017,6 +1054,8 @@ function App() {
           }
           onLoadProjects={loadProjects}
           onProjectChange={loadProjectTasks}
+          onLoadExistingSchedules={loadCreateSchedules}
+          onLoadUserCapacity={loadPlannerUserCapacity}
           onCreate={createTaskSchedules}
         />
       ) : workflow === "create" ? (
