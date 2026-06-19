@@ -580,7 +580,7 @@ function App() {
         backendClient.getTaskSchedules({
           from: filters.from,
           to: filters.to,
-          userId: selectedPlannerUserId || undefined,
+          userId: plannerUser.id,
         }),
         !selectedPlannerUserId
           ? backendClient.getMyProjectTasks()
@@ -620,7 +620,7 @@ function App() {
       const enrichedSchedules = enrichSchedulesWithProjectTasks(
         mapped.schedules.map((schedule) => ({
           ...schedule,
-          userId: selectedPlannerUserId ? plannerUser.id : schedule.userId,
+          userId: plannerUser.id,
         })),
         projectTasks,
       );
