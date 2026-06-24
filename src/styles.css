@@ -6031,7 +6031,6 @@ button.auto-plan-skipped-day:hover {
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   height: 100vh;
-  overflow: hidden;
   transition: width 0.22s ease;
   z-index: 100;
 }
