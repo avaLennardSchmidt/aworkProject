@@ -1,9 +1,4 @@
-import {
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 
 export interface SegmentedOption<T extends string> {
@@ -12,6 +7,7 @@ export interface SegmentedOption<T extends string> {
   icon?: ReactNode;
   className?: string;
   badgeText?: string;
+  badgeVariant?: "pill" | "dot";
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -84,7 +80,12 @@ export function SegmentedControl<T extends string>({
           className="segmented-indicator"
           initial={false}
           animate={indicator}
-          transition={{ type: "spring", stiffness: 520, damping: 40, mass: 0.8 }}
+          transition={{
+            type: "spring",
+            stiffness: 520,
+            damping: 40,
+            mass: 0.8,
+          }}
           aria-hidden="true"
         />
       ) : null}
@@ -108,8 +109,11 @@ export function SegmentedControl<T extends string>({
             <span className="segmented-label">
               {option.icon}
               {option.label}
-              {option.badgeText ? (
-                <span className="segmented-badge" aria-hidden="true">
+              {option.badgeText || option.badgeVariant === "dot" ? (
+                <span
+                  className={`segmented-badge${option.badgeVariant === "dot" ? " segmented-badge--dot" : ""}`}
+                  aria-hidden="true"
+                >
                   {option.badgeText}
                 </span>
               ) : null}

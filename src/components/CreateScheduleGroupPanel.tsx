@@ -260,8 +260,11 @@ export function CreateScheduleGroupPanel({
           pulseAutoPlan && option.value === "auto"
             ? "workflow-option-pulse"
             : undefined,
-        badgeText:
-          pulseAutoPlan && option.value === "auto" ? "NEU" : undefined,
+        badgeText: pulseAutoPlan && option.value === "auto" ? "" : undefined,
+        badgeVariant:
+          pulseAutoPlan && option.value === "auto"
+            ? ("dot" as const)
+            : undefined,
       })),
     [pulseAutoPlan],
   );
@@ -1548,7 +1551,10 @@ function AutoPlanPreview({
   const blockerCount = hasOverrides
     ? effectivePayloads.length
     : result.payloads.length;
-  const remainingMinutes = Math.max(0, result.requestedMinutes - plannedMinutes);
+  const remainingMinutes = Math.max(
+    0,
+    result.requestedMinutes - plannedMinutes,
+  );
   const isPartial = remainingMinutes > 0 && plannedMinutes > 0;
   const isEmpty = result.requestedMinutes > 0 && plannedMinutes === 0;
   const visibleSkippedDays = showAllSkippedDays
@@ -1725,9 +1731,25 @@ function AutoPlanWeekPreview({
             title="Blocker dieser Woche bearbeiten"
             onClick={onEdit}
           >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M10.9 2.1a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1l-6.7 6.7-2.8.7.7-2.8 6.7-6.7Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-              <path d="M9.6 3.4l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M10.9 2.1a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1l-6.7 6.7-2.8.7.7-2.8 6.7-6.7Z"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9.6 3.4l3 3"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         </div>

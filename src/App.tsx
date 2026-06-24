@@ -46,7 +46,6 @@ import type {
   UpdateResult,
 } from "./types/planner";
 import { BulkEditModal } from "./components/BulkEditModal";
-import { ConnectionPanel } from "./components/ConnectionPanel";
 import {
   CreateScheduleGroupPanel,
   type CreateGroupOptions,
@@ -58,15 +57,12 @@ import { FilterPanel } from "./components/FilterPanel";
 import { LoadingState } from "./components/LoadingState";
 import { ManualBlockerEditModal } from "./components/ManualBlockerEditModal";
 import { MultiGroupDurationEditModal } from "./components/MultiGroupDurationEditModal";
-import { PlannerUserSelector } from "./components/PlannerUserSelector";
 import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { BlockerOperationsPreviewModal } from "./components/BlockerOperationsPreviewModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
-import {
-  WorkflowChooser,
-  type PlannerWorkflow,
-} from "./components/WorkflowChooser";
+import type { PlannerWorkflow } from "./components/WorkflowChooser";
+import { Sidebar } from "./components/Sidebar";
 import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
 import { MonitoringModal } from "./components/MonitoringModal";
@@ -78,7 +74,8 @@ import { AnimatePresence, motion } from "motion/react";
 const backendClient = new BackendClient();
 const APP_ANNOUNCEMENT_VERSION = "2026.06";
 const FEATURE_KEYS = {
-  whatsNew: "whats-new-2026-06",
+  whatsNew: "whats-new-2026-06-tabellenansicht",
+  capacityTableView: "feature-capacity-tabellenansicht-v1",
   projectPlanIntro: "feature-project-einplanen-v1",
   autoPlanIntro: "feature-auto-plan-v1",
 } as const;
@@ -112,6 +109,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState<AworkUser>();
   const [selectedPlannerUserId, setSelectedPlannerUserId] = useState("");
   const [workflow, setWorkflow] = useState<PlannerWorkflow>("manage");
+  const [forceMainView, setForceMainView] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [scheduleRefreshNotice, setScheduleRefreshNotice] = useState("");
@@ -187,7 +185,7 @@ function App() {
     new Set(),
   );
   const [isMultiEditAvailable] = useState(true);
-  const isAnalysisRoute = isCapacityAnalysisRoute();
+  const isAnalysisRoute = !forceMainView && isCapacityAnalysisRoute();
 
   function consumeLoginRedirectFlag(): boolean {
     const wasRedirect =
@@ -295,6 +293,13 @@ function App() {
     }
   }
 
+  async function acknowledgeFeatures(featureKeys: readonly string[]) {
+    const uniqueFeatureKeys = Array.from(new Set(featureKeys));
+    for (const featureKey of uniqueFeatureKeys) {
+      await acknowledgeFeature(featureKey);
+    }
+  }
+
   function fireConfetti() {
     setConfettiTick((tick) => tick + 1);
   }
@@ -304,12 +309,17 @@ function App() {
     // Confetti only on the first open, while the "new" dot is still showing.
     if (featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.whatsNew)) {
       fireConfetti();
-      void acknowledgeFeature(FEATURE_KEYS.whatsNew);
     }
   }
 
   function handleWorkflowChange(nextWorkflow: PlannerWorkflow) {
     setWorkflow(nextWorkflow);
+    if (isAnalysisRoute) {
+      const url = new URL(globalThis.location.href);
+      url.searchParams.delete("view");
+      history.pushState({}, "", url.toString());
+      setForceMainView(true);
+    }
     if (
       nextWorkflow === "project" &&
       featureKeysLoaded &&
@@ -327,8 +337,8 @@ function App() {
     }
   }
 
-  async function confirmFeatureModal(featureKey: string) {
-    await acknowledgeFeature(featureKey);
+  async function confirmFeatureModal(featureKeys: readonly string[]) {
+    await acknowledgeFeatures(featureKeys);
     setActiveFeatureModal(null);
   }
 
@@ -338,12 +348,265 @@ function App() {
     featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro);
   const showWhatsNewDot =
     featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.whatsNew);
+  const showCapacityTableBadge =
+    featureKeysLoaded && !seenFeatureKeys.has(FEATURE_KEYS.capacityTableView);
+  const shouldShowLegacyWhatsNew =
+    featureKeysLoaded &&
+    (!seenFeatureKeys.has(FEATURE_KEYS.projectPlanIntro) ||
+      !seenFeatureKeys.has(FEATURE_KEYS.autoPlanIntro));
 
   useConfetti(confettiTick, {
     particleCount: 130,
     startVelocity: 32,
     spread: 80,
   });
+
+  const featureAnnouncementModal = activeFeatureModal ? (
+    <ModalShell
+      labelledBy="feature-announcement-title"
+      dialogClassName="modal feature-announcement-modal"
+      onClose={() => setActiveFeatureModal(null)}
+    >
+      <div className="modal-header feature-announcement-header">
+        <h2 id="feature-announcement-title">
+          {activeFeatureModal === "whats-new"
+            ? "What's New"
+            : activeFeatureModal === "project-plan"
+              ? "Neu: Projekt einplanen"
+              : "Neu: Auto Plan"}
+        </h2>
+        <button
+          type="button"
+          className="ghost-button feature-announcement-close"
+          onClick={() => setActiveFeatureModal(null)}
+          aria-label="Popup schließen"
+        >
+          ×
+        </button>
+      </div>
+
+      {activeFeatureModal === "whats-new" ? (
+        <motion.div
+          className="feature-announcement-copy"
+          variants={featureCopyContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          {shouldShowLegacyWhatsNew ? (
+            <>
+              <motion.h3
+                className="release-notes-headline"
+                variants={featureCopyItem}
+              >
+                Tabellenansicht, Projekt einplanen und Auto Plan
+              </motion.h3>
+              <motion.p
+                className="release-notes-intro"
+                variants={featureCopyItem}
+              >
+                Diese Funktionen sind neu oder wurden zuletzt ergänzt.
+              </motion.p>
+              <div className="feature-announcement-list">
+                <motion.div className="feature-item" variants={featureCopyItem}>
+                  <h4>Tabellenansicht in Kapazität</h4>
+                  <p className="feature-path">
+                    <strong>So findest du es:</strong> Sidebar → Kapazität →
+                    Tabellenansicht
+                  </p>
+                  <ul className="feature-item-list">
+                    <li>zusätzliche Ansicht neben der Balkenansicht</li>
+                    <li>kompakter Wochenvergleich pro Nutzer</li>
+                    <li>
+                      Stunden, Kunden-Ziel, Projekte und Abwesenheiten auf einen
+                      Blick
+                    </li>
+                  </ul>
+                </motion.div>
+                <motion.div className="feature-item" variants={featureCopyItem}>
+                  <h4>Projekt einplanen</h4>
+                  <p className="feature-path">
+                    <strong>So findest du es:</strong> Sidebar → Projekt
+                    einplanen
+                  </p>
+                  <ul className="feature-item-list">
+                    <li>mehrere Projektaufgaben in einem Schritt planen</li>
+                    <li>Wochentage und Arbeitszeiten einmal festlegen</li>
+                    <li>
+                      Verteilung vor dem Speichern in der Vorschau anpassen
+                    </li>
+                  </ul>
+                </motion.div>
+                <motion.div className="feature-item" variants={featureCopyItem}>
+                  <h4>Auto Plan</h4>
+                  <p className="feature-path">
+                    <strong>So findest du es:</strong> Sidebar → Blocker anlegen
+                    → Auto Plan
+                  </p>
+                  <ul className="feature-item-list">
+                    <li>freie Zeitfenster automatisch finden</li>
+                    <li>Dauer, Zeitraum und Arbeitszeiten vorgeben</li>
+                    <li>passende Blocker vor dem Speichern prüfen</li>
+                  </ul>
+                </motion.div>
+              </div>
+            </>
+          ) : (
+            <>
+              <motion.h3
+                className="release-notes-headline"
+                variants={featureCopyItem}
+              >
+                Neu in Kapazität: Tabellenansicht
+              </motion.h3>
+              <motion.p
+                className="release-notes-intro"
+                variants={featureCopyItem}
+              >
+                Die Kapazitätsanalyse hat jetzt zusätzlich eine kompakte
+                Tabellenansicht.
+              </motion.p>
+              <div className="feature-announcement-list">
+                <motion.div className="feature-item" variants={featureCopyItem}>
+                  <h4>Was du bekommst</h4>
+                  <p className="feature-path">
+                    <strong>So findest du es:</strong> Sidebar → Kapazität →
+                    Tabellenansicht
+                  </p>
+                  <ul className="feature-item-list">
+                    <li>Wochen direkt nebeneinander vergleichen</li>
+                    <li>geplante Stunden und Auslastung sofort lesen</li>
+                    <li>Projektblöcke und Abwesenheiten kompakt sehen</li>
+                  </ul>
+                </motion.div>
+                <motion.div className="feature-item" variants={featureCopyItem}>
+                  <h4>Warum das hilfreich ist</h4>
+                  <ul className="feature-item-list">
+                    <li>Überbuchungen fallen schneller auf</li>
+                    <li>Zielwerte bleiben farblich gut lesbar</li>
+                    <li>geeignet für schnelle Team- und Wochenchecks</li>
+                  </ul>
+                </motion.div>
+              </div>
+            </>
+          )}
+        </motion.div>
+      ) : activeFeatureModal === "project-plan" ? (
+        <motion.div
+          className="feature-announcement-copy"
+          variants={featureCopyContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.h3
+            className="release-notes-headline"
+            variants={featureCopyItem}
+          >
+            Projekt einplanen
+          </motion.h3>
+          <motion.p className="release-notes-intro" variants={featureCopyItem}>
+            Mehrere Aufgaben eines Projekts in einem Schritt einplanen.
+          </motion.p>
+          <motion.p
+            className="feature-path feature-path--standalone"
+            variants={featureCopyItem}
+          >
+            <strong>So findest du es:</strong> Sidebar → Projekt einplanen
+          </motion.p>
+          <ul className="feature-steps">
+            <motion.li variants={featureCopyItem}>
+              Projekt öffnen und relevante Aufgaben auswählen
+            </motion.li>
+            <motion.li variants={featureCopyItem}>
+              Wochentage, Startzeit, Endzeit und Verteilung festlegen
+            </motion.li>
+            <motion.li variants={featureCopyItem}>
+              Vorschlag vor dem Speichern in der Vorschau prüfen
+            </motion.li>
+            <motion.li variants={featureCopyItem}>
+              Blocker bei Bedarf verschieben oder entfernen
+            </motion.li>
+            <motion.li variants={featureCopyItem}>
+              Planung gesammelt übernehmen
+            </motion.li>
+          </ul>
+          <motion.p className="feature-callout" variants={featureCopyItem}>
+            <strong>Hinweis:</strong> Die Planung berücksichtigt nur awork
+            Blocker. Outlook-Termine und andere Kalendereinträge werden nicht
+            einbezogen.
+          </motion.p>
+        </motion.div>
+      ) : (
+        <motion.div
+          className="feature-announcement-copy"
+          variants={featureCopyContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.h3
+            className="release-notes-headline"
+            variants={featureCopyItem}
+          >
+            Auto Plan
+          </motion.h3>
+          <motion.p className="release-notes-intro" variants={featureCopyItem}>
+            Aufgaben schneller in passende freie Zeitfenster legen.
+          </motion.p>
+          <motion.p
+            className="feature-path feature-path--standalone"
+            variants={featureCopyItem}
+          >
+            <strong>So findest du es:</strong> Sidebar → Blocker anlegen → Auto
+            Plan
+          </motion.p>
+          <ul className="feature-steps">
+            <motion.li variants={featureCopyItem}>
+              Dauer, Zeitraum, Wochentage und Arbeitszeiten vorgeben
+            </motion.li>
+            <motion.li variants={featureCopyItem}>
+              freie Slots automatisch suchen lassen
+            </motion.li>
+            <motion.li variants={featureCopyItem}>
+              Vorschläge auf Kapazität und Verfügbarkeit prüfen
+            </motion.li>
+            <motion.li variants={featureCopyItem}>
+              Blocker vor dem Speichern anpassen oder direkt übernehmen
+            </motion.li>
+          </ul>
+          <motion.p className="feature-callout" variants={featureCopyItem}>
+            <strong>Hinweis:</strong> Auto Plan bezieht nur awork Aufgaben im
+            Kalender ein. Meetings und andere Kalendereinträge werden nicht
+            berücksichtigt.
+          </motion.p>
+        </motion.div>
+      )}
+
+      <div className="modal-actions">
+        {activeFeatureModal !== "whats-new" ? (
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() =>
+              void confirmFeatureModal(
+                activeFeatureModal === "project-plan"
+                  ? [FEATURE_KEYS.projectPlanIntro]
+                  : [FEATURE_KEYS.autoPlanIntro],
+              )
+            }
+          >
+            OK, nicht mehr anzeigen
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => void confirmFeatureModal([FEATURE_KEYS.whatsNew])}
+          >
+            OK, verstanden
+          </button>
+        )}
+      </div>
+    </ModalShell>
+  ) : null;
 
   const plannerUser = useMemo(() => {
     if (!currentUser) return undefined;
@@ -1111,496 +1374,649 @@ function App() {
 
   if (isAnalysisRoute) {
     return (
-      <>
-        <div className="status-toast-region">
-          <BackendStatusIndicator backendClient={backendClient} />
-        </div>
-        <CapacityAnalysisPage
-          backendClient={backendClient}
+      <div className="app-layout">
+        <Sidebar
+          activeItem={workflow}
+          isCapacityActive={isAnalysisRoute}
+          capacityHref={getCapacityAnalysisHref()}
+          pulseProject={pulseProjectWorkflow}
+          showWhatsNewDot={showWhatsNewDot}
+          onNavigate={handleWorkflowChange}
+          onOpenWhatsNew={openWhatsNew}
           currentUser={currentUser}
           isConnecting={isConnecting}
-          isAuthorized
-          isCheckingAccess={false}
           onLogin={handleLogin}
           onDisconnect={handleDisconnect}
+          plannerUserId={selectedPlannerUserId}
+          plannerUsers={availableUsers}
+          isLoadingUsers={isLoadingUsers}
+          onLoadUsers={() => {
+            void loadUsers();
+          }}
+          onPlannerUserChange={handlePlannerUserChange}
         />
-      </>
+        <div className="app-layout-content">
+          <div className="status-toast-region">
+            <BackendStatusIndicator backendClient={backendClient} />
+          </div>
+          <CapacityAnalysisPage
+            backendClient={backendClient}
+            currentUser={currentUser}
+            isConnecting={isConnecting}
+            isAuthorized
+            isCheckingAccess={false}
+            showTableViewBadge={showCapacityTableBadge}
+            onTableViewSeen={() =>
+              acknowledgeFeature(FEATURE_KEYS.capacityTableView)
+            }
+            onLogin={handleLogin}
+            onDisconnect={handleDisconnect}
+          />
+          {featureAnnouncementModal}
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">awork planner utility</p>
-          <h1>
-            Self-Service Bulk Planner
-            {hasMonitoringAccess ? (
-              <button
-                className="monitoring-trigger"
-                onClick={() => setShowMonitoringModal(true)}
-                aria-label="Monitoring Tool öffnen"
-                title="Monitoring Tool"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M2 16h16M4 12l3-4 3 2 4-6 2 3"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            ) : null}
-          </h1>
-        </div>
-        <p>
-          Geplante Aufgaben-Blocker für den ausgewählten Planner-Nutzer
-          bearbeiten.
-        </p>
-        <div
-          className="whats-new-teaser"
-          role="button"
-          tabIndex={0}
-          aria-label="What's New öffnen"
-          onClick={openWhatsNew}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              openWhatsNew();
-            }
-          }}
-        >
-          <span className="whats-new-teaser-label">What&apos;s new</span>
-          {showWhatsNewDot ? (
-            <span className="whats-new-teaser-dot" aria-hidden="true" />
-          ) : null}
-        </div>
-      </header>
-
-      <ConnectionPanel
+    <div className="app-layout">
+      <Sidebar
+        activeItem={workflow}
+        capacityHref={getCapacityAnalysisHref()}
+        pulseProject={pulseProjectWorkflow}
+        showWhatsNewDot={showWhatsNewDot}
+        onNavigate={handleWorkflowChange}
+        onOpenWhatsNew={openWhatsNew}
         currentUser={currentUser}
         isConnecting={isConnecting}
         onLogin={handleLogin}
         onDisconnect={handleDisconnect}
+        plannerUserId={selectedPlannerUserId}
+        plannerUsers={availableUsers}
+        isLoadingUsers={isLoadingUsers}
+        onLoadUsers={() => {
+          void loadUsers();
+        }}
+        onPlannerUserChange={handlePlannerUserChange}
       />
-
-      {currentUser ? (
-        <PlannerUserSelector
-          currentUser={currentUser}
-          selectedUserId={selectedPlannerUserId}
-          users={availableUsers}
-          isLoadingUsers={isLoadingUsers}
-          onLoadUsers={loadUsers}
-          onChange={handlePlannerUserChange}
-          analysisHref={getCapacityAnalysisHref()}
-        />
-      ) : null}
-
-      {workflow === "manage" ? (
-        <>
-          <FilterPanel
-            filters={filters}
-            projectOptions={projectOptions}
-            hasLoadedSchedules={hasLoadedSchedules}
-            disabled={!plannerUser}
-            isLoading={isLoadingSchedules}
-            workflowToggle={
-              <WorkflowChooser
-                value={workflow}
-                disabled={!currentUser}
-                pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
-                onChange={handleWorkflowChange}
-              />
-            }
-            onChange={setFilters}
-            onLoad={loadSchedules}
-          />
-
-          {isLoadingSchedules ? (
-            <p className="loading-text-hint">
-              Geplante Aufgaben werden geladen...
-            </p>
-          ) : null}
-          {scheduleRefreshNotice ? (
-            <div className="refresh-notice" aria-live="polite">
-              <span className="refresh-notice__icon" aria-hidden="true">
-                <span className="spinner" />
-              </span>
-              <div className="refresh-notice-copy">
-                <span className="refresh-notice-title">
-                  Synchronisiere geplante Aufgaben im Hintergrund...
-                </span>
-                <span className="refresh-notice-detail">
-                  {scheduleRefreshNotice}
-                </span>
-              </div>
-            </div>
-          ) : null}
-          <ScheduleGroupsList
-            groups={groups}
-            hasLoaded={hasLoadedSchedules}
-            selectedGroupIds={selectedGroupIds}
-            onSelectionChange={setSelectedGroupIds}
-            onMultiEdit={() => setMultiEditGroups(selectedGroups)}
-            onChangeTimeWindow={setSelectedGroup}
-            onDeleteGroup={(group) => {
-              setDeleteGroup(group);
-              setDeleteResults(undefined);
-            }}
-            isMultiEditAvailable={isMultiEditAvailable}
-          />
-        </>
-      ) : workflow === "create" && plannerUser ? (
-        <CreateScheduleGroupPanel
-          currentUser={plannerUser}
-          projects={availableProjects}
-          tasks={projectTasksForCreate}
-          isLoadingProjects={isLoadingProjects}
-          isLoadingTasks={isLoadingProjectTasks}
-          isCreating={isCreatingSchedules}
-          myAssignedTaskIds={myAssignedTaskIds}
-          myAssignedProjectIds={myAssignedProjectIds}
-          absenceRanges={plannerAbsenceRanges}
-          workflowToggle={
-            <WorkflowChooser
-              value={workflow}
-              disabled={!currentUser}
-              pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
-              onChange={handleWorkflowChange}
-            />
-          }
-          onLoadProjects={loadProjects}
-          onProjectChange={loadProjectTasks}
-          onLoadExistingSchedules={loadCreateSchedules}
-          onLoadUserCapacity={loadPlannerUserCapacity}
-          pulseAutoPlan={pulseAutoPlanMode}
-          onOpenAutoPlan={handleAutoPlanOpen}
-          onCreate={createTaskSchedules}
-        />
-      ) : workflow === "project" && plannerUser ? (
-        <ProjectPlanPanel
-          currentUser={plannerUser}
-          projects={availableProjects}
-          isLoadingProjects={isLoadingProjects}
-          isCreating={isCreatingSchedules}
-          myAssignedProjectIds={myAssignedProjectIds}
-          workflowToggle={
-            <WorkflowChooser
-              value={workflow}
-              disabled={!currentUser}
-              pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
-              onChange={handleWorkflowChange}
-            />
-          }
-          onLoadProjects={loadProjects}
-          onLoadProjectTasks={loadProjectTasksList}
-          onLoadExistingSchedules={loadCreateSchedules}
-          onLoadUserCapacity={loadPlannerUserCapacity}
-          onCreate={createProjectSchedules}
-        />
-      ) : workflow === "create" || workflow === "project" ? (
-        <section className="panel">
-          <div className="panel-header">
+      <div className="app-layout-content">
+        <main className="app-shell">
+          <header className="app-header">
             <div>
-              <p className="eyebrow">Workflow</p>
-              <h2>
-                {workflow === "project" ? "Projekt einplanen" : "Blocker anlegen"}
-              </h2>
+              <p className="eyebrow">awork planner utility</p>
+              <h1>
+                Self-Service Bulk Planner
+                {hasMonitoringAccess ? (
+                  <button
+                    className="monitoring-trigger"
+                    onClick={() => setShowMonitoringModal(true)}
+                    aria-label="Monitoring Tool öffnen"
+                    title="Monitoring Tool"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M2 16h16M4 12l3-4 3 2 4-6 2 3"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                ) : null}
+              </h1>
             </div>
-            <WorkflowChooser
-              value={workflow}
-              disabled={!currentUser}
-              pulseWorkflow={pulseProjectWorkflow ? "project" : undefined}
-              onChange={handleWorkflowChange}
+            <p>
+              Geplante Aufgaben-Blocker für den ausgewählten Planner-Nutzer
+              bearbeiten.
+            </p>
+          </header>
+
+          {workflow === "manage" ? (
+            <>
+              <FilterPanel
+                filters={filters}
+                projectOptions={projectOptions}
+                hasLoadedSchedules={hasLoadedSchedules}
+                disabled={!plannerUser}
+                isLoading={isLoadingSchedules}
+                onChange={setFilters}
+                onLoad={loadSchedules}
+              />
+
+              {isLoadingSchedules ? (
+                <p className="loading-text-hint">
+                  Geplante Aufgaben werden geladen...
+                </p>
+              ) : null}
+              {scheduleRefreshNotice ? (
+                <div className="refresh-notice" aria-live="polite">
+                  <span className="refresh-notice__icon" aria-hidden="true">
+                    <span className="spinner" />
+                  </span>
+                  <div className="refresh-notice-copy">
+                    <span className="refresh-notice-title">
+                      Synchronisiere geplante Aufgaben im Hintergrund...
+                    </span>
+                    <span className="refresh-notice-detail">
+                      {scheduleRefreshNotice}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+              <ScheduleGroupsList
+                groups={groups}
+                hasLoaded={hasLoadedSchedules}
+                selectedGroupIds={selectedGroupIds}
+                onSelectionChange={setSelectedGroupIds}
+                onMultiEdit={() => setMultiEditGroups(selectedGroups)}
+                onChangeTimeWindow={setSelectedGroup}
+                onDeleteGroup={(group) => {
+                  setDeleteGroup(group);
+                  setDeleteResults(undefined);
+                }}
+                isMultiEditAvailable={isMultiEditAvailable}
+              />
+            </>
+          ) : workflow === "create" && plannerUser ? (
+            <CreateScheduleGroupPanel
+              currentUser={plannerUser}
+              projects={availableProjects}
+              tasks={projectTasksForCreate}
+              isLoadingProjects={isLoadingProjects}
+              isLoadingTasks={isLoadingProjectTasks}
+              isCreating={isCreatingSchedules}
+              myAssignedTaskIds={myAssignedTaskIds}
+              myAssignedProjectIds={myAssignedProjectIds}
+              absenceRanges={plannerAbsenceRanges}
+              onLoadProjects={loadProjects}
+              onProjectChange={loadProjectTasks}
+              onLoadExistingSchedules={loadCreateSchedules}
+              onLoadUserCapacity={loadPlannerUserCapacity}
+              pulseAutoPlan={pulseAutoPlanMode}
+              onOpenAutoPlan={handleAutoPlanOpen}
+              onCreate={createTaskSchedules}
             />
-          </div>
-        </section>
-      ) : null}
-
-      {activeFeatureModal ? (
-        <ModalShell
-          labelledBy="feature-announcement-title"
-          dialogClassName="modal feature-announcement-modal"
-          onClose={() => setActiveFeatureModal(null)}
-        >
-          <div className="modal-header feature-announcement-header">
-            <h2 id="feature-announcement-title">
-              {activeFeatureModal === "whats-new"
-                ? "What's New"
-                : activeFeatureModal === "project-plan"
-                  ? "Neu: Projekt einplanen"
-                  : "Neu: Auto Plan"}
-            </h2>
-            <button
-              type="button"
-              className="ghost-button feature-announcement-close"
-              onClick={() => setActiveFeatureModal(null)}
-              aria-label="Popup schließen"
-            >
-              ×
-            </button>
-          </div>
-
-          {activeFeatureModal === "whats-new" ? (
-            <motion.div
-              className="feature-announcement-copy"
-              variants={featureCopyContainer}
-              initial="hidden"
-              animate="visible"
-            >
-              <motion.h3 className="release-notes-headline" variants={featureCopyItem}>
-                🎉 Projekt einplanen und Auto Plan sind da
-              </motion.h3>
-              <motion.p className="release-notes-intro" variants={featureCopyItem}>
-                Zwei neue Funktionen, die deine Planung spürbar beschleunigen. Statt jede Aufgabe einzeln einzuplanen, planst du jetzt ein ganzes Projekt auf einmal oder lässt das Tool den passenden Zeitpunkt für dich finden.
-              </motion.p>
-              <div className="feature-announcement-list">
-                <motion.div className="feature-item" variants={featureCopyItem}>
-                  <h4>✨ Projekt einplanen</h4>
-                  <p>Schluss mit dem Planen Aufgabe für Aufgabe. Öffne ein Projekt, wähle die Aufgaben aus, die das Tool einplanen soll, lege Wochentage und Arbeitszeiten fest, und das Tool verteilt sie automatisch sinnvoll über deinen Kalender. Es berücksichtigt deine aktuelle Auslastung und findet den nächsten freien Slot. Das Tool plant dabei ausschließlich rund um deine awork Blocker. Termine aus Outlook und andere Kalendereinträge werden nicht einbezogen. Vor dem Speichern justierst du in der Vorschau alles nach.</p>
-                </motion.div>
-                <motion.div className="feature-item" variants={featureCopyItem}>
-                  <h4>⚡ Auto Plan</h4>
-                  <p>Du hast eine Aufgabe, weißt aber nicht, wann sie reinpasst? Das übernimmt Auto Plan. Du gibst Zeitraum, Arbeitszeiten und Dauer vor, und das Tool durchsucht deinen Kalender, findet freie Slots und schlägt dir passende Zeiten vor. Auto Plan bezieht dabei nur deine awork Aufgaben im Kalender ein. Kalendereinträge wie Meetings bleiben unberücksichtigt.</p>
-                </motion.div>
+          ) : workflow === "project" && plannerUser ? (
+            <ProjectPlanPanel
+              currentUser={plannerUser}
+              projects={availableProjects}
+              isLoadingProjects={isLoadingProjects}
+              isCreating={isCreatingSchedules}
+              myAssignedProjectIds={myAssignedProjectIds}
+              onLoadProjects={loadProjects}
+              onLoadProjectTasks={loadProjectTasksList}
+              onLoadExistingSchedules={loadCreateSchedules}
+              onLoadUserCapacity={loadPlannerUserCapacity}
+              onCreate={createProjectSchedules}
+            />
+          ) : workflow === "create" || workflow === "project" ? (
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Workflow</p>
+                  <h2>
+                    {workflow === "project"
+                      ? "Projekt einplanen"
+                      : "Blocker anlegen"}
+                  </h2>
+                </div>
               </div>
-            </motion.div>
-          ) : activeFeatureModal === "project-plan" ? (
-            <motion.div
-              className="feature-announcement-copy"
-              variants={featureCopyContainer}
-              initial="hidden"
-              animate="visible"
-            >
-              <motion.h3 className="release-notes-headline" variants={featureCopyItem}>
-                🚀 Endlich da: Projekt einplanen
-              </motion.h3>
-              <motion.p className="release-notes-intro" variants={featureCopyItem}>
-                Das Problem kennst du: Dein Projekt in awork steht, die Aufgaben sind definiert, aber jetzt musst du jede Aufgabe einzeln einplanen. Das kostet Zeit, vor allem bei einer ganzen Reihe von Aufgaben.
-              </motion.p>
-              <motion.p className="release-notes-solution" variants={featureCopyItem}>
-                <strong>So funktioniert es:</strong> Öffne „Projekt einplanen", wähle dein Projekt, hake die Aufgaben an, die eingeplant werden sollen, und das Tool übernimmt den Rest.
-              </motion.p>
-              <ul className="feature-steps">
-                <motion.li variants={featureCopyItem}>💡 Das Tool liest die awork Zeitrahmen und die geplante Dauer jeder Aufgabe automatisch aus</motion.li>
-                <motion.li variants={featureCopyItem}>📅 Du legst fest: Wochentage, Startzeit und Endzeit pro Tag sowie die Verteilung (gleichmäßig oder gebündelt)</motion.li>
-                <motion.li variants={featureCopyItem}>🎯 Das Tool plant alle Aufgaben sinnvoll rund um deine bestehenden awork Blocker</motion.li>
-                <motion.li variants={featureCopyItem}>✏️ In der Vorschau verschiebst oder löschst du jeden Blocker noch nach Belieben</motion.li>
-                <motion.li variants={featureCopyItem}>✅ Ein Klick und alle Blocker sind angelegt</motion.li>
-              </ul>
-              <motion.p className="feature-callout" variants={featureCopyItem}>
-                📌 <strong>Gut zu wissen:</strong> Das Tool plant ausschließlich rund um deine awork Blocker und findet dafür den passenden Slot. Termine aus Outlook und andere Kalendereinträge werden nicht einbezogen.
-              </motion.p>
-            </motion.div>
-          ) : (
-            <motion.div
-              className="feature-announcement-copy"
-              variants={featureCopyContainer}
-              initial="hidden"
-              animate="visible"
-            >
-              <motion.h3 className="release-notes-headline" variants={featureCopyItem}>
-                ⚡ Auto Plan: dein neuer Zeitmanager
-              </motion.h3>
-              <motion.p className="release-notes-intro" variants={featureCopyItem}>
-                Du kennst die Situation: „Diese Aufgabe muss noch irgendwann rein, aber wann passt sie?" Das ständige Ausprobieren im Kalender kostet Nerven: freie Lücken suchen, schieben, verwerfen. Damit ist jetzt Schluss.
-              </motion.p>
-              <motion.p className="release-notes-solution" variants={featureCopyItem}>
-                <strong>Das übernimmt Auto Plan:</strong> Gib der Aufgabe eine Dauer, einen Zeitraum und deine Arbeitszeiten vor, und das Tool durchsucht deinen Kalender automatisch, findet freie Slots und schlägt dir passende Zeitfenster vor.
-              </motion.p>
-              <ul className="feature-steps">
-                <motion.li variants={featureCopyItem}>⏱️ Du gibst vor: Dauer (z.B. 8 Stunden), Zeitraum (z.B. diese und nächste Woche), Wochentage (Montag bis Freitag) und Arbeitszeiten (9 bis 17 Uhr)</motion.li>
-                <motion.li variants={featureCopyItem}>🔍 Das Tool scannt deinen aktuellen Kalender automatisch</motion.li>
-                <motion.li variants={featureCopyItem}>📍 Es findet zusammenhängende freie Slots und berücksichtigt deine Kapazität</motion.li>
-                <motion.li variants={featureCopyItem}>✅ Das Tool schlägt dir sinnvolle Blocker vor (z.B. Mo 2h, Di 2h, Mi 2h, Do 2h)</motion.li>
-                <motion.li variants={featureCopyItem}>🎯 Du prüfst alles in der Vorschau und passt es bei Bedarf an oder speicherst direkt</motion.li>
-              </ul>
-              <motion.p className="feature-callout" variants={featureCopyItem}>
-                📌 <strong>Gut zu wissen:</strong> Auto Plan bezieht nur deine awork Aufgaben im Kalender ein. Kalendereinträge wie Meetings werden nicht berücksichtigt.
-              </motion.p>
-            </motion.div>
-          )}
+            </section>
+          ) : null}
 
-          <div className="modal-actions">
-            {activeFeatureModal !== "whats-new" ? (
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() =>
-                  void confirmFeatureModal(
-                    activeFeatureModal === "project-plan"
-                      ? FEATURE_KEYS.projectPlanIntro
-                      : FEATURE_KEYS.autoPlanIntro,
-                  )
-                }
-              >
-                OK, nicht mehr anzeigen
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => setActiveFeatureModal(null)}
-              >
-                Schließen
-              </button>
-            )}
+          {activeFeatureModal ? (
+            <ModalShell
+              labelledBy="feature-announcement-title"
+              dialogClassName="modal feature-announcement-modal"
+              onClose={() => setActiveFeatureModal(null)}
+            >
+              <div className="modal-header feature-announcement-header">
+                <h2 id="feature-announcement-title">
+                  {activeFeatureModal === "whats-new"
+                    ? "What's New"
+                    : activeFeatureModal === "project-plan"
+                      ? "Neu: Projekt einplanen"
+                      : "Neu: Auto Plan"}
+                </h2>
+                <button
+                  type="button"
+                  className="ghost-button feature-announcement-close"
+                  onClick={() => setActiveFeatureModal(null)}
+                  aria-label="Popup schließen"
+                >
+                  ×
+                </button>
+              </div>
+
+              {activeFeatureModal === "whats-new" ? (
+                <motion.div
+                  className="feature-announcement-copy"
+                  variants={featureCopyContainer}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {shouldShowLegacyWhatsNew ? (
+                    <>
+                      <motion.h3
+                        className="release-notes-headline"
+                        variants={featureCopyItem}
+                      >
+                        🎉 Tabellenansicht, Projekt einplanen und Auto Plan sind
+                        da
+                      </motion.h3>
+                      <motion.p
+                        className="release-notes-intro"
+                        variants={featureCopyItem}
+                      >
+                        Du bekommst hier gesammelt alle Funktionen, die in den
+                        letzten Releases neu dazugekommen sind, damit du nichts
+                        verpasst und danach ohne weitere Intro-Popups
+                        weiterarbeiten kannst.
+                      </motion.p>
+                      <div className="feature-announcement-list">
+                        <motion.div
+                          className="feature-item"
+                          variants={featureCopyItem}
+                        >
+                          <h4>📊 Neue Tabellenansicht in Kapazität</h4>
+                          <p>
+                            In der Kapazitätsanalyse kannst du jetzt zwischen
+                            Balkenansicht und Tabellenansicht wechseln. Die
+                            Tabellenansicht zeigt dir geplante Stunden,
+                            Kunden-Ziel, Projektblöcke und Abwesenheiten kompakt
+                            pro Woche, damit du Überlastung und freie Kapazität
+                            schneller vergleichen kannst.
+                          </p>
+                        </motion.div>
+                        <motion.div
+                          className="feature-item"
+                          variants={featureCopyItem}
+                        >
+                          <h4>✨ Projekt einplanen</h4>
+                          <p>
+                            Schluss mit dem Planen Aufgabe für Aufgabe. Öffne
+                            ein Projekt, wähle die Aufgaben aus, die das Tool
+                            einplanen soll, lege Wochentage und Arbeitszeiten
+                            fest, und das Tool verteilt sie automatisch sinnvoll
+                            über deinen Kalender. Es berücksichtigt deine
+                            aktuelle Auslastung und findet den nächsten freien
+                            Slot. Das Tool plant dabei ausschließlich rund um
+                            deine awork Blocker. Termine aus Outlook und andere
+                            Kalendereinträge werden nicht einbezogen. Vor dem
+                            Speichern justierst du in der Vorschau alles nach.
+                          </p>
+                        </motion.div>
+                        <motion.div
+                          className="feature-item"
+                          variants={featureCopyItem}
+                        >
+                          <h4>⚡ Auto Plan</h4>
+                          <p>
+                            Du hast eine Aufgabe, weißt aber nicht, wann sie
+                            reinpasst? Das übernimmt Auto Plan. Du gibst
+                            Zeitraum, Arbeitszeiten und Dauer vor, und das Tool
+                            durchsucht deinen Kalender, findet freie Slots und
+                            schlägt dir passende Zeiten vor. Auto Plan bezieht
+                            dabei nur deine awork Aufgaben im Kalender ein.
+                            Kalendereinträge wie Meetings bleiben
+                            unberücksichtigt.
+                          </p>
+                        </motion.div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <motion.h3
+                        className="release-notes-headline"
+                        variants={featureCopyItem}
+                      >
+                        📊 Neu in Kapazität: Tabellenansicht
+                      </motion.h3>
+                      <motion.p
+                        className="release-notes-intro"
+                        variants={featureCopyItem}
+                      >
+                        Neben der Balkenansicht gibt es jetzt eine neue
+                        Tabellenansicht, mit der du Wochen, Auslastung und
+                        Projektverteilung deutlich kompakter lesen kannst.
+                      </motion.p>
+                      <div className="feature-announcement-list">
+                        <motion.div
+                          className="feature-item"
+                          variants={featureCopyItem}
+                        >
+                          <h4>🗂️ Wochen kompakt vergleichen</h4>
+                          <p>
+                            Jede Woche wird pro Nutzer in einer eigenen Zelle
+                            dargestellt. So siehst du geplante Stunden,
+                            Auslastung, Projektblöcke und Abwesenheiten direkt
+                            nebeneinander.
+                          </p>
+                        </motion.div>
+                        <motion.div
+                          className="feature-item"
+                          variants={featureCopyItem}
+                        >
+                          <h4>🎯 Engpässe schneller erkennen</h4>
+                          <p>
+                            Farben und Kennzahlen orientieren sich an der
+                            bestehenden Kapazitätslogik. Überbuchte Wochen
+                            fallen sofort auf, während Zielwerte und Projektlast
+                            übersichtlich lesbar bleiben.
+                          </p>
+                        </motion.div>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              ) : activeFeatureModal === "project-plan" ? (
+                <motion.div
+                  className="feature-announcement-copy"
+                  variants={featureCopyContainer}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <motion.h3
+                    className="release-notes-headline"
+                    variants={featureCopyItem}
+                  >
+                    🚀 Endlich da: Projekt einplanen
+                  </motion.h3>
+                  <motion.p
+                    className="release-notes-intro"
+                    variants={featureCopyItem}
+                  >
+                    Das Problem kennst du: Dein Projekt in awork steht, die
+                    Aufgaben sind definiert, aber jetzt musst du jede Aufgabe
+                    einzeln einplanen. Das kostet Zeit, vor allem bei einer
+                    ganzen Reihe von Aufgaben.
+                  </motion.p>
+                  <motion.p
+                    className="release-notes-solution"
+                    variants={featureCopyItem}
+                  >
+                    <strong>So funktioniert es:</strong> Öffne „Projekt
+                    einplanen", wähle dein Projekt, hake die Aufgaben an, die
+                    eingeplant werden sollen, und das Tool übernimmt den Rest.
+                  </motion.p>
+                  <ul className="feature-steps">
+                    <motion.li variants={featureCopyItem}>
+                      💡 Das Tool liest die awork Zeitrahmen und die geplante
+                      Dauer jeder Aufgabe automatisch aus
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      📅 Du legst fest: Wochentage, Startzeit und Endzeit pro
+                      Tag sowie die Verteilung (gleichmäßig oder gebündelt)
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      🎯 Das Tool plant alle Aufgaben sinnvoll rund um deine
+                      bestehenden awork Blocker
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      ✏️ In der Vorschau verschiebst oder löschst du jeden
+                      Blocker noch nach Belieben
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      ✅ Ein Klick und alle Blocker sind angelegt
+                    </motion.li>
+                  </ul>
+                  <motion.p
+                    className="feature-callout"
+                    variants={featureCopyItem}
+                  >
+                    📌 <strong>Gut zu wissen:</strong> Das Tool plant
+                    ausschließlich rund um deine awork Blocker und findet dafür
+                    den passenden Slot. Termine aus Outlook und andere
+                    Kalendereinträge werden nicht einbezogen.
+                  </motion.p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  className="feature-announcement-copy"
+                  variants={featureCopyContainer}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <motion.h3
+                    className="release-notes-headline"
+                    variants={featureCopyItem}
+                  >
+                    ⚡ Auto Plan: dein neuer Zeitmanager
+                  </motion.h3>
+                  <motion.p
+                    className="release-notes-intro"
+                    variants={featureCopyItem}
+                  >
+                    Du kennst die Situation: „Diese Aufgabe muss noch irgendwann
+                    rein, aber wann passt sie?" Das ständige Ausprobieren im
+                    Kalender kostet Nerven: freie Lücken suchen, schieben,
+                    verwerfen. Damit ist jetzt Schluss.
+                  </motion.p>
+                  <motion.p
+                    className="release-notes-solution"
+                    variants={featureCopyItem}
+                  >
+                    <strong>Das übernimmt Auto Plan:</strong> Gib der Aufgabe
+                    eine Dauer, einen Zeitraum und deine Arbeitszeiten vor, und
+                    das Tool durchsucht deinen Kalender automatisch, findet
+                    freie Slots und schlägt dir passende Zeitfenster vor.
+                  </motion.p>
+                  <ul className="feature-steps">
+                    <motion.li variants={featureCopyItem}>
+                      ⏱️ Du gibst vor: Dauer (z.B. 8 Stunden), Zeitraum (z.B.
+                      diese und nächste Woche), Wochentage (Montag bis Freitag)
+                      und Arbeitszeiten (9 bis 17 Uhr)
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      🔍 Das Tool scannt deinen aktuellen Kalender automatisch
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      📍 Es findet zusammenhängende freie Slots und
+                      berücksichtigt deine Kapazität
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      ✅ Das Tool schlägt dir sinnvolle Blocker vor (z.B. Mo 2h,
+                      Di 2h, Mi 2h, Do 2h)
+                    </motion.li>
+                    <motion.li variants={featureCopyItem}>
+                      🎯 Du prüfst alles in der Vorschau und passt es bei Bedarf
+                      an oder speicherst direkt
+                    </motion.li>
+                  </ul>
+                  <motion.p
+                    className="feature-callout"
+                    variants={featureCopyItem}
+                  >
+                    📌 <strong>Gut zu wissen:</strong> Auto Plan bezieht nur
+                    deine awork Aufgaben im Kalender ein. Kalendereinträge wie
+                    Meetings werden nicht berücksichtigt.
+                  </motion.p>
+                </motion.div>
+              )}
+
+              <div className="modal-actions">
+                {activeFeatureModal !== "whats-new" ? (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() =>
+                      void confirmFeatureModal(
+                        activeFeatureModal === "project-plan"
+                          ? [FEATURE_KEYS.projectPlanIntro]
+                          : [FEATURE_KEYS.autoPlanIntro],
+                      )
+                    }
+                  >
+                    OK, nicht mehr anzeigen
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() =>
+                      void confirmFeatureModal([FEATURE_KEYS.whatsNew])
+                    }
+                  >
+                    OK, verstanden
+                  </button>
+                )}
+              </div>
+            </ModalShell>
+          ) : null}
+
+          {selectedGroup && plannerUser && !previewChanges ? (
+            <BulkEditModal
+              group={selectedGroup}
+              currentUser={plannerUser}
+              onClose={closeModals}
+              onPreview={handlePreview}
+              onManualEditRequest={handleManualEditRequest}
+            />
+          ) : null}
+
+          {multiEditGroups &&
+          plannerUser &&
+          !previewChanges &&
+          !blockerOperations &&
+          isMultiEditAvailable ? (
+            <MultiGroupDurationEditModal
+              groups={multiEditGroups}
+              currentUser={plannerUser}
+              onClose={closeModals}
+              onPreview={handlePreview}
+              onUnplanPreview={(operations) => {
+                setMultiEditGroups(undefined);
+                handleBlockerOperationsPreview(operations);
+              }}
+            />
+          ) : null}
+
+          {manualEditGroup && plannerUser ? (
+            <ManualBlockerEditModal
+              group={manualEditGroup}
+              currentUser={plannerUser}
+              onBack={() => {
+                setSelectedGroup(manualEditGroup);
+                setManualEditGroup(undefined);
+              }}
+              onClose={closeModals}
+              onPreview={handleBlockerOperationsPreview}
+            />
+          ) : null}
+
+          {deleteGroup ? (
+            <DeleteGroupModal
+              group={deleteGroup}
+              isDeleting={isDeleting}
+              deleteResults={deleteResults}
+              onCancel={closeModals}
+              onDelete={handleDeleteGroup}
+            />
+          ) : null}
+
+          {createSuccess ? (
+            <SuccessPopup
+              title="Blocker angelegt"
+              message={`${createSuccess.count} Blocker erfolgreich angelegt.`}
+              detail={
+                createSuccess.taskCreated
+                  ? `Aufgabe angelegt: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} Blocker fehlgeschlagen.` : "Alle Blocker wurden für den Planner-Nutzer angelegt."}`
+                  : createSuccess.failed > 0
+                    ? `${createSuccess.failed} fehlgeschlagen und unverändert geblieben.`
+                    : "Alle Blocker wurden für den ausgewählten Planner-Nutzer angelegt."
+              }
+              onClose={() => setCreateSuccess(undefined)}
+            />
+          ) : null}
+
+          {deleteSuccess ? (
+            <SuccessPopup
+              title="Gruppe ausgeplant"
+              message={`${deleteSuccess.count} Blocker erfolgreich ausgeplant.`}
+              detail="Alle ausgewählten Blocker wurden aus dem Planner entfernt. Die awork-Aufgabe wurde nicht gelöscht."
+              onClose={() => setDeleteSuccess(undefined)}
+            />
+          ) : null}
+
+          {updateSuccess ? (
+            <SuccessPopup
+              title={updateSuccess.title ?? "Zeitfenster angepasst"}
+              message={`${updateSuccess.count} Blocker erfolgreich aktualisiert.`}
+              detail={
+                updateSuccess.detail ??
+                "Das neue Zeitfenster wurde auf die ausgewählten Blocker angewendet."
+              }
+              onClose={() => setUpdateSuccess(undefined)}
+            />
+          ) : null}
+
+          {blockerOperations ? (
+            <BlockerOperationsPreviewModal
+              operations={blockerOperations}
+              isApplying={isApplyingBlockerOperations}
+              results={blockerOperationResults}
+              onBack={() => {
+                setBlockerOperations(undefined);
+                setBlockerOperationResults(undefined);
+              }}
+              onCancel={closeModals}
+              onApply={handleApplyBlockerOperations}
+            />
+          ) : null}
+
+          {previewChanges ? (
+            <PreviewChangesModal
+              changes={previewChanges}
+              isUpdating={isUpdating}
+              updateResults={updateResults}
+              onBack={() => {
+                setPreviewChanges(undefined);
+                setUpdateResults(undefined);
+              }}
+              onCancel={closeModals}
+              onApply={handleApplyChanges}
+            />
+          ) : null}
+
+          {showMonitoringModal ? (
+            <MonitoringModal
+              backendClient={backendClient}
+              onClose={() => setShowMonitoringModal(false)}
+            />
+          ) : null}
+
+          <div className="status-toast-region">
+            <BackendStatusIndicator backendClient={backendClient} />
+            <AnimatePresence>
+              {error ? (
+                <StatusToast
+                  key="error"
+                  message={error}
+                  variant="error"
+                  onDismiss={() => setError("")}
+                />
+              ) : null}
+              {statusMessage ? (
+                <StatusToast
+                  key="status"
+                  message={statusMessage}
+                  variant="success"
+                  autoDismissMs={5000}
+                  onDismiss={() => setStatusMessage("")}
+                />
+              ) : null}
+            </AnimatePresence>
           </div>
-        </ModalShell>
-      ) : null}
-
-      {selectedGroup && plannerUser && !previewChanges ? (
-        <BulkEditModal
-          group={selectedGroup}
-          currentUser={plannerUser}
-          onClose={closeModals}
-          onPreview={handlePreview}
-          onManualEditRequest={handleManualEditRequest}
-        />
-      ) : null}
-
-      {multiEditGroups &&
-      plannerUser &&
-      !previewChanges &&
-      !blockerOperations &&
-      isMultiEditAvailable ? (
-        <MultiGroupDurationEditModal
-          groups={multiEditGroups}
-          currentUser={plannerUser}
-          onClose={closeModals}
-          onPreview={handlePreview}
-          onUnplanPreview={(operations) => {
-            setMultiEditGroups(undefined);
-            handleBlockerOperationsPreview(operations);
-          }}
-        />
-      ) : null}
-
-      {manualEditGroup && plannerUser ? (
-        <ManualBlockerEditModal
-          group={manualEditGroup}
-          currentUser={plannerUser}
-          onBack={() => {
-            setSelectedGroup(manualEditGroup);
-            setManualEditGroup(undefined);
-          }}
-          onClose={closeModals}
-          onPreview={handleBlockerOperationsPreview}
-        />
-      ) : null}
-
-      {deleteGroup ? (
-        <DeleteGroupModal
-          group={deleteGroup}
-          isDeleting={isDeleting}
-          deleteResults={deleteResults}
-          onCancel={closeModals}
-          onDelete={handleDeleteGroup}
-        />
-      ) : null}
-
-      {createSuccess ? (
-        <SuccessPopup
-          title="Blocker angelegt"
-          message={`${createSuccess.count} Blocker erfolgreich angelegt.`}
-          detail={
-            createSuccess.taskCreated
-              ? `Aufgabe angelegt: ${createSuccess.taskCreated}. ${createSuccess.failed > 0 ? `${createSuccess.failed} Blocker fehlgeschlagen.` : "Alle Blocker wurden für den Planner-Nutzer angelegt."}`
-              : createSuccess.failed > 0
-                ? `${createSuccess.failed} fehlgeschlagen und unverändert geblieben.`
-                : "Alle Blocker wurden für den ausgewählten Planner-Nutzer angelegt."
-          }
-          onClose={() => setCreateSuccess(undefined)}
-        />
-      ) : null}
-
-      {deleteSuccess ? (
-        <SuccessPopup
-          title="Gruppe ausgeplant"
-          message={`${deleteSuccess.count} Blocker erfolgreich ausgeplant.`}
-          detail="Alle ausgewählten Blocker wurden aus dem Planner entfernt. Die awork-Aufgabe wurde nicht gelöscht."
-          onClose={() => setDeleteSuccess(undefined)}
-        />
-      ) : null}
-
-      {updateSuccess ? (
-        <SuccessPopup
-          title={updateSuccess.title ?? "Zeitfenster angepasst"}
-          message={`${updateSuccess.count} Blocker erfolgreich aktualisiert.`}
-          detail={
-            updateSuccess.detail ??
-            "Das neue Zeitfenster wurde auf die ausgewählten Blocker angewendet."
-          }
-          onClose={() => setUpdateSuccess(undefined)}
-        />
-      ) : null}
-
-      {blockerOperations ? (
-        <BlockerOperationsPreviewModal
-          operations={blockerOperations}
-          isApplying={isApplyingBlockerOperations}
-          results={blockerOperationResults}
-          onBack={() => {
-            setBlockerOperations(undefined);
-            setBlockerOperationResults(undefined);
-          }}
-          onCancel={closeModals}
-          onApply={handleApplyBlockerOperations}
-        />
-      ) : null}
-
-      {previewChanges ? (
-        <PreviewChangesModal
-          changes={previewChanges}
-          isUpdating={isUpdating}
-          updateResults={updateResults}
-          onBack={() => {
-            setPreviewChanges(undefined);
-            setUpdateResults(undefined);
-          }}
-          onCancel={closeModals}
-          onApply={handleApplyChanges}
-        />
-      ) : null}
-
-      {showMonitoringModal ? (
-        <MonitoringModal
-          backendClient={backendClient}
-          onClose={() => setShowMonitoringModal(false)}
-        />
-      ) : null}
-
-      <div className="status-toast-region">
-        <BackendStatusIndicator backendClient={backendClient} />
-        <AnimatePresence>
-          {error ? (
-            <StatusToast
-              key="error"
-              message={error}
-              variant="error"
-              onDismiss={() => setError("")}
-            />
-          ) : null}
-          {statusMessage ? (
-            <StatusToast
-              key="status"
-              message={statusMessage}
-              variant="success"
-              autoDismissMs={5000}
-              onDismiss={() => setStatusMessage("")}
-            />
-          ) : null}
-        </AnimatePresence>
+        </main>
       </div>
-    </main>
+    </div>
   );
 }
 

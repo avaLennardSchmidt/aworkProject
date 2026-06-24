@@ -4,7 +4,6 @@ import type {
   CreateProjectTaskPayload,
   CreateTaskSchedulePayload,
 } from "../types/awork";
-import { isUserInPdsOrSimTeam } from "./teamFilter";
 
 const BACKEND_BASE_URL = (
   import.meta.env.VITE_BACKEND_BASE_URL ?? "http://localhost:5174"
@@ -135,7 +134,6 @@ export class BackendClient {
       })
       .map(mapNullableUser)
       .filter((user): user is AworkUser => Boolean(user))
-      .filter(isUserInPdsOrSimTeam)
       .sort((a, b) => formatUserName(a).localeCompare(formatUserName(b)));
   }
 
@@ -283,13 +281,17 @@ export class BackendClient {
   }
 
   async getSeenFeatureKeys(): Promise<string[]> {
-    const response = await this.request<FeatureSeenResponse>("/api/feature-seen");
+    const response =
+      await this.request<FeatureSeenResponse>("/api/feature-seen");
     return Array.isArray(response.keys)
       ? response.keys.filter((key): key is string => typeof key === "string")
       : [];
   }
 
-  async markFeatureSeen(featureKey: string, appVersion?: string): Promise<void> {
+  async markFeatureSeen(
+    featureKey: string,
+    appVersion?: string,
+  ): Promise<void> {
     await this.request(`/api/feature-seen/${encodeURIComponent(featureKey)}`, {
       method: "POST",
       body: JSON.stringify(appVersion ? { appVersion } : {}),
@@ -380,6 +382,10 @@ async function safeReadError(response: Response): Promise<string> {
   } catch {
     return "";
   }
+}
+
+export function getProfileImageUrl(userId: string): string {
+  return `${BACKEND_BASE_URL}/api/users/${encodeURIComponent(userId)}/profile-image`;
 }
 
 export function mapUser(rawUser: unknown): AworkUser {

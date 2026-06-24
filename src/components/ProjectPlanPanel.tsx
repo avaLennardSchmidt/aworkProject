@@ -1053,18 +1053,20 @@ export function ProjectPlanPanel({
                                         : "manuell"}
                                   </span>
                                 </span>
-                                <button
-                                  type="button"
-                                  className="ghost-button project-plan-manual-btn"
-                                  aria-label="Blocker manuell bearbeiten"
-                                  title="Blocker manuell bearbeiten"
-                                  onClick={() => openManualResolve(task, taskOpenMinutes, taskHint?.result?.payloads ?? [])}
-                                >
-                                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                                    <path d="M10.9 2.1a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1l-6.7 6.7-2.8.7.7-2.8 6.7-6.7Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-                                    <path d="M9.6 3.4l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                                  </svg>
-                                </button>
+                                {!isOverbooked ? (
+                                  <button
+                                    type="button"
+                                    className="ghost-button project-plan-manual-btn"
+                                    aria-label="Blocker manuell bearbeiten"
+                                    title="Blocker manuell bearbeiten"
+                                    onClick={() => openManualResolve(task, taskOpenMinutes, taskHint?.result?.payloads ?? [])}
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                      <path d="M10.9 2.1a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1l-6.7 6.7-2.8.7.7-2.8 6.7-6.7Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                                      <path d="M9.6 3.4l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                                    </svg>
+                                  </button>
+                                ) : null}
                               </div>
                               {taskPending ? (
                                 <div className="project-plan-task-overbook-row">
@@ -1082,9 +1084,20 @@ export function ProjectPlanPanel({
                                   <span className="project-plan-overbook-badge">
                                     {formatMinutesAsHours(taskOpenMinutes)} offen · keine freien Slots
                                   </span>
-                                  <span className="project-plan-manual-action-badge">
-                                    Bearbeite die Blocker manuell →
-                                  </span>
+                                  <button
+                                    type="button"
+                                    className="project-plan-manual-action-badge"
+                                    title="Offene Stunden manuell mit Blockern lösen"
+                                    onClick={() =>
+                                      openManualResolve(
+                                        task,
+                                        taskOpenMinutes,
+                                        taskHint?.result?.payloads ?? [],
+                                      )
+                                    }
+                                  >
+                                    Manuell lösen →
+                                  </button>
                                 </div>
                               ) : null}
                             </li>

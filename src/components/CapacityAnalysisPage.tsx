@@ -39,7 +39,6 @@ import type {
   AworkUser,
   AworkUserCapacity,
 } from "../types/awork";
-import { ConnectionPanel } from "./ConnectionPanel";
 import { ErrorAlert } from "./ErrorAlert";
 import { LoadingState } from "./LoadingState";
 import {
@@ -48,6 +47,7 @@ import {
 } from "./SearchableSelect";
 import { DatePickerInput } from "./DatePickerInput";
 import { SegmentedControl } from "./SegmentedControl";
+import { CapacityTableView } from "./CapacityTableView";
 
 interface CapacityAnalysisPageProps {
   backendClient: BackendClient;
@@ -55,6 +55,8 @@ interface CapacityAnalysisPageProps {
   isConnecting: boolean;
   isAuthorized: boolean;
   isCheckingAccess: boolean;
+  showTableViewBadge: boolean;
+  onTableViewSeen: () => void | Promise<void>;
   onLogin: () => void;
   onDisconnect: () => Promise<void>;
 }
@@ -179,6 +181,8 @@ export function CapacityAnalysisPage({
   isConnecting,
   isAuthorized,
   isCheckingAccess,
+  showTableViewBadge,
+  onTableViewSeen,
   onLogin,
   onDisconnect,
 }: CapacityAnalysisPageProps) {
@@ -218,6 +222,7 @@ export function CapacityAnalysisPage({
   const [unresolvedProjectHintsByTaskId, setUnresolvedProjectHintsByTaskId] =
     useState<Record<string, string>>({});
   const [isDetailsTableCollapsed, setIsDetailsTableCollapsed] = useState(false);
+  const [viewMode, setViewMode] = useState<"bar" | "table">("bar");
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -228,6 +233,13 @@ export function CapacityAnalysisPage({
   const [error, setError] = useState("");
   const [analysisLoadingMessageIndex, setAnalysisLoadingMessageIndex] =
     useState(0);
+
+  function handleViewModeChange(nextViewMode: "bar" | "table") {
+    setViewMode(nextViewMode);
+    if (nextViewMode === "table" && showTableViewBadge) {
+      void onTableViewSeen();
+    }
+  }
 
   useEffect(() => {
     saveCapacityInputs(capacityInputs);
@@ -670,36 +682,10 @@ export function CapacityAnalysisPage({
           <p>
             Geplante Projektzeit und verfügbare Team-Kapazität in einer Ansicht.
           </p>
-          <a className="ghost-link-button" href={getPlannerHref()}>
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-              style={{ marginRight: 7 }}
-            >
-              <path
-                d="M10.5 3L5.5 8l5 5"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Zurück zum Planner
-          </a>
         </div>
       </header>
 
       <ErrorAlert message={error} />
-
-      <ConnectionPanel
-        currentUser={currentUser}
-        isConnecting={isConnecting}
-        onLogin={onLogin}
-        onDisconnect={onDisconnect}
-      />
 
       {!currentUser ? null : isCheckingAccess ? (
         <LoadingState label="Analyse-Zugriff wird geprüft..." />
@@ -710,90 +696,6 @@ export function CapacityAnalysisPage({
               <p className="eyebrow">Analysezeitraum</p>
               <h2>Kapazitätsübersicht</h2>
             </div>
-            <div className="analysis-control-grid">
-              <div className="analysis-date-inputs">
-                <div className="form-row">
-                  <label htmlFor="analysis-from">Von</label>
-                  <DatePickerInput
-                    id="analysis-from"
-                    value={from}
-                    disabled={isLoading}
-                    onChange={setFrom}
-                  />
-                </div>
-                <div className="form-row">
-                  <label htmlFor="analysis-to">Bis</label>
-                  <DatePickerInput
-                    id="analysis-to"
-                    value={to}
-                    disabled={isLoading}
-                    onChange={setTo}
-                  />
-                </div>
-              </div>
-              <div className="analysis-presets">
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("this-month")}
-                >
-                  Dieser Monat
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("next-4-weeks")}
-                >
-                  Nächste 4 Wochen
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("this-quarter")}
-                >
-                  Dieses Quartal
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={isLoading}
-                  onClick={() => applyDatePreset("this-year")}
-                >
-                  Dieses Jahr
-                </button>
-              </div>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={
-                  isLoading ||
-                  isLoadingUsers ||
-                  usersSelectedForAnalysis.length === 0
-                }
-                title={
-                  usersSelectedForAnalysis.length === 0
-                    ? "Erst unten mindestens einen Nutzer auswählen"
-                    : undefined
-                }
-                onClick={() => void loadAnalysis()}
-              >
-                {isLoading ? (
-                  <>
-                    <span className="button-spinner" aria-hidden="true" />
-                    Wird geladen...
-                  </>
-                ) : (
-                  "Analyse starten"
-                )}
-              </button>
-            </div>
-            <p className="analysis-range-note">
-              {usersSelectedForAnalysis.length} von {availableUsers.length}{" "}
-              Nutzern für die Analyse ausgewählt.
-            </p>
             <div className="analysis-selection-tools">
               <div className="form-row analysis-team-filter-row">
                 <label htmlFor="analysis-team-filter">Teams</label>
@@ -892,6 +794,91 @@ export function CapacityAnalysisPage({
                 );
               })}
             </div>
+            <hr className="analysis-divider" />
+            <p className="analysis-range-note">
+              {usersSelectedForAnalysis.length} von {availableUsers.length}{" "}
+              Nutzern für die Analyse ausgewählt.
+            </p>
+            <div className="analysis-control-grid">
+              <div className="analysis-date-inputs">
+                <div className="form-row">
+                  <label htmlFor="analysis-from">Von</label>
+                  <DatePickerInput
+                    id="analysis-from"
+                    value={from}
+                    disabled={isLoading}
+                    onChange={setFrom}
+                  />
+                </div>
+                <div className="form-row">
+                  <label htmlFor="analysis-to">Bis</label>
+                  <DatePickerInput
+                    id="analysis-to"
+                    value={to}
+                    disabled={isLoading}
+                    onChange={setTo}
+                  />
+                </div>
+              </div>
+              <div className="analysis-presets">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-month")}
+                >
+                  Dieser Monat
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("next-4-weeks")}
+                >
+                  Nächste 4 Wochen
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-quarter")}
+                >
+                  Dieses Quartal
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-year")}
+                >
+                  Dieses Jahr
+                </button>
+              </div>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={
+                  isLoading ||
+                  isLoadingUsers ||
+                  usersSelectedForAnalysis.length === 0
+                }
+                title={
+                  usersSelectedForAnalysis.length === 0
+                    ? "Erst unten mindestens einen Nutzer auswählen"
+                    : undefined
+                }
+                onClick={() => void loadAnalysis()}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="button-spinner" aria-hidden="true" />
+                    Wird geladen...
+                  </>
+                ) : (
+                  "Analyse starten"
+                )}
+              </button>
+            </div>
           </section>
 
           {absenceLoadFailed && hasLoaded ? (
@@ -971,6 +958,25 @@ export function CapacityAnalysisPage({
                     <h2>Geplante Zeit pro Nutzer</h2>
                   </div>
                   <div className="analysis-chart-controls">
+                    <SegmentedControl
+                      value={viewMode}
+                      options={[
+                        { value: "bar" as const, label: "Balkenansicht" },
+                        {
+                          value: "table" as const,
+                          label: "Tabellenansicht",
+                          badgeText: showTableViewBadge ? "" : undefined,
+                          badgeVariant: showTableViewBadge ? "dot" : undefined,
+                          className: showTableViewBadge
+                            ? "capacity-table-option-pulse"
+                            : undefined,
+                        },
+                      ]}
+                      ariaLabel="Ansicht wechseln"
+                      onChange={handleViewModeChange}
+                    />
+                    {viewMode === "bar" && (
+                    <>
                     <div className="analysis-chart-toolbar">
                       <button
                         type="button"
@@ -1113,8 +1119,12 @@ export function CapacityAnalysisPage({
                         Auf Auswahl anwenden
                       </button>
                     </div>
+                    </>
+                    )}
                   </div>
                 </div>
+                {viewMode === "bar" ? (
+                <>
                 <div className="capacity-chart-legend" aria-label="Legende">
                   <input
                     id="analysis-user-search"
@@ -1187,6 +1197,13 @@ export function CapacityAnalysisPage({
                         : "Keine Nutzer entsprechen der Suche oder dem Auslastungsfilter."}
                     </p>
                   </div>
+                )}
+                </>
+                ) : (
+                  <CapacityTableView
+                    entries={visibleSelectedRowSummaries}
+                    capacityWeeks={capacityWeeks}
+                  />
                 )}
               </section>
 
@@ -1348,7 +1365,7 @@ function CapacityChartRow({
     () => buildProjectColorResolver(projectTotals),
     [projectTotals],
   );
-  const workloadColor = getWorkloadColor(totals.customerTargetPercent);
+  const workloadColor = getWorkloadColor(totals.customerTargetPercent, row.inputs.customerPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
   const [copied, setCopied] = useState(false);
 
@@ -1376,6 +1393,8 @@ function CapacityChartRow({
     const y = Math.max(12, event.clientY + 18);
     setTooltip({ text, x, y });
   }
+
+  const workloadTooltip = `Auslastung\n${formatHours(totals.plannedHours)} geplant / ${formatHours(totals.effectiveCapacityHours)} verfügbar = ${formatDecimal(totals.customerTargetPercent)}%\nDas ist belegte Arbeitszeit, nicht die Erfüllung des Kunden-Ziels (${formatHours(totals.targetHours)}).`;
 
   return (
     <article
@@ -1416,8 +1435,12 @@ function CapacityChartRow({
             </button>
           </div>
           <span
+            className="capacity-user-workload"
             style={{ color: workloadColor }}
-            title="Erfüllung des Kundenziels: geplante Stunden geteilt durch das Kunden-%-Ziel für den gewählten Zeitraum."
+            aria-label={workloadTooltip}
+            onMouseEnter={(event) => showProjectTooltip(workloadTooltip, event)}
+            onMouseMove={(event) => showProjectTooltip(workloadTooltip, event)}
+            onMouseLeave={() => setTooltip(undefined)}
           >
             {formatHours(totals.plannedHours)} geplant –{" "}
             {formatDecimal(totals.customerTargetPercent)}%
@@ -1780,7 +1803,7 @@ function CapacityWeekBar({
           </span>
         </span>
         <span
-          style={{ color: getWorkloadColor(weekRow.customerTargetPercent) }}
+          style={{ color: getWorkloadColor(weekRow.customerTargetPercent, customerPercent) }}
         >
           {formatDecimal(weekRow.customerTargetPercent)}%
         </span>
@@ -2313,7 +2336,7 @@ function buildCapacityWeeks(from: string, to: string): CapacityWeek[] {
 
     weeks.push({
       key: `${year}-${isoWeek}`,
-      label: `CW ${isoWeek}`,
+      label: `KW ${isoWeek}`,
       from: clippedStart,
       to: clippedEnd,
       dayCount: differenceInCalendarDays(clippedEnd, clippedStart) + 1,
@@ -2545,9 +2568,23 @@ function mergeUnresolvedHints(
   return `${existingHint} | ${nextHint}`;
 }
 
-function getWorkloadColor(workloadPercent: number): string {
-  const clampedPercent = Math.max(0, Math.min(100, workloadPercent));
-  const progress = clampedPercent / 100;
+function getWorkloadColor(
+  workloadPercent: number,
+  customerTargetPercent = 100,
+): string {
+  const target = Math.max(1, Math.min(100, customerTargetPercent));
+  const clamped = Math.max(0, workloadPercent);
+
+  let progress: number;
+  if (clamped <= target) {
+    // 0 → target maps to 0 → 1 (orange → green)
+    progress = clamped / target;
+  } else {
+    // above target: 1 → 0 (green → orange/red)
+    const overshoot = (clamped - target) / target;
+    progress = Math.max(0, 1 - overshoot);
+  }
+
   const hue = 18 + progress * 110;
   const saturation = 58 - progress * 12;
   const lightness = 56 - progress * 14;
