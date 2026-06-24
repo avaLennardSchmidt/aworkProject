@@ -976,7 +976,6 @@ export function CapacityAnalysisPage({
                       onChange={handleViewModeChange}
                     />
                     {viewMode === "bar" && (
-                    <>
                     <div className="analysis-chart-toolbar">
                       <button
                         type="button"
@@ -1009,7 +1008,9 @@ export function CapacityAnalysisPage({
                           ? "Alle Nutzer einklappen"
                           : "Alle Nutzer ausklappen"}
                       </button>
-                      <div className="analysis-toolbar-divider" />
+                    </div>
+                    )}
+                    <div className="analysis-chart-toolbar">
                       <div className="analysis-workload-filter">
                         <SegmentedControl
                           value={workloadFilterMode}
@@ -1119,8 +1120,6 @@ export function CapacityAnalysisPage({
                         Auf Auswahl anwenden
                       </button>
                     </div>
-                    </>
-                    )}
                   </div>
                 </div>
                 {viewMode === "bar" ? (
