@@ -108,7 +108,7 @@ export function FilterPanel({
             onChange={(value) => onChange({ ...filters, to: value })}
           />
         </div>
-        <div className="form-row project-filter-row">
+        <div className="form-row">
           <label htmlFor="project-filter">Projekt</label>
           <SearchableSelect
             buttonId="project-filter"

@@ -229,6 +229,59 @@ select:disabled {
   margin-top: 6px;
 }
 
+/* Placement button group */
+.placement-options {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.placement-btn {
+  flex: 1;
+  padding: 8px 12px;
+  min-height: 44px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: #fbfcfd;
+  border: none;
+  border-right: 1px solid var(--color-border-strong);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.placement-btn:last-child {
+  border-right: none;
+}
+
+.placement-btn:hover {
+  background: var(--color-accent-soft);
+}
+
+.placement-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Optional field tag */
+.optional-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .connection-panel {
   display: grid;
   gap: 20px;
@@ -1143,6 +1196,85 @@ select:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.project-primary-row,
+.task-primary-row {
+  grid-column: 1 / -1;
+}
+
+.project-primary-row label,
+.task-primary-row label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.project-primary-row .searchable-select-button,
+.task-primary-row .searchable-select-button {
+  border: 2px solid var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.project-primary-row .searchable-select-button:hover,
+.task-primary-row .searchable-select-button:hover {
+  border-color: var(--color-accent-hover);
+}
+
+.task-filter-toggle {
+  align-self: end;
+  padding-bottom: 10px;
+}
+
+.project-filter-section,
+.task-filter-section {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: rgba(0, 0, 0, 0.022);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.project-filter-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-filter-section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.project-filter-optional-badge {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: var(--color-border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.project-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.project-filter-row label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
 .project-plan-schedule-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1230,9 +1362,107 @@ select:disabled {
   margin-top: 10px;
 }
 
+.panel-section-break {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 2px;
+}
+
+.panel-section-break::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.panel-section-break span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.schedule-section-divider {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: -2px;
+}
+
+.schedule-section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.schedule-section-divider span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.tageszeit-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+}
+
+.tageszeit-field-time {
+  width: 152px;
+  flex-shrink: 0;
+  padding-bottom: 4px;
+}
+
+.tageszeit-field-maxhours {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.tageszeit-field-placement {
+  flex: 1;
+  max-width: 270px;
+}
+
+.tageszeit-optional-group {
+  align-self: flex-end;
+}
+
+.tageszeit-optional-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px 4px;
+  background: rgba(0, 0, 0, 0.022);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.tageszeit-optional-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.tageszeit-optional-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
 .project-toggle-row {
-  grid-column: 1;
-  margin-top: -2px;
+  margin-top: 2px;
 }
 
 .task-mode-row {
@@ -2350,6 +2580,41 @@ button.auto-plan-skipped-day:hover {
 }
 
 /* ─── End Date Picker ─────────────────────────────────────────────────────── */
+
+/* ─── Time Picker ─────────────────────────────────────────────────────────── */
+
+.time-picker-menu {
+  width: 220px;
+  padding: 14px 12px;
+}
+
+.time-picker-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.time-picker-spinners {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.time-picker-spinners .date-picker-section {
+  flex: 1;
+}
+
+.time-picker-colon {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  padding-top: 20px;
+}
+
+/* ─── End Time Picker ─────────────────────────────────────────────────────── */
 
 .create-preview h3,
 .create-preview p {

@@ -1,5 +1,6 @@
 import { addDays, format, parseISO, set } from "date-fns";
 import { DatePickerInput } from "./DatePickerInput";
+import { TimePickerInput } from "./TimePickerInput";
 import { useMemo, useState } from "react";
 import type { AworkUser, CreateTaskSchedulePayload } from "../types/awork";
 import type { BlockerOperation, ScheduleGroup } from "../types/planner";
@@ -306,27 +307,21 @@ export function ManualBlockerEditModal({
                 </label>
                 <label>
                   Start
-                  <input
-                    type="time"
+                  <TimePickerInput
                     value={view.row.startTime}
                     disabled={view.row.remove}
-                    onChange={(event) =>
-                      updateExistingRow(schedule.id, {
-                        startTime: event.target.value,
-                      })
+                    onChange={(val) =>
+                      updateExistingRow(schedule.id, { startTime: val })
                     }
                   />
                 </label>
                 <label>
                   Ende
-                  <input
-                    type="time"
+                  <TimePickerInput
                     value={view.row.endTime}
                     disabled={view.row.remove}
-                    onChange={(event) =>
-                      updateExistingRow(schedule.id, {
-                        endTime: event.target.value,
-                      })
+                    onChange={(val) =>
+                      updateExistingRow(schedule.id, { endTime: val })
                     }
                   />
                 </label>
@@ -389,23 +384,19 @@ export function ManualBlockerEditModal({
                 </label>
                 <label>
                   Start
-                  <input
-                    type="time"
+                  <TimePickerInput
                     value={row.startTime}
-                    onChange={(event) =>
-                      updateNewRow(row.tempId, {
-                        startTime: event.target.value,
-                      })
+                    onChange={(val) =>
+                      updateNewRow(row.tempId, { startTime: val })
                     }
                   />
                 </label>
                 <label>
                   Ende
-                  <input
-                    type="time"
+                  <TimePickerInput
                     value={row.endTime}
-                    onChange={(event) =>
-                      updateNewRow(row.tempId, { endTime: event.target.value })
+                    onChange={(val) =>
+                      updateNewRow(row.tempId, { endTime: val })
                     }
                   />
                 </label>

@@ -26,12 +26,14 @@ import {
   formatPayloadTimeWindow,
   MIN_AUTO_PLAN_BLOCKER_MINUTES,
   type AutoPlanDay,
+  type AutoPlanPlacement,
   type AutoPlanResult,
   type AutoPlanWeek,
   type PayloadOverlap,
 } from "../services/autoPlanScheduler";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
 import { DatePickerInput } from "./DatePickerInput";
+import { TimePickerInput } from "./TimePickerInput";
 import {
   formatSearchPlaceholder,
   MultiSearchableSelect,
@@ -285,6 +287,9 @@ export function CreateScheduleGroupPanel({
     PROJECT_TYPE_FILTER_ALL,
   );
   const [autoPlanHours, setAutoPlanHours] = useState(defaults.autoPlanHours);
+  const [maxBlockerHours, setMaxBlockerHours] = useState("");
+  const [blockerPlacement, setBlockerPlacement] =
+    useState<AutoPlanPlacement>("start");
   const [existingSchedules, setExistingSchedules] = useState<
     AworkTaskSchedule[]
   >([]);
@@ -414,6 +419,9 @@ export function CreateScheduleGroupPanel({
     [filteredTasks],
   );
   const autoRequestedMinutes = readHoursToMinutes(autoPlanHours);
+  const autoMaxBlockerMinutes = maxBlockerHours
+    ? readHoursToMinutes(maxBlockerHours)
+    : undefined;
   const autoPlanResult = useMemo(
     () =>
       buildAutoPlan({
@@ -427,9 +435,13 @@ export function CreateScheduleGroupPanel({
         requestedMinutes: autoRequestedMinutes,
         existingSchedules,
         userCapacity,
+        maxBlockerMinutes: autoMaxBlockerMinutes,
+        placement: blockerPlacement,
       }),
     [
       autoRequestedMinutes,
+      autoMaxBlockerMinutes,
+      blockerPlacement,
       currentUser,
       effectiveTaskId,
       existingSchedules,
@@ -474,6 +486,8 @@ export function CreateScheduleGroupPanel({
       weekday,
       startTime,
       endTime,
+      maxBlockerMinutes: autoMaxBlockerMinutes,
+      placement: blockerPlacement,
     });
   }, [
     effectiveAutoPayloads,
@@ -485,6 +499,8 @@ export function CreateScheduleGroupPanel({
     startTime,
     endTime,
     taskMode,
+    autoMaxBlockerMinutes,
+    blockerPlacement,
   ]);
   const totalMinutes = previewPayloads.reduce(
     (sum, payload) => sum + payload.plannedDuration / 60,
@@ -593,6 +609,8 @@ export function CreateScheduleGroupPanel({
               requestedMinutes: autoRequestedMinutes,
               existingSchedules: context.schedules,
               userCapacity: context.capacity,
+              maxBlockerMinutes: autoMaxBlockerMinutes,
+              placement: blockerPlacement,
             })
           : undefined;
       const nextPreviewPayloads = nextAutoPlanResult
@@ -605,6 +623,8 @@ export function CreateScheduleGroupPanel({
             weekday,
             startTime,
             endTime,
+            maxBlockerMinutes: autoMaxBlockerMinutes,
+            placement: blockerPlacement,
           });
       // Reconcile the summary with manual edits so the confirm step does not
       // show a stale "X offen" warning after gaps were filled by hand.
@@ -674,6 +694,9 @@ export function CreateScheduleGroupPanel({
 
     if (created) {
       resetScheduleFields();
+      setTaskId("");
+      setNewTaskName("");
+      setTaskStatusFilter(TASK_FILTER_ALL);
       setCreatePreview(null);
     }
   }
@@ -687,6 +710,8 @@ export function CreateScheduleGroupPanel({
     setStartTime(nextDefaults.startTime);
     setEndTime(nextDefaults.endTime);
     setAutoPlanHours(nextDefaults.autoPlanHours);
+    setMaxBlockerHours("");
+    setBlockerPlacement("start");
     setWeekOverrides(new Map());
     setError("");
   }
@@ -753,54 +778,80 @@ export function CreateScheduleGroupPanel({
         </div>
 
         <div className="create-grid project-selection-grid">
-          <div className="form-row">
-            <label htmlFor="create-project-type">Statustyp</label>
-            <SearchableSelect
-              buttonId="create-project-type"
-              value={projectTypeFilter}
-              disabled={isLoadingProjects}
-              options={projectTypeOptions}
-              placeholder="Statustyp auswählen"
-              searchPlaceholder={formatSearchPlaceholder(
-                "Typ filtern",
-                projectTypeOptions.length,
-              )}
-              emptyLabel="Keine Typen gefunden"
-              onChange={(value) => {
-                setProjectTypeFilter(value);
-                setProjectStatusFilter(PROJECT_FILTER_ACTIVE);
-                setProjectId("");
-                setTaskId("");
-                setTaskStatusFilter(TASK_FILTER_ALL);
-                setNewTaskName("");
-              }}
-            />
+          <div className="project-filter-section">
+            <div className="project-filter-section-header">
+              <span className="project-filter-section-label">
+                Liste eingrenzen
+              </span>
+              <span className="project-filter-optional-badge">Optional</span>
+            </div>
+            <div className="project-filter-row">
+              <div className="form-row">
+                <label htmlFor="create-project-type">Statustyp</label>
+                <SearchableSelect
+                  buttonId="create-project-type"
+                  value={projectTypeFilter}
+                  disabled={isLoadingProjects}
+                  options={projectTypeOptions}
+                  placeholder="Statustyp auswählen"
+                  searchPlaceholder={formatSearchPlaceholder(
+                    "Typ filtern",
+                    projectTypeOptions.length,
+                  )}
+                  emptyLabel="Keine Typen gefunden"
+                  onChange={(value) => {
+                    setProjectTypeFilter(value);
+                    setProjectStatusFilter(PROJECT_FILTER_ACTIVE);
+                    setProjectId("");
+                    setTaskId("");
+                    setTaskStatusFilter(TASK_FILTER_ALL);
+                    setNewTaskName("");
+                  }}
+                />
+              </div>
+              <div className="form-row">
+                <label htmlFor="create-project-status">Projektstatus</label>
+                <SearchableSelect
+                  buttonId="create-project-status"
+                  value={projectStatusFilter}
+                  disabled={isLoadingProjects}
+                  options={projectStatusOptions}
+                  placeholder="Projektstatus auswählen"
+                  searchPlaceholder={formatSearchPlaceholder(
+                    "Status filtern",
+                    projectStatusOptions.length,
+                  )}
+                  emptyLabel="Keine Status gefunden"
+                  onChange={(value) => {
+                    setProjectStatusFilter(value);
+                    setProjectId("");
+                    setTaskId("");
+                    setTaskStatusFilter(TASK_FILTER_ALL);
+                    setNewTaskName("");
+                  }}
+                />
+              </div>
+            </div>
+            <div className="form-row project-toggle-row">
+              <label
+                htmlFor="create-only-my-projects"
+                className="checkbox-row"
+              >
+                <input
+                  id="create-only-my-projects"
+                  type="checkbox"
+                  checked={onlyMyProjects}
+                  disabled={myAssignedProjectIds.size === 0}
+                  onChange={(event) =>
+                    handleOnlyMyProjectsChange(event.target.checked)
+                  }
+                />
+                <span>Nur mir zugewiesene Projekte</span>
+              </label>
+            </div>
           </div>
-          <div className="form-row">
-            <label htmlFor="create-project-status">Projektstatus</label>
-            <SearchableSelect
-              buttonId="create-project-status"
-              value={projectStatusFilter}
-              disabled={isLoadingProjects}
-              options={projectStatusOptions}
-              placeholder="Projektstatus auswählen"
-              searchPlaceholder={formatSearchPlaceholder(
-                "Status filtern",
-                projectStatusOptions.length,
-              )}
-              emptyLabel="Keine Status gefunden"
-              onChange={(value) => {
-                setProjectStatusFilter(value);
-                setProjectId("");
-                setTaskId("");
-                setTaskStatusFilter(TASK_FILTER_ALL);
-                setNewTaskName("");
-              }}
-            />
-          </div>
-
-          <div className="form-row">
-            <label htmlFor="create-project">Projekt</label>
+          <div className="form-row project-primary-row">
+            <label htmlFor="create-project">Projekt auswählen</label>
             <SearchableSelect
               buttonId="create-project"
               value={projectId}
@@ -818,20 +869,6 @@ export function CreateScheduleGroupPanel({
               emptyLabel="Keine Projekte gefunden"
               onChange={(value) => void handleProjectChange(value)}
             />
-          </div>
-          <div className="form-row project-toggle-row">
-            <label htmlFor="create-only-my-projects" className="checkbox-row">
-              <input
-                id="create-only-my-projects"
-                type="checkbox"
-                checked={onlyMyProjects}
-                disabled={myAssignedProjectIds.size === 0}
-                onChange={(event) =>
-                  handleOnlyMyProjectsChange(event.target.checked)
-                }
-              />
-              <span>Nur mir zugewiesene Projekte</span>
-            </label>
           </div>
         </div>
 
@@ -851,28 +888,56 @@ export function CreateScheduleGroupPanel({
         <div className="create-grid task-details-grid">
           {taskMode === "existing" ? (
             <>
-              <div className="form-row">
-                <label htmlFor="create-task-status">Aufgabenstatus</label>
-                <SearchableSelect
-                  buttonId="create-task-status"
-                  value={taskStatusFilter}
-                  disabled={!projectId || isLoadingTasks}
-                  options={taskStatusOptions}
-                  placeholder="Aufgabenstatus auswählen"
-                  searchPlaceholder={formatSearchPlaceholder(
-                    "Status filtern",
-                    taskStatusOptions.length,
-                  )}
-                  emptyLabel="Keine Status gefunden"
-                  onChange={(value) => {
-                    setTaskStatusFilter(value);
-                    setTaskId("");
-                  }}
-                />
+              <div className="task-filter-section">
+                <div className="project-filter-section-header">
+                  <span className="project-filter-section-label">
+                    Liste eingrenzen
+                  </span>
+                  <span className="project-filter-optional-badge">
+                    Optional
+                  </span>
+                </div>
+                <div className="project-filter-row">
+                  <div className="form-row">
+                    <label htmlFor="create-task-status">Aufgabenstatus</label>
+                    <SearchableSelect
+                      buttonId="create-task-status"
+                      value={taskStatusFilter}
+                      disabled={!projectId || isLoadingTasks}
+                      options={taskStatusOptions}
+                      placeholder="Aufgabenstatus auswählen"
+                      searchPlaceholder={formatSearchPlaceholder(
+                        "Status filtern",
+                        taskStatusOptions.length,
+                      )}
+                      emptyLabel="Keine Status gefunden"
+                      onChange={(value) => {
+                        setTaskStatusFilter(value);
+                        setTaskId("");
+                      }}
+                    />
+                  </div>
+                  <div className="form-row task-filter-toggle">
+                    <label
+                      htmlFor="create-only-my-assigned-tasks"
+                      className="checkbox-row"
+                    >
+                      <input
+                        id="create-only-my-assigned-tasks"
+                        type="checkbox"
+                        checked={onlyMyAssignedTasks}
+                        disabled={myAssignedTaskIds.size === 0 || !projectId}
+                        onChange={(event) =>
+                          handleOnlyMyAssignedTasksChange(event.target.checked)
+                        }
+                      />
+                      <span>Nur mir zugewiesene Aufgaben</span>
+                    </label>
+                  </div>
+                </div>
               </div>
-
-              <div className="form-row">
-                <label htmlFor="create-task">Aufgabe</label>
+              <div className="form-row task-primary-row">
+                <label htmlFor="create-task">Aufgabe auswählen</label>
                 <SearchableSelect
                   buttonId="create-task"
                   value={taskId}
@@ -890,23 +955,6 @@ export function CreateScheduleGroupPanel({
                   emptyLabel="Keine Aufgaben gefunden"
                   onChange={setTaskId}
                 />
-              </div>
-              <div className="form-row form-row-col2">
-                <label
-                  htmlFor="create-only-my-assigned-tasks"
-                  className="checkbox-row"
-                >
-                  <input
-                    id="create-only-my-assigned-tasks"
-                    type="checkbox"
-                    checked={onlyMyAssignedTasks}
-                    disabled={myAssignedTaskIds.size === 0 || !projectId}
-                    onChange={(event) =>
-                      handleOnlyMyAssignedTasksChange(event.target.checked)
-                    }
-                  />
-                  <span>Nur mir zugewiesene Aufgaben</span>
-                </label>
               </div>
             </>
           ) : taskMode === "auto" ? (
@@ -954,30 +1002,62 @@ export function CreateScheduleGroupPanel({
               </div>
               {autoTaskSource === "existing" ? (
                 <>
-                  <div className="form-row">
-                    <label htmlFor="create-auto-task-status">
-                      Aufgabenstatus
-                    </label>
-                    <SearchableSelect
-                      buttonId="create-auto-task-status"
-                      value={taskStatusFilter}
-                      disabled={!projectId || isLoadingTasks}
-                      options={taskStatusOptions}
-                      placeholder="Aufgabenstatus auswählen"
-                      searchPlaceholder={formatSearchPlaceholder(
-                        "Status filtern",
-                        taskStatusOptions.length,
-                      )}
-                      emptyLabel="Keine Status gefunden"
-                      onChange={(value) => {
-                        setTaskStatusFilter(value);
-                        setTaskId("");
-                      }}
-                    />
+                  <div className="task-filter-section">
+                    <div className="project-filter-section-header">
+                      <span className="project-filter-section-label">
+                        Liste eingrenzen
+                      </span>
+                      <span className="project-filter-optional-badge">
+                        Optional
+                      </span>
+                    </div>
+                    <div className="project-filter-row">
+                      <div className="form-row">
+                        <label htmlFor="create-auto-task-status">
+                          Aufgabenstatus
+                        </label>
+                        <SearchableSelect
+                          buttonId="create-auto-task-status"
+                          value={taskStatusFilter}
+                          disabled={!projectId || isLoadingTasks}
+                          options={taskStatusOptions}
+                          placeholder="Aufgabenstatus auswählen"
+                          searchPlaceholder={formatSearchPlaceholder(
+                            "Status filtern",
+                            taskStatusOptions.length,
+                          )}
+                          emptyLabel="Keine Status gefunden"
+                          onChange={(value) => {
+                            setTaskStatusFilter(value);
+                            setTaskId("");
+                          }}
+                        />
+                      </div>
+                      <div className="form-row task-filter-toggle">
+                        <label
+                          htmlFor="create-auto-only-my-assigned-tasks"
+                          className="checkbox-row"
+                        >
+                          <input
+                            id="create-auto-only-my-assigned-tasks"
+                            type="checkbox"
+                            checked={onlyMyAssignedTasks}
+                            disabled={
+                              myAssignedTaskIds.size === 0 || !projectId
+                            }
+                            onChange={(event) =>
+                              handleOnlyMyAssignedTasksChange(
+                                event.target.checked,
+                              )
+                            }
+                          />
+                          <span>Nur mir zugewiesene Aufgaben</span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="form-row">
-                    <label htmlFor="create-auto-task">Aufgabe</label>
+                  <div className="form-row task-primary-row">
+                    <label htmlFor="create-auto-task">Aufgabe auswählen</label>
                     <SearchableSelect
                       buttonId="create-auto-task"
                       value={taskId}
@@ -995,23 +1075,6 @@ export function CreateScheduleGroupPanel({
                       emptyLabel="Keine Aufgaben gefunden"
                       onChange={setTaskId}
                     />
-                  </div>
-                  <div className="form-row form-row-col2">
-                    <label
-                      htmlFor="create-auto-only-my-assigned-tasks"
-                      className="checkbox-row"
-                    >
-                      <input
-                        id="create-auto-only-my-assigned-tasks"
-                        type="checkbox"
-                        checked={onlyMyAssignedTasks}
-                        disabled={myAssignedTaskIds.size === 0 || !projectId}
-                        onChange={(event) =>
-                          handleOnlyMyAssignedTasksChange(event.target.checked)
-                        }
-                      />
-                      <span>Nur mir zugewiesene Aufgaben</span>
-                    </label>
                   </div>
                 </>
               ) : (
@@ -1045,42 +1108,36 @@ export function CreateScheduleGroupPanel({
           )}
         </div>
 
+        <div className="panel-section-break">
+          <span>Zeitplanung</span>
+        </div>
+
         <div className="create-grid schedule-fields-grid">
+          <div className="schedule-section-divider">
+            <span>Zeitraum</span>
+          </div>
           {taskMode === "auto" ? (
-            <>
-              <div className="form-row">
-                <label htmlFor="create-auto-weekdays">Wochentage</label>
-                <MultiSearchableSelect
-                  buttonId="create-auto-weekdays"
-                  values={selectedAutoWeekdays}
-                  options={weekdays
-                    .filter((day) => day.value >= 1 && day.value <= 5)
-                    .map((day) => ({
-                      value: String(day.value),
-                      label: day.label,
-                    }))}
-                  placeholder="Wochentage auswählen"
-                  searchPlaceholder="Wochentage filtern (5 gefunden)"
-                  emptyLabel="Kein Wochentag gefunden."
-                  menuWidth="compact"
-                  selectedLabel={(count) =>
-                    `${count} Wochentag${count === 1 ? "" : "e"} ausgewählt`
-                  }
-                  onChange={setSelectedAutoWeekdays}
-                />
-              </div>
-              <div className="form-row">
-                <label htmlFor="create-auto-hours">Stunden pro Woche</label>
-                <input
-                  id="create-auto-hours"
-                  type="text"
-                  inputMode="decimal"
-                  value={autoPlanHours}
-                  placeholder="z.B. 5,5"
-                  onChange={(event) => setAutoPlanHours(event.target.value)}
-                />
-              </div>
-            </>
+            <div className="form-row">
+              <label htmlFor="create-auto-weekdays">Wochentage</label>
+              <MultiSearchableSelect
+                buttonId="create-auto-weekdays"
+                values={selectedAutoWeekdays}
+                options={weekdays
+                  .filter((day) => day.value >= 1 && day.value <= 5)
+                  .map((day) => ({
+                    value: String(day.value),
+                    label: day.label,
+                  }))}
+                placeholder="Wochentage auswählen"
+                searchPlaceholder="Wochentage filtern (5 gefunden)"
+                emptyLabel="Kein Wochentag gefunden."
+                menuWidth="compact"
+                selectedLabel={(count) =>
+                  `${count} Wochentag${count === 1 ? "" : "e"} ausgewählt`
+                }
+                onChange={setSelectedAutoWeekdays}
+              />
+            </div>
           ) : (
             <div className="form-row">
               <label htmlFor="create-weekday">Wochentag</label>
@@ -1117,24 +1174,149 @@ export function CreateScheduleGroupPanel({
               onChange={setTo}
             />
           </div>
-          <div className="form-row">
-            <label htmlFor="create-start">Start</label>
-            <input
-              id="create-start"
-              type="time"
-              value={startTime}
-              onChange={(event) => setStartTime(event.target.value)}
-            />
+
+          <div className="schedule-section-divider">
+            <span>{taskMode === "auto" ? "Kapazität" : "Tageszeit"}</span>
           </div>
-          <div className="form-row">
-            <label htmlFor="create-end">Ende</label>
-            <input
-              id="create-end"
-              type="time"
-              value={endTime}
-              onChange={(event) => setEndTime(event.target.value)}
-            />
-          </div>
+          {taskMode === "auto" ? (
+            <>
+              <div className="form-row">
+                <label htmlFor="create-auto-hours">Stunden pro Woche</label>
+                <input
+                  id="create-auto-hours"
+                  type="text"
+                  inputMode="decimal"
+                  value={autoPlanHours}
+                  placeholder="z.B. 5,5"
+                  onChange={(event) => setAutoPlanHours(event.target.value)}
+                />
+              </div>
+              <div className="form-row">
+                <label htmlFor="create-start">Start</label>
+                <TimePickerInput
+                  id="create-start"
+                  value={startTime}
+                  onChange={setStartTime}
+                />
+              </div>
+              <div className="form-row">
+                <label htmlFor="create-end">Ende</label>
+                <TimePickerInput
+                  id="create-end"
+                  value={endTime}
+                  onChange={setEndTime}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="tageszeit-row">
+              <div className="form-row tageszeit-field-time">
+                <label htmlFor="create-start">Start</label>
+                <TimePickerInput
+                  id="create-start"
+                  value={startTime}
+                  onChange={setStartTime}
+                />
+              </div>
+              <div className="form-row tageszeit-field-time">
+                <label htmlFor="create-end">Ende</label>
+                <TimePickerInput
+                  id="create-end"
+                  value={endTime}
+                  onChange={setEndTime}
+                />
+              </div>
+              <div className="tageszeit-separator" />
+              <div className="tageszeit-optional-group">
+                <span className="tageszeit-optional-eyebrow">Optional</span>
+                <div className="tageszeit-optional-inner">
+                  <div className="form-row tageszeit-field-maxhours">
+                    <label htmlFor="create-max-blocker">Max. Stunden</label>
+                    <input
+                      id="create-max-blocker"
+                      type="text"
+                      inputMode="decimal"
+                      value={maxBlockerHours}
+                      placeholder="∞"
+                      onChange={(event) => setMaxBlockerHours(event.target.value)}
+                    />
+                  </div>
+                  <div className="form-row tageszeit-field-placement">
+                    <label>Platzierung</label>
+                    {!maxBlockerHours && (
+                      <p className="field-hint">
+                        Wirkt nur bei gesetztem Max. Stunden.
+                      </p>
+                    )}
+                    <div className="placement-options">
+                      {(
+                        [
+                          ["start", "Anfang"],
+                          ["center", "Mitte"],
+                          ["end", "Ende"],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`placement-btn${blockerPlacement === value ? " active" : ""}`}
+                          onClick={() => setBlockerPlacement(value)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {taskMode === "auto" && (
+            <div className="tageszeit-row">
+              <div className="tageszeit-optional-group">
+                <span className="tageszeit-optional-eyebrow">Optional</span>
+                <div className="tageszeit-optional-inner">
+                  <div className="form-row tageszeit-field-maxhours">
+                    <label htmlFor="create-max-blocker">Max. Stunden</label>
+                    <input
+                      id="create-max-blocker"
+                      type="text"
+                      inputMode="decimal"
+                      value={maxBlockerHours}
+                      placeholder="∞"
+                      onChange={(event) => setMaxBlockerHours(event.target.value)}
+                    />
+                  </div>
+                  <div className="form-row tageszeit-field-placement">
+                    <label>Platzierung</label>
+                    {!maxBlockerHours && (
+                      <p className="field-hint">
+                        Wirkt nur bei gesetztem Max. Stunden.
+                      </p>
+                    )}
+                    <div className="placement-options">
+                      {(
+                        [
+                          ["start", "Anfang"],
+                          ["center", "Mitte"],
+                          ["end", "Ende"],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`placement-btn${blockerPlacement === value ? " active" : ""}`}
+                          onClick={() => setBlockerPlacement(value)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {overlapEntries.length > 0 && taskMode !== "auto" ? (
@@ -1937,17 +2119,13 @@ function AutoPlanWeekEditModal({
                       maxDate={maxDate}
                       onChange={setEditDate}
                     />
-                    <input
-                      type="time"
+                    <TimePickerInput
                       value={editStart}
-                      className="manual-resolve-planned-edit-input"
-                      onChange={(e) => setEditStart(e.target.value)}
+                      onChange={setEditStart}
                     />
-                    <input
-                      type="time"
+                    <TimePickerInput
                       value={editEnd}
-                      className="manual-resolve-planned-edit-input"
-                      onChange={(e) => setEditEnd(e.target.value)}
+                      onChange={setEditEnd}
                     />
                     <button
                       type="button"
@@ -2032,20 +2210,18 @@ function AutoPlanWeekEditModal({
           </div>
           <div className="form-row">
             <label htmlFor="auto-week-add-start">Start</label>
-            <input
+            <TimePickerInput
               id="auto-week-add-start"
-              type="time"
               value={formStart}
-              onChange={(e) => setFormStart(e.target.value)}
+              onChange={setFormStart}
             />
           </div>
           <div className="form-row">
             <label htmlFor="auto-week-add-end">Ende</label>
-            <input
+            <TimePickerInput
               id="auto-week-add-end"
-              type="time"
               value={formEnd}
-              onChange={(e) => setFormEnd(e.target.value)}
+              onChange={setFormEnd}
             />
           </div>
         </div>
@@ -2249,6 +2425,8 @@ function buildPayloads({
   weekday,
   startTime,
   endTime,
+  maxBlockerMinutes,
+  placement,
 }: {
   currentUser: AworkUser;
   taskId: string;
@@ -2257,6 +2435,8 @@ function buildPayloads({
   weekday: number;
   startTime: string;
   endTime: string;
+  maxBlockerMinutes?: number;
+  placement?: AutoPlanPlacement;
 }): CreateTaskSchedulePayload[] {
   if (!taskId || !from || !to || !startTime || !endTime) return [];
 
@@ -2269,23 +2449,64 @@ function buildPayloads({
   )
     return [];
 
-  return eachDayOfInterval({ start: startDate, end: endDate })
-    .filter((date) => getDay(date) === weekday)
-    .map((date) => {
-      const start = setTime(date, startTime);
-      const end = setTime(date, endTime);
-      const plannedDuration = Math.max(
-        0,
-        Math.round((end.getTime() - start.getTime()) / 1000),
-      );
-      return {
+  const payloads: CreateTaskSchedulePayload[] = [];
+
+  for (const date of eachDayOfInterval({ start: startDate, end: endDate })) {
+    if (getDay(date) !== weekday) continue;
+
+    const slotStart = setTime(date, startTime);
+    const slotEnd = setTime(date, endTime);
+    const slotMinutes = Math.max(
+      0,
+      Math.round((slotEnd.getTime() - slotStart.getTime()) / 60000),
+    );
+
+    if (slotMinutes <= 0) continue;
+
+    const cap =
+      maxBlockerMinutes && maxBlockerMinutes > 0 && maxBlockerMinutes < slotMinutes
+        ? maxBlockerMinutes
+        : undefined;
+
+    if (!cap) {
+      // Full window — single blocker
+      payloads.push({
         taskId,
         userId: currentUser.id,
-        startDate: format(start, "yyyy-MM-dd'T'HH:mm:ssxxx"),
-        endDate: format(end, "yyyy-MM-dd'T'HH:mm:ssxxx"),
-        plannedDuration,
-      };
-    });
+        startDate: format(slotStart, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+        endDate: format(slotEnd, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+        plannedDuration: slotMinutes * 60,
+      });
+    } else {
+      // Place a single capped blocker according to placement
+      const p = placement ?? "start";
+      let blockStart: Date;
+      let blockEnd: Date;
+
+      if (p === "start") {
+        blockStart = slotStart;
+        blockEnd = new Date(slotStart.getTime() + cap * 60000);
+      } else if (p === "end") {
+        blockEnd = slotEnd;
+        blockStart = new Date(slotEnd.getTime() - cap * 60000);
+      } else {
+        // center
+        const offset = Math.round((slotMinutes - cap) / 2);
+        blockStart = new Date(slotStart.getTime() + offset * 60000);
+        blockEnd = new Date(blockStart.getTime() + cap * 60000);
+      }
+
+      payloads.push({
+        taskId,
+        userId: currentUser.id,
+        startDate: format(blockStart, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+        endDate: format(blockEnd, "yyyy-MM-dd'T'HH:mm:ssxxx"),
+        plannedDuration: cap * 60,
+      });
+    }
+  }
+
+  return payloads;
 }
 
 function setTime(date: Date, hhmm: string): Date {

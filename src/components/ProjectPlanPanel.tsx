@@ -37,6 +37,7 @@ import {
 } from "./SearchableSelect";
 import { SegmentedControl } from "./SegmentedControl";
 import { DatePickerInput } from "./DatePickerInput";
+import { TimePickerInput } from "./TimePickerInput";
 
 interface ProjectPlanPanelProps {
   currentUser: AworkUser;
@@ -816,24 +817,22 @@ export function ProjectPlanPanel({
             </div>
             <div className="form-row">
               <label htmlFor="project-plan-start">Start</label>
-              <input
+              <TimePickerInput
                 id="project-plan-start"
-                type="time"
                 value={startTime}
-                onChange={(event) => {
-                  setStartTime(event.target.value);
+                onChange={(val) => {
+                  setStartTime(val);
                   setPreview(null);
                 }}
               />
             </div>
             <div className="form-row">
               <label htmlFor="project-plan-end">Ende</label>
-              <input
+              <TimePickerInput
                 id="project-plan-end"
-                type="time"
                 value={endTime}
-                onChange={(event) => {
-                  setEndTime(event.target.value);
+                onChange={(val) => {
+                  setEndTime(val);
                   setPreview(null);
                 }}
               />
@@ -1236,26 +1235,24 @@ export function ProjectPlanPanel({
                       </label>
                       <label>
                         <span>Start</span>
-                        <input
-                          type="time"
+                        <TimePickerInput
                           value={format(parseISO(payload.startDate), "HH:mm")}
-                          onChange={(event) =>
+                          onChange={(val) =>
                             updatePreviewPayload(
                               index,
-                              movePayloadStartTime(payload, event.target.value),
+                              movePayloadStartTime(payload, val),
                             )
                           }
                         />
                       </label>
                       <label>
                         <span>Ende</span>
-                        <input
-                          type="time"
+                        <TimePickerInput
                           value={format(parseISO(payload.endDate), "HH:mm")}
-                          onChange={(event) =>
+                          onChange={(val) =>
                             updatePreviewPayload(
                               index,
-                              movePayloadEndTime(payload, event.target.value),
+                              movePayloadEndTime(payload, val),
                             )
                           }
                         />
@@ -1578,17 +1575,13 @@ function ManualResolveModal({
                       maxDate={windowEnd}
                       onChange={setEditDate}
                     />
-                    <input
-                      type="time"
+                    <TimePickerInput
                       value={editStart}
-                      className="manual-resolve-planned-edit-input"
-                      onChange={(e) => setEditStart(e.target.value)}
+                      onChange={setEditStart}
                     />
-                    <input
-                      type="time"
+                    <TimePickerInput
                       value={editEnd}
-                      className="manual-resolve-planned-edit-input"
-                      onChange={(e) => setEditEnd(e.target.value)}
+                      onChange={setEditEnd}
                     />
                     <button type="button" className="manual-resolve-planned-save" title="Speichern" onClick={saveEditRow}>✓</button>
                     <button type="button" className="manual-resolve-planned-cancel" title="Abbrechen" onClick={() => setEditingIdx(null)}>×</button>
@@ -1645,20 +1638,18 @@ function ManualResolveModal({
           </div>
           <div className="form-row">
             <label htmlFor="manual-add-start">Start</label>
-            <input
+            <TimePickerInput
               id="manual-add-start"
-              type="time"
               value={formStart}
-              onChange={(e) => setFormStart(e.target.value)}
+              onChange={setFormStart}
             />
           </div>
           <div className="form-row">
             <label htmlFor="manual-add-end">Ende</label>
-            <input
+            <TimePickerInput
               id="manual-add-end"
-              type="time"
               value={formEnd}
-              onChange={(e) => setFormEnd(e.target.value)}
+              onChange={setFormEnd}
             />
           </div>
         </div>

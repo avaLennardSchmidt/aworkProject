@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { TimePickerInput } from "./TimePickerInput";
 import type { AworkUser } from "../types/awork";
 import type { PreviewChange, ScheduleGroup } from "../types/planner";
 import {
@@ -125,11 +126,11 @@ export function BulkEditModal({ group, currentUser, onClose, onPreview, onManual
           </div>
           <div className="form-row">
             <label htmlFor="new-start">Neue Startzeit</label>
-            <input id="new-start" type="time" value={newStartTime} onChange={(event) => setNewStartTime(event.target.value)} />
+            <TimePickerInput id="new-start" value={newStartTime} onChange={setNewStartTime} />
           </div>
           <div className="form-row">
             <label htmlFor="new-end">Neue Endzeit</label>
-            <input id="new-end" type="time" value={newEndTime} onChange={(event) => setNewEndTime(event.target.value)} />
+            <TimePickerInput id="new-end" value={newEndTime} onChange={setNewEndTime} />
           </div>
         </div>
 

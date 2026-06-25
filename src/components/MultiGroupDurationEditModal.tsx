@@ -1,5 +1,6 @@
 import { addMinutes, format, parseISO } from "date-fns";
 import { useMemo, useState } from "react";
+import { TimePickerInput } from "./TimePickerInput";
 import type { AworkUser } from "../types/awork";
 import type {
   BlockerOperation,
@@ -302,20 +303,18 @@ export function MultiGroupDurationEditModal({
               <>
                 <div className="form-row multi-edit-panel">
                   <label htmlFor="multi-window-start">Startzeit</label>
-                  <input
+                  <TimePickerInput
                     id="multi-window-start"
-                    type="time"
                     value={windowStartTime}
-                    onChange={(event) => setWindowStartTime(event.target.value)}
+                    onChange={setWindowStartTime}
                   />
                 </div>
                 <div className="form-row multi-edit-panel">
                   <label htmlFor="multi-window-end">Endzeit</label>
-                  <input
+                  <TimePickerInput
                     id="multi-window-end"
-                    type="time"
                     value={windowEndTime}
-                    onChange={(event) => setWindowEndTime(event.target.value)}
+                    onChange={setWindowEndTime}
                   />
                 </div>
               </>

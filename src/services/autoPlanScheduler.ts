@@ -28,6 +28,8 @@ export interface PayloadOverlap {
 
 export type AutoPlanDistributionMode = "packed" | "even";
 
+export type AutoPlanPlacement = "start" | "center" | "end";
+
 export interface AutoPlanInput {
   currentUser: AworkUser;
   taskId: string;
@@ -41,6 +43,8 @@ export interface AutoPlanInput {
   userCapacity?: AworkUserCapacity;
   distributionMode?: AutoPlanDistributionMode;
   allowOverbooking?: boolean;
+  maxBlockerMinutes?: number;
+  placement?: AutoPlanPlacement;
 }
 
 export interface AutoPlanDay {
@@ -189,21 +193,46 @@ export function buildAutoPlan(input: AutoPlanInput): AutoPlanResult {
           }
 
           const slotMinutes = getSlotMinutes(slot);
-          const plannedMinutes = Math.min(slotMinutes, dayRemaining);
-          if (plannedMinutes < MIN_AUTO_PLAN_BLOCKER_MINUTES) {
-            continue;
-          }
+          const maxBlocker = input.maxBlockerMinutes && input.maxBlockerMinutes > 0
+            ? input.maxBlockerMinutes
+            : Infinity;
+          const placement = input.placement ?? "start";
 
-          const payload = buildPayload(
-            input.currentUser,
-            input.taskId,
-            slot.start,
-            addMinutes(slot.start, plannedMinutes),
-          );
-          plannedPayloads.push(payload);
-          plannedForDay.push(payload);
-          dayRemaining -= plannedMinutes;
-          weekRemainingMinutes -= plannedMinutes;
+          let slotOffset = 0;
+          while (slotOffset < slotMinutes && dayRemaining > 0) {
+            const remainingInSlot = slotMinutes - slotOffset;
+            const plannedMinutes = Math.min(remainingInSlot, dayRemaining, maxBlocker);
+            if (plannedMinutes < MIN_AUTO_PLAN_BLOCKER_MINUTES) {
+              break;
+            }
+
+            let blockerStart: Date;
+            if (placement === "end") {
+              blockerStart = addMinutes(slot.start, slotOffset + (remainingInSlot - plannedMinutes));
+            } else if (placement === "center") {
+              blockerStart = addMinutes(slot.start, slotOffset + Math.floor((remainingInSlot - plannedMinutes) / 2));
+            } else {
+              blockerStart = addMinutes(slot.start, slotOffset);
+            }
+
+            const payload = buildPayload(
+              input.currentUser,
+              input.taskId,
+              blockerStart,
+              addMinutes(blockerStart, plannedMinutes),
+            );
+            plannedPayloads.push(payload);
+            plannedForDay.push(payload);
+            dayRemaining -= plannedMinutes;
+            weekRemainingMinutes -= plannedMinutes;
+
+            // If max blocker is set, advance past the planned block;
+            // otherwise the entire slot is consumed in one iteration.
+            slotOffset += plannedMinutes;
+            // Only split within a single slot if placement is "start";
+            // for center/end, one block per slot makes more sense.
+            if (placement !== "start") break;
+          }
         }
         remainingCandidateDays -= 1;
 
