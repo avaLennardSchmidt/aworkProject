@@ -1420,7 +1420,6 @@ select:disabled {
 .tageszeit-field-time {
   width: 152px;
   flex-shrink: 0;
-  padding-bottom: 4px;
 }
 
 .tageszeit-field-maxhours {
@@ -1437,22 +1436,14 @@ select:disabled {
   align-self: flex-end;
 }
 
-.tageszeit-optional-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 6px 10px 4px;
-  background: rgba(0, 0, 0, 0.022);
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-}
-
 .tageszeit-optional-eyebrow {
+  display: block;
+  margin-bottom: 8px;
   font-size: 0.72rem;
   font-weight: 800;
+  line-height: 1;
   color: var(--color-accent);
   text-transform: uppercase;
-  letter-spacing: 0;
 }
 
 .tageszeit-optional-inner {
