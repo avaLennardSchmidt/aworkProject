@@ -7,6 +7,7 @@ import {
   endOfYear,
   endOfWeek,
   format,
+  getDay,
   getISOWeek,
   parseISO,
   startOfMonth,
@@ -14,11 +15,15 @@ import {
   startOfYear,
   startOfWeek,
 } from "date-fns";
+import { de } from "date-fns/locale";
 import {
+  calculateAbsentFractionForDay,
   calculateAbsentWorkingDays,
   countWorkingDaysInRange,
+  getAbsentHalfForDay,
   groupAbsencesByUserId,
   mapAbsencesResponse,
+  type AbsentDayHalf,
 } from "../services/absenceMapper";
 import { BackendClient, mapUser } from "../services/backendClient";
 import { fuzzyMatches } from "../services/fuzzySearch";
@@ -31,7 +36,10 @@ import {
   isOwnSchedule,
   mapTaskSchedulesResponse,
 } from "../services/scheduleMapper";
-import { calculateDurationMinutes } from "../services/scheduleTimeCalculator";
+import {
+  calculateDurationMinutes,
+  getTimeHHmm,
+} from "../services/scheduleTimeCalculator";
 import type {
   AworkAbsence,
   AworkProjectTask,
@@ -104,6 +112,34 @@ interface UserCapacityWeek {
   utilizationPercent: number;
   customerTargetPercent: number;
   projectTotals: WeekProjectTotal[];
+}
+
+type UserExpandMode = "weeks" | "days";
+
+interface DayScheduleDetail {
+  scheduleId: string;
+  projectKey: string;
+  projectName: string;
+  taskName?: string;
+  startHHmm: string;
+  endHHmm: string;
+  minutes: number;
+  unresolvedHint?: string;
+}
+
+interface UserCapacityDay {
+  key: string;
+  date: Date;
+  label: string;
+  isWeekend: boolean;
+  dayCapacityHours: number;
+  absentFraction: number;
+  absentHalf: AbsentDayHalf;
+  absentHours: number;
+  effectiveCapacityHours: number;
+  plannedMinutes: number;
+  utilizationPercent: number;
+  segments: DayScheduleDetail[];
 }
 
 interface ChartTooltip {
@@ -210,9 +246,9 @@ export function CapacityAnalysisPage({
     Record<string, number>
   >({});
   const [chartUserSearch, setChartUserSearch] = useState("");
-  const [expandedUserIds, setExpandedUserIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [expandedViewByUser, setExpandedViewByUser] = useState<
+    Map<string, UserExpandMode>
+  >(new Map());
   const [showCollapsedRangeBars, setShowCollapsedRangeBars] = useState(true);
   const [workloadFilterMode, setWorkloadFilterMode] =
     useState<WorkloadFilterMode>("all");
@@ -397,7 +433,7 @@ export function CapacityAnalysisPage({
   const areAllSelectedUsersExpanded =
     visibleSelectedRowSummaries.length > 0 &&
     visibleSelectedRowSummaries.every((entry) =>
-      expandedUserIds.has(entry.row.user.id),
+      expandedViewByUser.has(entry.row.user.id),
     );
 
   const summary = useMemo(() => {
@@ -469,7 +505,7 @@ export function CapacityAnalysisPage({
       setAbsenceLoadFailed(!absenceLoadSucceeded);
 
       setSelectedUserIds(new Set(usersToAnalyze.map((user) => user.id)));
-      setExpandedUserIds(new Set());
+      setExpandedViewByUser(new Map());
       setHasLoaded(true);
     } catch (loadError) {
       setError(
@@ -631,24 +667,48 @@ export function CapacityAnalysisPage({
     });
   }
 
-  function toggleUserExpansion(userId: string) {
-    setExpandedUserIds((current) => {
-      const next = new Set(current);
-      if (next.has(userId)) {
+  function resetWeeklyHoursToAworkDefaults() {
+    setBulkWeeklyHoursInput("");
+    setCapacityInputs((current) => {
+      const next: Record<string, CapacityInputs> = {};
+      Object.entries(current).forEach(([userId, value]) => {
+        next[userId] = {
+          ...value,
+          weeklyHours: capacityDefaultsByUser[userId] ?? DEFAULT_WEEKLY_HOURS,
+        };
+      });
+      return next;
+    });
+  }
+
+  function toggleUserExpandMode(userId: string, mode: UserExpandMode) {
+    setExpandedViewByUser((current) => {
+      const next = new Map(current);
+      if (next.get(userId) === mode) {
         next.delete(userId);
       } else {
-        next.add(userId);
+        next.set(userId, mode);
       }
       return next;
     });
   }
 
   function applyDatePreset(
-    preset: "this-month" | "next-4-weeks" | "this-quarter" | "this-year",
+    preset:
+      | "this-week"
+      | "this-month"
+      | "next-4-weeks"
+      | "this-quarter"
+      | "this-year",
   ) {
     const now = new Date();
 
     switch (preset) {
+      case "this-week": {
+        setFrom(format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"));
+        setTo(format(endOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd"));
+        return;
+      }
       case "this-month": {
         setFrom(format(startOfMonth(now), "yyyy-MM-dd"));
         setTo(format(endOfMonth(now), "yyyy-MM-dd"));
@@ -825,9 +885,9 @@ export function CapacityAnalysisPage({
                   type="button"
                   className="ghost-button"
                   disabled={isLoading}
-                  onClick={() => applyDatePreset("this-month")}
+                  onClick={() => applyDatePreset("this-week")}
                 >
-                  Dieser Monat
+                  Diese Woche
                 </button>
                 <button
                   type="button"
@@ -836,6 +896,14 @@ export function CapacityAnalysisPage({
                   onClick={() => applyDatePreset("next-4-weeks")}
                 >
                   Nächste 4 Wochen
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  disabled={isLoading}
+                  onClick={() => applyDatePreset("this-month")}
+                >
+                  Dieser Monat
                 </button>
                 <button
                   type="button"
@@ -975,109 +1043,177 @@ export function CapacityAnalysisPage({
                       ariaLabel="Ansicht wechseln"
                       onChange={handleViewModeChange}
                     />
-                    {viewMode === "bar" && (
-                    <div className="analysis-chart-toolbar">
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() =>
-                          setShowCollapsedRangeBars((current) => !current)
-                        }
-                      >
-                        {showCollapsedRangeBars
-                          ? "Gesamtbalken ausblenden"
-                          : "Gesamtbalken einblenden"}
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        disabled={visibleSelectedRowSummaries.length === 0}
-                        onClick={() => {
-                          setExpandedUserIds(
-                            areAllSelectedUsersExpanded
-                              ? new Set()
-                              : new Set(
-                                  visibleSelectedRowSummaries.map(
-                                    (entry) => entry.row.user.id,
-                                  ),
-                                ),
-                          );
-                        }}
-                      >
-                        {areAllSelectedUsersExpanded
-                          ? "Alle Nutzer einklappen"
-                          : "Alle Nutzer ausklappen"}
-                      </button>
-                    </div>
-                    )}
-                    <div className="analysis-chart-toolbar">
-                      <div className="analysis-workload-filter">
-                        <SegmentedControl
-                          value={workloadFilterMode}
-                          options={workloadFilterOptions}
-                          ariaLabel="Auslastungsvergleich"
-                          onChange={setWorkloadFilterMode}
-                        />
-                        <div className="analysis-workload-threshold">
-                          <input
-                            type="number"
-                            min="0"
-                            max="300"
-                            step="1"
-                            disabled={workloadFilterMode === "all"}
-                            value={workloadFilterValue}
-                            onChange={(event) =>
-                              setWorkloadFilterValue(
-                                Math.max(0, Number(event.target.value) || 0),
-                              )
+                  </div>
+                </div>
+                <section
+                  className="capacity-config-panel"
+                  aria-label="Konfiguration"
+                >
+                  <div className="capacity-config-header">
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M2 4.5h6.5M13 4.5H14M2 11.5h2M8.5 11.5H14"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                      />
+                      <circle
+                        cx="10.75"
+                        cy="4.5"
+                        r="1.9"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                      />
+                      <circle
+                        cx="6.25"
+                        cy="11.5"
+                        r="1.9"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                      />
+                    </svg>
+                    <h3>Konfiguration</h3>
+                  </div>
+                  <div
+                    className="capacity-config-bar"
+                    role="group"
+                    aria-label="Analyse-Einstellungen"
+                  >
+                  {viewMode === "bar" ? (
+                    <>
+                      <div className="capacity-config-item">
+                        <span className="capacity-config-label">Diagramm</span>
+                        <div className="capacity-config-controls">
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            onClick={() =>
+                              setShowCollapsedRangeBars((current) => !current)
                             }
-                            aria-label="Auslastungsschwellenwert Prozent"
-                          />
-                          <span>%</span>
+                          >
+                            {showCollapsedRangeBars
+                              ? "Gesamtbalken ausblenden"
+                              : "Gesamtbalken einblenden"}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            disabled={visibleSelectedRowSummaries.length === 0}
+                            onClick={() => {
+                              setExpandedViewByUser((current) =>
+                                areAllSelectedUsersExpanded
+                                  ? new Map()
+                                  : new Map(
+                                      visibleSelectedRowSummaries.map(
+                                        (entry) => [
+                                          entry.row.user.id,
+                                          current.get(entry.row.user.id) ??
+                                            "weeks",
+                                        ],
+                                      ),
+                                    ),
+                              );
+                            }}
+                          >
+                            {areAllSelectedUsersExpanded
+                              ? "Alle Nutzer einklappen"
+                              : "Alle Nutzer ausklappen"}
+                          </button>
                         </div>
                       </div>
+                      <div
+                        className="capacity-config-divider"
+                        aria-hidden="true"
+                      />
+                    </>
+                  ) : null}
+                  <div className="capacity-config-item">
+                    <span className="capacity-config-label">Auslastung</span>
+                    <div className="capacity-config-controls">
+                      <SegmentedControl
+                        value={workloadFilterMode}
+                        options={workloadFilterOptions}
+                        ariaLabel="Auslastungsvergleich"
+                        onChange={setWorkloadFilterMode}
+                      />
+                      <div className="analysis-workload-threshold">
+                        <input
+                          type="number"
+                          min="0"
+                          max="300"
+                          step="1"
+                          disabled={workloadFilterMode === "all"}
+                          value={workloadFilterValue}
+                          onChange={(event) =>
+                            setWorkloadFilterValue(
+                              Math.max(0, Number(event.target.value) || 0),
+                            )
+                          }
+                          aria-label="Auslastungsschwellenwert Prozent"
+                        />
+                        <span>%</span>
+                      </div>
                     </div>
-                    <div className="capacity-bulk-inputs">
-                      <label>
-                        <span>Wochenstunden</span>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="—"
-                          value={bulkWeeklyHoursInput}
-                          aria-invalid={isInvalidNumberInput(
-                            bulkWeeklyHoursInput,
-                          )}
-                          className={
-                            isInvalidNumberInput(bulkWeeklyHoursInput)
-                              ? "input-invalid"
-                              : undefined
-                          }
-                          onChange={(event) =>
-                            setBulkWeeklyHoursInput(event.target.value)
-                          }
-                        />
-                      </label>
-                      <label>
-                        <span>Kunden %</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="70"
-                          value={bulkCustomerPercentInput}
-                          aria-invalid={isInvalidNumberInput(
-                            bulkCustomerPercentInput,
-                          )}
-                          className={
-                            isInvalidNumberInput(bulkCustomerPercentInput)
-                              ? "input-invalid"
-                              : undefined
-                          }
-                          onChange={(event) =>
-                            setBulkCustomerPercentInput(event.target.value)
-                          }
-                        />
-                      </label>
+                  </div>
+                  <div className="capacity-config-divider" aria-hidden="true" />
+                  <div className="capacity-config-item">
+                    <label
+                      className="capacity-config-label"
+                      htmlFor="bulk-weekly-hours"
+                    >
+                      Wochenstunden
+                    </label>
+                    <input
+                      id="bulk-weekly-hours"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="—"
+                      value={bulkWeeklyHoursInput}
+                      aria-invalid={isInvalidNumberInput(bulkWeeklyHoursInput)}
+                      className={
+                        isInvalidNumberInput(bulkWeeklyHoursInput)
+                          ? "capacity-config-input input-invalid"
+                          : "capacity-config-input"
+                      }
+                      onChange={(event) =>
+                        setBulkWeeklyHoursInput(event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="capacity-config-item">
+                    <label
+                      className="capacity-config-label"
+                      htmlFor="bulk-customer-percent"
+                    >
+                      Kunden %
+                    </label>
+                    <input
+                      id="bulk-customer-percent"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="70"
+                      value={bulkCustomerPercentInput}
+                      aria-invalid={isInvalidNumberInput(
+                        bulkCustomerPercentInput,
+                      )}
+                      className={
+                        isInvalidNumberInput(bulkCustomerPercentInput)
+                          ? "capacity-config-input input-invalid"
+                          : "capacity-config-input"
+                      }
+                      onChange={(event) =>
+                        setBulkCustomerPercentInput(event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="capacity-config-item">
+                    <div className="capacity-config-controls">
                       <button
                         type="button"
                         className="ghost-button"
@@ -1119,9 +1255,18 @@ export function CapacityAnalysisPage({
                       >
                         Auf Auswahl anwenden
                       </button>
+                      <button
+                        type="button"
+                        className="ghost-button ghost-button-danger"
+                        title="Setzt die Wochenstunden aller Nutzer auf die Arbeitszeiten aus awork zurück."
+                        onClick={resetWeeklyHoursToAworkDefaults}
+                      >
+                        Zurücksetzen
+                      </button>
                     </div>
                   </div>
-                </div>
+                  </div>
+                </section>
                 {viewMode === "bar" ? (
                 <>
                 <div className="capacity-chart-legend" aria-label="Legende">
@@ -1178,10 +1323,18 @@ export function CapacityAnalysisPage({
                           key={entry.row.user.id}
                           row={entry.row}
                           weekRows={entry.weekRows}
-                          isExpanded={expandedUserIds.has(entry.row.user.id)}
+                          expandMode={
+                            expandedViewByUser.get(entry.row.user.id) ?? null
+                          }
                           showCollapsedRangeBar={showCollapsedRangeBars}
-                          onToggleExpanded={() =>
-                            toggleUserExpansion(entry.row.user.id)
+                          userAbsences={
+                            absencesByUser[entry.row.user.id] ?? []
+                          }
+                          unresolvedHintsByTaskId={
+                            unresolvedProjectHintsByTaskId
+                          }
+                          onSetExpandMode={(mode) =>
+                            toggleUserExpandMode(entry.row.user.id, mode)
                           }
                           onInputChange={updateCapacityInput}
                         />
@@ -1342,27 +1495,49 @@ function SummaryCard({
 function CapacityChartRow({
   row,
   weekRows,
-  isExpanded,
+  expandMode,
   showCollapsedRangeBar,
-  onToggleExpanded,
+  userAbsences,
+  unresolvedHintsByTaskId,
+  onSetExpandMode,
   onInputChange,
 }: {
   row: UserCapacityRow;
   weekRows: UserCapacityWeek[];
-  isExpanded: boolean;
+  expandMode: UserExpandMode | null;
   showCollapsedRangeBar: boolean;
-  onToggleExpanded: () => void;
+  userAbsences: AworkAbsence[];
+  unresolvedHintsByTaskId: Record<string, string>;
+  onSetExpandMode: (mode: UserExpandMode) => void;
   onInputChange: (
     userId: string,
     field: keyof CapacityInputs,
     value: number,
   ) => void;
 }) {
+  const isExpanded = expandMode !== null;
   const totals = summarizeWeekRows(weekRows);
   const projectTotals = summarizeWeekProjectTotals(weekRows);
   const projectColorFor = useMemo(
     () => buildProjectColorResolver(projectTotals),
     [projectTotals],
+  );
+  const dayRowsByWeek = useMemo(
+    () =>
+      expandMode === "days"
+        ? new Map(
+            weekRows.map((weekRow) => [
+              weekRow.week.key,
+              buildUserCapacityDays(
+                row,
+                weekRow.week,
+                userAbsences,
+                unresolvedHintsByTaskId,
+              ),
+            ]),
+          )
+        : null,
+    [expandMode, weekRows, row, userAbsences, unresolvedHintsByTaskId],
   );
   const workloadColor = getWorkloadColor(totals.customerTargetPercent, row.inputs.customerPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
@@ -1450,14 +1625,26 @@ function CapacityChartRow({
             {formatHours(totals.targetHours)} Kunden-Ziel
           </span>
         </div>
-        <button
-          type="button"
-          className="ghost-button capacity-expand-button"
-          aria-expanded={isExpanded}
-          onClick={onToggleExpanded}
-        >
-          {isExpanded ? "Wochen einklappen" : "Wochen einblenden"}
-        </button>
+        <div className="capacity-expand-actions">
+          <button
+            type="button"
+            className="primary-button capacity-expand-button"
+            aria-expanded={expandMode === "weeks"}
+            aria-pressed={expandMode === "weeks"}
+            onClick={() => onSetExpandMode("weeks")}
+          >
+            {expandMode === "weeks" ? "Wochen einklappen" : "Wochen einblenden"}
+          </button>
+          <button
+            type="button"
+            className="primary-button capacity-expand-button"
+            aria-expanded={expandMode === "days"}
+            aria-pressed={expandMode === "days"}
+            onClick={() => onSetExpandMode("days")}
+          >
+            {expandMode === "days" ? "Tage einklappen" : "Tage einblenden"}
+          </button>
+        </div>
         <div className="capacity-inputs">
           <label>
             Wochenstunden
@@ -1511,13 +1698,14 @@ function CapacityChartRow({
       {isExpanded ? (
         <div className="capacity-row-main">
           <div
-            className="capacity-week-grid"
+            className={`capacity-week-grid${expandMode === "days" ? " capacity-week-grid--days" : ""}`}
             aria-label={`Geplante Projektstunden von ${formatUserName(row.user)} pro Kalenderwoche`}
           >
             {weekRows.map((weekRow) => (
               <CapacityWeekBar
                 key={weekRow.week.key}
                 weekRow={weekRow}
+                dayRows={dayRowsByWeek?.get(weekRow.week.key)}
                 projectColorFor={projectColorFor}
                 customerPercent={row.inputs.customerPercent}
                 onTooltip={showProjectTooltip}
@@ -1597,7 +1785,7 @@ function CapacityCombinedBar({
         </span>
       </div>
       <div
-        className="capacity-range-track"
+        className="capacity-range-track capacity-range-track--labeled-marker"
         aria-label={`Gewählter Zeitraum: ${formatHours(totals.plannedHours)} geplant von ${formatHours(totals.effectiveCapacityHours)} verfügbarer Kapazität.`}
       >
         <div
@@ -1655,13 +1843,18 @@ function CapacityCombinedBar({
             )}
           </div>
           <span
-            className="capacity-marker capacity-marker-target"
+            className="capacity-marker capacity-marker-target capacity-marker-target--labeled"
             style={{ left: `${customerMarkerPercent}%` }}
             aria-label={customerTargetTooltip}
             onMouseEnter={(event) => onTooltip(customerTargetTooltip, event)}
             onMouseMove={(event) => onTooltip(customerTargetTooltip, event)}
             onMouseLeave={onTooltipClear}
-          />
+          >
+            <span className="capacity-marker-flag">
+              Kunden-Ziel · {formatHours(totals.targetHours)} /{" "}
+              {formatDecimal(customerPercent)} %
+            </span>
+          </span>
         </div>
       </div>
     </div>
@@ -1670,12 +1863,14 @@ function CapacityCombinedBar({
 
 function CapacityWeekBar({
   weekRow,
+  dayRows,
   projectColorFor,
   customerPercent,
   onTooltip,
   onTooltipClear,
 }: {
   weekRow: UserCapacityWeek;
+  dayRows?: UserCapacityDay[];
   projectColorFor: ProjectColorResolver;
   customerPercent: number;
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
@@ -1725,6 +1920,22 @@ function CapacityWeekBar({
           </span>
         </div>
       </div>
+      {dayRows ? (
+        <div
+          className="capacity-day-list"
+          aria-label={`${weekRow.week.label}: geplante Projektzeit pro Tag`}
+        >
+          {dayRows.map((day) => (
+            <CapacityDayRow
+              key={day.key}
+              day={day}
+              projectColorFor={projectColorFor}
+              onTooltip={onTooltip}
+              onTooltipClear={onTooltipClear}
+            />
+          ))}
+        </div>
+      ) : (
       <div
         className="capacity-week-track"
         aria-label={`${weekRow.week.label}: ${formatHours(weekRow.plannedMinutes / 60)} geplant von ${formatHours(weekRow.effectiveCapacityHours)} verfügbarer Kap.`}
@@ -1793,6 +2004,7 @@ function CapacityWeekBar({
           />
         </div>
       </div>
+      )}
       <div className="capacity-week-stats">
         <span>
           {formatHours(weekRow.plannedMinutes / 60)}
@@ -1807,6 +2019,118 @@ function CapacityWeekBar({
           {formatDecimal(weekRow.customerTargetPercent)}%
         </span>
       </div>
+    </div>
+  );
+}
+
+function CapacityDayRow({
+  day,
+  projectColorFor,
+  onTooltip,
+  onTooltipClear,
+}: {
+  day: UserCapacityDay;
+  projectColorFor: ProjectColorResolver;
+  onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
+  onTooltipClear: () => void;
+}) {
+  const displayPercent = Math.max(100, day.utilizationPercent);
+  const pct = (h: number) =>
+    day.dayCapacityHours > 0
+      ? (h / day.dayCapacityHours) * (10000 / displayPercent)
+      : 0;
+  const availableZonePercent = pct(day.effectiveCapacityHours);
+  const absentZonePercent = pct(Math.min(day.dayCapacityHours, day.absentHours));
+  const stackWidthPercent =
+    day.dayCapacityHours > 0
+      ? pct(day.plannedMinutes / 60)
+      : day.plannedMinutes > 0
+        ? 100
+        : 0;
+  const hasAbsent = absentZonePercent > 0;
+  const isMorningAbsent = hasAbsent && day.absentHalf === "morning";
+  const absentLabel =
+    day.absentFraction >= 1
+      ? "Ganztägig abwesend"
+      : day.absentHalf === "morning"
+        ? "Vormittags abwesend"
+        : day.absentHalf === "afternoon"
+          ? "Nachmittags abwesend"
+          : "½ Tag abwesend";
+  const absentTooltip = `Abwesenheit\n${absentLabel} · ${formatHours(day.absentHours)} weniger Kap.`;
+
+  return (
+    <div
+      className={`capacity-day-row${day.isWeekend ? " capacity-day-row--weekend" : ""}`}
+    >
+      <span className="capacity-day-label">{day.label}</span>
+      <div
+        className="capacity-day-track"
+        aria-label={`${day.label}: ${formatHours(day.plannedMinutes / 60)} geplant von ${formatHours(day.effectiveCapacityHours)} verfügbarer Kap.`}
+      >
+        <div
+          className="capacity-day-inner"
+          style={{ width: `${displayPercent}%` }}
+        >
+          {!day.isWeekend && (
+            <div
+              className={`capacity-zone${hasAbsent ? " capacity-zone--partial" : ""}`}
+              style={{
+                width: `${availableZonePercent}%`,
+                left: isMorningAbsent ? `${absentZonePercent}%` : undefined,
+              }}
+            />
+          )}
+          {hasAbsent && (
+            <div
+              className={`capacity-absent-zone${availableZonePercent <= 0 ? " capacity-absent-zone--isolated" : ""}${isMorningAbsent ? " capacity-absent-zone--leading" : ""}`}
+              style={{
+                left: isMorningAbsent ? 0 : `${availableZonePercent}%`,
+                width: `${absentZonePercent}%`,
+              }}
+              aria-label={absentTooltip}
+              onMouseEnter={(event) => onTooltip(absentTooltip, event)}
+              onMouseMove={(event) => onTooltip(absentTooltip, event)}
+              onMouseLeave={onTooltipClear}
+            />
+          )}
+          <div
+            className="capacity-stacked-bar"
+            style={{
+              width: `${stackWidthPercent}%`,
+              marginLeft: isMorningAbsent ? `${absentZonePercent}%` : undefined,
+            }}
+          >
+            {day.segments.length > 0 && day.plannedMinutes > 0 ? (
+              day.segments.map((segment) => {
+                const tooltipText = `${segment.projectName}${segment.taskName ? ` · ${segment.taskName}` : ""}\n${segment.startHHmm}–${segment.endHHmm} · ${formatHours(segment.minutes / 60)}${segment.unresolvedHint ? `\nHinweis: ${segment.unresolvedHint}` : ""}`;
+
+                return (
+                  <span
+                    key={segment.scheduleId}
+                    className="capacity-segment"
+                    aria-label={tooltipText}
+                    style={{
+                      width: `${day.plannedMinutes > 0 ? (segment.minutes / day.plannedMinutes) * 100 : 0}%`,
+                      background: projectColorFor(segment.projectKey),
+                    }}
+                    onMouseEnter={(event) => onTooltip(tooltipText, event)}
+                    onMouseMove={(event) => onTooltip(tooltipText, event)}
+                    onMouseLeave={onTooltipClear}
+                  />
+                );
+              })
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <span className="capacity-day-stats">
+        {formatHours(day.plannedMinutes / 60)}
+        <span className="capacity-week-cap">
+          {" "}
+          / {formatHours(day.effectiveCapacityHours)}
+        </span>
+      </span>
     </div>
   );
 }
@@ -2243,6 +2567,105 @@ function buildUserCapacityWeeks(
   });
 }
 
+// Mirrors buildUserCapacityWeeks day by day: same schedule filter (start
+// within the clipped week) and the shared per-day absence fraction, so the
+// day rows of a week always sum to that week's numbers.
+function buildUserCapacityDays(
+  row: UserCapacityRow,
+  week: CapacityWeek,
+  userAbsences: AworkAbsence[],
+  unresolvedHintsByTaskId: Record<string, string>,
+): UserCapacityDay[] {
+  const segmentsByDay = new Map<string, DayScheduleDetail[]>();
+
+  row.schedules.forEach((schedule) => {
+    const scheduleStart = parseISO(schedule.start);
+    if (scheduleStart < week.from || scheduleStart > endOfDay(week.to)) {
+      return;
+    }
+
+    const key = schedule.projectId ?? "unresolved-project";
+    const segment: DayScheduleDetail = {
+      scheduleId: schedule.id,
+      projectKey: key,
+      projectName: schedule.projectName ?? "Projekt nicht aufgelöst",
+      taskName: schedule.taskName,
+      startHHmm: getTimeHHmm(schedule.start),
+      endHHmm: getTimeHHmm(schedule.end),
+      minutes: Math.max(
+        0,
+        calculateDurationMinutes(schedule.start, schedule.end),
+      ),
+      unresolvedHint:
+        key === "unresolved-project"
+          ? unresolvedHintsByTaskId[schedule.taskId]
+          : undefined,
+    };
+    const dayKey = format(scheduleStart, "yyyy-MM-dd");
+    const daySegments = segmentsByDay.get(dayKey) ?? [];
+    daySegments.push(segment);
+    segmentsByDay.set(dayKey, daySegments);
+  });
+
+  const days: UserCapacityDay[] = [];
+  let day = week.from;
+  while (day <= week.to) {
+    const dayKey = format(day, "yyyy-MM-dd");
+    const segments = (segmentsByDay.get(dayKey) ?? []).sort((a, b) =>
+      a.startHHmm.localeCompare(b.startHHmm),
+    );
+    const dow = getDay(day);
+    const isWeekend = dow === 0 || dow === 6;
+    const plannedMinutes = segments.reduce(
+      (sum, segment) => sum + segment.minutes,
+      0,
+    );
+
+    if (!isWeekend || plannedMinutes > 0) {
+      const dayCapacityHours = isWeekend ? 0 : row.inputs.weeklyHours / 5;
+      const absentFraction = calculateAbsentFractionForDay(
+        userAbsences,
+        row.user.id,
+        day,
+      );
+      const absentHalf = getAbsentHalfForDay(userAbsences, row.user.id, day);
+      const absentHours = Math.min(
+        dayCapacityHours,
+        absentFraction * (row.inputs.weeklyHours / 5),
+      );
+      const effectiveCapacityHours = Math.max(
+        0,
+        dayCapacityHours - absentHours,
+      );
+      const plannedHours = plannedMinutes / 60;
+      const utilizationPercent =
+        effectiveCapacityHours > 0
+          ? (plannedHours / effectiveCapacityHours) * 100
+          : plannedMinutes > 0
+            ? 100
+            : 0;
+
+      days.push({
+        key: dayKey,
+        date: day,
+        label: format(day, "EEEEEE dd.MM.", { locale: de }),
+        isWeekend,
+        dayCapacityHours,
+        absentFraction,
+        absentHalf,
+        absentHours,
+        effectiveCapacityHours,
+        plannedMinutes,
+        utilizationPercent,
+        segments,
+      });
+    }
+    day = addDays(day, 1);
+  }
+
+  return days;
+}
+
 function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
   const plannedMinutes = weekRows.reduce(
     (sum, week) => sum + week.plannedMinutes,
@@ -2384,7 +2807,15 @@ function loadCapacityInputs(): Record<string, CapacityInputs> {
 
 function saveCapacityInputs(inputs: Record<string, CapacityInputs>) {
   try {
-    localStorage.setItem(CAPACITY_STORAGE_KEY, JSON.stringify(inputs));
+    // Wochenstunden werden bewusst nicht gespeichert: Nach einem Reload
+    // gelten wieder die Arbeitszeiten aus awork.
+    const persistable = Object.fromEntries(
+      Object.entries(inputs).map(([userId, value]) => [
+        userId,
+        { customerPercent: value.customerPercent },
+      ]),
+    );
+    localStorage.setItem(CAPACITY_STORAGE_KEY, JSON.stringify(persistable));
   } catch {
     // Keep the analysis usable even when browser storage is unavailable.
   }

@@ -1,6 +1,14 @@
 import { addDays, getDay, parseISO, startOfDay } from "date-fns";
 import type { AworkAbsence } from "../types/awork";
 
+// awork encodes absence boundaries as UTC timestamps on the intended calendar
+// day (e.g. endOn "2026-07-15T23:59:59Z"). Parsing them as local timestamps
+// shifts the end into the next local day east of UTC, inflating every absence
+// by one day — so only the UTC date portion may be used.
+function parseAworkAbsenceDay(isoTimestamp: string): Date {
+  return startOfDay(parseISO(isoTimestamp.slice(0, 10)));
+}
+
 export function mapAbsencesResponse(raw: unknown): AworkAbsence[] {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((item) => {
@@ -30,6 +38,84 @@ export function countWorkingDaysInRange(from: Date, to: Date): number {
   return count;
 }
 
+export function calculateAbsentFractionForDay(
+  absences: AworkAbsence[],
+  userId: string,
+  day: Date,
+): number {
+  const dow = getDay(day);
+  if (dow < 1 || dow > 5) return 0;
+
+  const dayStart = startOfDay(day);
+  let totalFraction = 0;
+
+  for (const absence of absences) {
+    if (absence.userId !== userId) continue;
+
+    const absenceStart = parseAworkAbsenceDay(absence.startOn);
+    const absenceEnd = parseAworkAbsenceDay(absence.endOn);
+    if (dayStart < absenceStart || dayStart > absenceEnd) continue;
+
+    let fraction = 1.0;
+    const isFirstDay = dayStart.getTime() === absenceStart.getTime();
+    const isLastDay = dayStart.getTime() === absenceEnd.getTime();
+    if (absence.isHalfDayOnStart && isFirstDay) fraction -= 0.5;
+    if (absence.isHalfDayOnEnd && isLastDay) fraction -= 0.5;
+    totalFraction += Math.max(0, fraction);
+  }
+
+  return totalFraction;
+}
+
+export type AbsentDayHalf = "morning" | "afternoon" | null;
+
+// For a half-day absence, awork encodes which half in the UTC time portion:
+// 00:00–12:00Z is the morning, 12:00–23:59Z the afternoon. Returns which half
+// of `day` is absent, or null when the day is fully absent, not absent, or
+// the covered interval doesn't line up with a clear half.
+export function getAbsentHalfForDay(
+  absences: AworkAbsence[],
+  userId: string,
+  day: Date,
+): AbsentDayHalf {
+  const dow = getDay(day);
+  if (dow < 1 || dow > 5) return null;
+
+  const dayStart = startOfDay(day);
+  let half: AbsentDayHalf = null;
+  let totalFraction = 0;
+
+  for (const absence of absences) {
+    if (absence.userId !== userId) continue;
+
+    const absenceStart = parseAworkAbsenceDay(absence.startOn);
+    const absenceEnd = parseAworkAbsenceDay(absence.endOn);
+    if (dayStart < absenceStart || dayStart > absenceEnd) continue;
+
+    let fraction = 1.0;
+    const isFirstDay = dayStart.getTime() === absenceStart.getTime();
+    const isLastDay = dayStart.getTime() === absenceEnd.getTime();
+    if (absence.isHalfDayOnStart && isFirstDay) fraction -= 0.5;
+    if (absence.isHalfDayOnEnd && isLastDay) fraction -= 0.5;
+    fraction = Math.max(0, fraction);
+    totalFraction += fraction;
+
+    if (fraction === 0.5) {
+      const startHour = isFirstDay ? readUtcHour(absence.startOn, 0) : 0;
+      const endHour = isLastDay ? readUtcHour(absence.endOn, 24) : 24;
+      if (startHour >= 12) half = "afternoon";
+      else if (endHour <= 12) half = "morning";
+    }
+  }
+
+  return totalFraction === 0.5 ? half : null;
+}
+
+function readUtcHour(isoTimestamp: string, fallback: number): number {
+  const hour = Number.parseInt(isoTimestamp.slice(11, 13), 10);
+  return Number.isNaN(hour) ? fallback : hour;
+}
+
 export function calculateAbsentWorkingDays(
   absences: AworkAbsence[],
   userId: string,
@@ -37,32 +123,12 @@ export function calculateAbsentWorkingDays(
   weekTo: Date,
 ): number {
   let totalDays = 0;
-
-  for (const absence of absences) {
-    if (absence.userId !== userId) continue;
-
-    const absenceStart = startOfDay(parseISO(absence.startOn));
-    const absenceEnd = startOfDay(parseISO(absence.endOn));
-
-    const overlapStart = absenceStart < weekFrom ? weekFrom : absenceStart;
-    const overlapEnd = absenceEnd > weekTo ? weekTo : absenceEnd;
-    if (overlapStart > overlapEnd) continue;
-
-    let day = startOfDay(overlapStart);
-    while (day <= overlapEnd) {
-      const dow = getDay(day);
-      if (dow >= 1 && dow <= 5) {
-        let fraction = 1.0;
-        const isFirstDay = day.getTime() === absenceStart.getTime();
-        const isLastDay = day.getTime() === absenceEnd.getTime();
-        if (absence.isHalfDayOnStart && isFirstDay) fraction -= 0.5;
-        if (absence.isHalfDayOnEnd && isLastDay) fraction -= 0.5;
-        totalDays += Math.max(0, fraction);
-      }
-      day = addDays(day, 1);
-    }
+  let day = startOfDay(weekFrom);
+  const end = startOfDay(weekTo);
+  while (day <= end) {
+    totalDays += calculateAbsentFractionForDay(absences, userId, day);
+    day = addDays(day, 1);
   }
-
   return totalDays;
 }
 
