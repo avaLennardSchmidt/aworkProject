@@ -312,7 +312,9 @@ export class BackendClient {
         },
       });
 
-      // If backend is starting up (503), wait and retry
+      // If backend is starting up (503), wait and retry. A received 503 means
+      // the app never processed the request, so replaying is safe even for
+      // mutations.
       if (response.status === 503) {
         return this.handleBackendStarting<T>(path, init);
       }
@@ -331,9 +333,20 @@ export class BackendClient {
       this.notifyStatusChange("ok");
       return response.json() as Promise<T>;
     } catch (error) {
-      // Connection error likely means backend is starting
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        return this.handleBackendStarting<T>(path, init);
+      // Connection error likely means backend is starting. But it can also
+      // mean the connection dropped AFTER the request was sent — in that case
+      // the outcome is unknown, and replaying a mutation could execute it
+      // twice (e.g. duplicate task schedules). Only auto-retry reads.
+      if (error instanceof TypeError) {
+        const method = (init.method ?? "GET").toUpperCase();
+        if (method === "GET" || method === "HEAD") {
+          return this.handleBackendStarting<T>(path, init);
+        }
+        throw new Error(
+          "Die Verbindung wurde unterbrochen, bevor eine Antwort ankam. " +
+            "Die Änderung wurde NICHT automatisch wiederholt, um Duplikate zu vermeiden — " +
+            "bitte Ansicht neu laden und prüfen, ob die Änderung angekommen ist.",
+        );
       }
       throw error;
     }

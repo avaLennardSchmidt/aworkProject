@@ -18,9 +18,15 @@ function mapOneProjectTask(raw: unknown): AworkProjectTask | null {
   }
 
   const id = firstString(raw, ["id", "taskId", "task.id"]);
-  const projectId = firstString(raw, ["projectId", "project.id", "entityId", "task.projectId", "task.project.id", "entity.id"]);
+  const baseType = firstString(raw, ["baseType", "task.baseType"]);
+  // For private tasks awork sets entityId/entityName to the OWNING USER, not a
+  // project — using them as project fields would fabricate a project named
+  // after the user. Only fall back to entity* for genuine project tasks.
+  const isPrivate = baseType === "private";
+  const directProjectId = firstString(raw, ["projectId", "project.id", "task.projectId", "task.project.id"]);
+  const projectId = directProjectId ?? (isPrivate ? undefined : firstString(raw, ["entityId", "entity.id"]));
 
-  if (!id || !projectId) {
+  if (!id) {
     return null;
   }
 
@@ -28,7 +34,14 @@ function mapOneProjectTask(raw: unknown): AworkProjectTask | null {
     id,
     name: firstString(raw, ["name", "title", "task.name"]),
     projectId,
-    projectName: firstString(raw, ["projectName", "project.name", "entityName", "entity.name", "task.projectName", "task.project.name"]),
+    isPrivate,
+    projectName: firstString(raw, [
+      "projectName",
+      "project.name",
+      ...(isPrivate ? [] : ["entityName", "entity.name"]),
+      "task.projectName",
+      "task.project.name",
+    ]),
     statusId: firstString(raw, ["taskStatusId", "statusId", "task.statusId", "task.taskStatusId", "taskStatus.id", "status.id"]),
     statusName: firstString(raw, ["taskStatus.name", "status.name", "task.taskStatus.name", "task.status.name", "statusName", "taskStatusName"]),
     statusType: firstString(raw, ["taskStatus.type", "status.type", "task.taskStatus.type", "task.status.type", "statusType", "taskStatusType"]),

@@ -36,10 +36,7 @@ import {
   isOwnSchedule,
   mapTaskSchedulesResponse,
 } from "../services/scheduleMapper";
-import {
-  calculateDurationMinutes,
-  getTimeHHmm,
-} from "../services/scheduleTimeCalculator";
+import { calculateDurationMinutes } from "../services/scheduleTimeCalculator";
 import type {
   AworkAbsence,
   AworkProjectTask,
@@ -185,7 +182,7 @@ interface MissingTaskResolutionResult {
 type ProjectColorResolver = (projectKey: string) => string;
 
 const DEFAULT_WEEKLY_HOURS = 40;
-const DEFAULT_CUSTOMER_PERCENT = 80;
+const DEFAULT_CUSTOMER_PERCENT = 70;
 const CAPACITY_STORAGE_KEY = "awork_capacity_inputs";
 const DEFAULT_TEAM_SELECTION = "sim";
 const TEAM_PATH_SEGMENT_PATTERN =
@@ -667,14 +664,16 @@ export function CapacityAnalysisPage({
     });
   }
 
-  function resetWeeklyHoursToAworkDefaults() {
+  function resetConfigurationToDefaults() {
     setBulkWeeklyHoursInput("");
+    setBulkCustomerPercentInput("");
     setCapacityInputs((current) => {
       const next: Record<string, CapacityInputs> = {};
       Object.entries(current).forEach(([userId, value]) => {
         next[userId] = {
           ...value,
           weeklyHours: capacityDefaultsByUser[userId] ?? DEFAULT_WEEKLY_HOURS,
+          customerPercent: DEFAULT_CUSTOMER_PERCENT,
         };
       });
       return next;
@@ -1258,8 +1257,8 @@ export function CapacityAnalysisPage({
                       <button
                         type="button"
                         className="ghost-button ghost-button-danger"
-                        title="Setzt die Wochenstunden aller Nutzer auf die Arbeitszeiten aus awork zurück."
-                        onClick={resetWeeklyHoursToAworkDefaults}
+                        title={`Setzt die Wochenstunden aller Nutzer auf die Arbeitszeiten aus awork und Kunden % auf den Standard (${DEFAULT_CUSTOMER_PERCENT} %) zurück.`}
+                        onClick={resetConfigurationToDefaults}
                       >
                         Zurücksetzen
                       </button>
@@ -1468,7 +1467,7 @@ function SummaryCards({
         <SummaryCard
           label="Überlastete Nutzer"
           value={String(overloadedUsers)}
-          title="Nutzer, deren geplante Stunden die Gesamtkapazität übersteigen."
+          title="Nutzer, deren geplante Auslastung das Kunden-Ziel übersteigt (z. B. 50 % geplant bei 40 % Ziel)."
         />
       </div>
     </section>
@@ -2418,7 +2417,8 @@ async function loadMissingProjectTasks(
           return mappedTask;
         } catch {
           unresolvedHintsByTaskId[taskId] =
-            "Aufgaben-Details konnten nicht von awork geladen werden.";
+            "Aufgaben-Details konnten nicht von awork geladen werden — " +
+            "vermutlich eine private Aufgabe oder ein Projekt ohne Zugriff.";
           return null;
         }
       }),
@@ -2441,6 +2441,12 @@ async function loadMissingProjectTasks(
       unresolvedHintsByTaskId[schedule.taskId] =
         unresolvedHintsByTaskId[schedule.taskId] ??
         "Aufgaben-ID wurde nicht in den zugewiesenen Aufgaben gefunden und Einzelabruf schlug fehl.";
+      return;
+    }
+
+    if (task.isPrivate) {
+      unresolvedHintsByTaskId[schedule.taskId] =
+        "Private Aufgabe — gehört keinem Projekt und ist nur für die Person selbst sichtbar.";
       return;
     }
 
@@ -2478,18 +2484,22 @@ function buildUserCapacityWeeks(
 ): UserCapacityWeek[] {
   return weeks.map((week) => {
     const projectTotalsByKey = new Map<string, WeekProjectTotal>();
+    const weekEndExclusive = addDays(startOfLocalDay(week.to), 1);
     let plannedMinutes = 0;
 
     row.schedules.forEach((schedule) => {
-      const scheduleStart = parseISO(schedule.start);
-      if (scheduleStart < week.from || scheduleStart > endOfDay(week.to)) {
+      // The backend returns schedules that merely overlap the range; count
+      // only the minutes falling inside this week, so range-spanning and
+      // multi-day schedules are neither dropped nor booked fully into their
+      // start week.
+      const duration = getScheduleOverlapMinutes(
+        schedule,
+        week.from,
+        weekEndExclusive,
+      );
+      if (duration <= 0) {
         return;
       }
-
-      const duration = Math.max(
-        0,
-        calculateDurationMinutes(schedule.start, schedule.end),
-      );
       plannedMinutes += duration;
 
       const key = schedule.projectId ?? "unresolved-project";
@@ -2567,9 +2577,10 @@ function buildUserCapacityWeeks(
   });
 }
 
-// Mirrors buildUserCapacityWeeks day by day: same schedule filter (start
-// within the clipped week) and the shared per-day absence fraction, so the
-// day rows of a week always sum to that week's numbers.
+// Mirrors buildUserCapacityWeeks day by day: schedules are split into per-day
+// segments with only the overlapping minutes, and the shared per-day absence
+// fraction is used, so the day rows of a week always sum to that week's
+// numbers.
 function buildUserCapacityDays(
   row: UserCapacityRow,
   week: CapacityWeek,
@@ -2580,31 +2591,44 @@ function buildUserCapacityDays(
 
   row.schedules.forEach((schedule) => {
     const scheduleStart = parseISO(schedule.start);
-    if (scheduleStart < week.from || scheduleStart > endOfDay(week.to)) {
-      return;
-    }
-
+    const scheduleEnd = parseISO(schedule.end);
     const key = schedule.projectId ?? "unresolved-project";
-    const segment: DayScheduleDetail = {
-      scheduleId: schedule.id,
-      projectKey: key,
-      projectName: schedule.projectName ?? "Projekt nicht aufgelöst",
-      taskName: schedule.taskName,
-      startHHmm: getTimeHHmm(schedule.start),
-      endHHmm: getTimeHHmm(schedule.end),
-      minutes: Math.max(
+
+    let day = startOfLocalDay(week.from);
+    while (day <= week.to) {
+      const dayEndExclusive = addDays(day, 1);
+      const segmentStart = scheduleStart > day ? scheduleStart : day;
+      const segmentEnd =
+        scheduleEnd < dayEndExclusive ? scheduleEnd : dayEndExclusive;
+      const minutes = Math.max(
         0,
-        calculateDurationMinutes(schedule.start, schedule.end),
-      ),
-      unresolvedHint:
-        key === "unresolved-project"
-          ? unresolvedHintsByTaskId[schedule.taskId]
-          : undefined,
-    };
-    const dayKey = format(scheduleStart, "yyyy-MM-dd");
-    const daySegments = segmentsByDay.get(dayKey) ?? [];
-    daySegments.push(segment);
-    segmentsByDay.set(dayKey, daySegments);
+        Math.round((segmentEnd.getTime() - segmentStart.getTime()) / 60000),
+      );
+
+      if (minutes > 0) {
+        const segment: DayScheduleDetail = {
+          scheduleId: schedule.id,
+          projectKey: key,
+          projectName: schedule.projectName ?? "Projekt nicht aufgelöst",
+          taskName: schedule.taskName,
+          startHHmm: format(segmentStart, "HH:mm"),
+          endHHmm:
+            segmentEnd.getTime() === dayEndExclusive.getTime()
+              ? "24:00"
+              : format(segmentEnd, "HH:mm"),
+          minutes,
+          unresolvedHint:
+            key === "unresolved-project"
+              ? unresolvedHintsByTaskId[schedule.taskId]
+              : undefined,
+        };
+        const dayKey = format(day, "yyyy-MM-dd");
+        const daySegments = segmentsByDay.get(dayKey) ?? [];
+        daySegments.push(segment);
+        segmentsByDay.set(dayKey, daySegments);
+      }
+      day = dayEndExclusive;
+    }
   });
 
   const days: UserCapacityDay[] = [];
@@ -2704,7 +2728,11 @@ function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
     customerTargetPercent:
       effectiveCapacityHours > 0 ? (plannedHours / effectiveCapacityHours) * 100 : 0,
     blockerCount,
-    isOverloaded: targetHours > 0 && plannedHours > targetHours,
+    // Overloaded = the planned share of effective capacity exceeds the
+    // Kunden-Ziel percentage (e.g. 50 % planned vs. 40 % goal). No
+    // targetHours > 0 guard: a fully absent user with planned hours (or a
+    // 0 %-goal user with any planning) is overloaded too.
+    isOverloaded: plannedHours > targetHours,
   };
 }
 
@@ -2735,6 +2763,28 @@ function summarizeWeekProjectTotals(
   });
 
   return Array.from(totalsByKey.values()).sort((a, b) => b.minutes - a.minutes);
+}
+
+// Minutes of a schedule that fall inside [intervalStart, intervalEndExclusive).
+function getScheduleOverlapMinutes(
+  schedule: AworkTaskSchedule,
+  intervalStart: Date,
+  intervalEndExclusive: Date,
+): number {
+  const start = parseISO(schedule.start);
+  const end = parseISO(schedule.end);
+  const overlapStart = start > intervalStart ? start : intervalStart;
+  const overlapEnd = end < intervalEndExclusive ? end : intervalEndExclusive;
+  return Math.max(
+    0,
+    Math.round((overlapEnd.getTime() - overlapStart.getTime()) / 60000),
+  );
+}
+
+function startOfLocalDay(date: Date): Date {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
 }
 
 function buildCapacityWeeks(from: string, to: string): CapacityWeek[] {
@@ -2776,12 +2826,6 @@ function calculateWeekCapacityHours(
 ): number {
   const workingDays = countWorkingDaysInRange(week.from, week.to);
   return weeklyHours * (workingDays / 5);
-}
-
-function endOfDay(date: Date): Date {
-  const end = new Date(date);
-  end.setHours(23, 59, 59, 999);
-  return end;
 }
 
 function loadCapacityInputs(): Record<string, CapacityInputs> {

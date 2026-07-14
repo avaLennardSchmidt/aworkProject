@@ -56,15 +56,30 @@ export function calculateAbsentFractionForDay(
     const absenceEnd = parseAworkAbsenceDay(absence.endOn);
     if (dayStart < absenceStart || dayStart > absenceEnd) continue;
 
-    let fraction = 1.0;
-    const isFirstDay = dayStart.getTime() === absenceStart.getTime();
-    const isLastDay = dayStart.getTime() === absenceEnd.getTime();
-    if (absence.isHalfDayOnStart && isFirstDay) fraction -= 0.5;
-    if (absence.isHalfDayOnEnd && isLastDay) fraction -= 0.5;
-    totalFraction += Math.max(0, fraction);
+    totalFraction += absenceFractionForDay(absence, dayStart, absenceStart, absenceEnd);
   }
 
-  return totalFraction;
+  // Overlapping absence records (e.g. vacation entered twice, or vacation plus
+  // sickness on the same day) must not deduct more than one full day.
+  return Math.min(1, totalFraction);
+}
+
+function absenceFractionForDay(
+  absence: AworkAbsence,
+  dayStart: Date,
+  absenceStart: Date,
+  absenceEnd: Date,
+): number {
+  const isFirstDay = dayStart.getTime() === absenceStart.getTime();
+  const isLastDay = dayStart.getTime() === absenceEnd.getTime();
+  const halfOnStart = absence.isHalfDayOnStart && isFirstDay;
+  const halfOnEnd = absence.isHalfDayOnEnd && isLastDay;
+
+  // A one-day absence flagged half-day on both ends is a half-day absence,
+  // not "1 − 0.5 − 0.5 = 0 = not absent".
+  if (halfOnStart && halfOnEnd) return 0.5;
+  if (halfOnStart || halfOnEnd) return 0.5;
+  return 1;
 }
 
 export type AbsentDayHalf = "morning" | "afternoon" | null;
@@ -92,12 +107,9 @@ export function getAbsentHalfForDay(
     const absenceEnd = parseAworkAbsenceDay(absence.endOn);
     if (dayStart < absenceStart || dayStart > absenceEnd) continue;
 
-    let fraction = 1.0;
     const isFirstDay = dayStart.getTime() === absenceStart.getTime();
     const isLastDay = dayStart.getTime() === absenceEnd.getTime();
-    if (absence.isHalfDayOnStart && isFirstDay) fraction -= 0.5;
-    if (absence.isHalfDayOnEnd && isLastDay) fraction -= 0.5;
-    fraction = Math.max(0, fraction);
+    const fraction = absenceFractionForDay(absence, dayStart, absenceStart, absenceEnd);
     totalFraction += fraction;
 
     if (fraction === 0.5) {

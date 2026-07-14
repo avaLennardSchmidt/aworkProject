@@ -860,7 +860,9 @@ function App() {
       const myTasksArray = mapProjectTasksResponse(myAssignedTasksResponse);
       const myTaskIds = new Set(myTasksArray.map((t) => t.id));
       const myProjectIds = new Set(
-        myTasksArray.map((t) => t.projectId).filter(Boolean),
+        myTasksArray
+          .map((t) => t.projectId)
+          .filter((id): id is string => Boolean(id)),
       );
       setMyAssignedTaskIds(myTaskIds);
       setMyAssignedProjectIds(myProjectIds);
@@ -971,7 +973,11 @@ function App() {
         const myTasksArray = mapProjectTasksResponse(myTasksResponse);
         setMyAssignedTaskIds(new Set(myTasksArray.map((t) => t.id)));
         setMyAssignedProjectIds(
-          new Set(myTasksArray.map((t) => t.projectId).filter(Boolean)),
+          new Set(
+            myTasksArray
+              .map((t) => t.projectId)
+              .filter((id): id is string => Boolean(id)),
+          ),
         );
       }
     } catch (projectError) {

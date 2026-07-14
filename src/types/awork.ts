@@ -20,8 +20,11 @@ export interface AworkProject {
 export interface AworkProjectTask {
   id: string;
   name?: string;
-  projectId: string;
+  // Missing for private tasks — they belong to a user, not a project.
+  projectId?: string;
   projectName?: string;
+  // awork baseType "private": personal task, visible only to its owner.
+  isPrivate?: boolean;
   statusId?: string;
   statusName?: string;
   statusType?: string;
