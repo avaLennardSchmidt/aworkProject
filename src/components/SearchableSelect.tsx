@@ -10,7 +10,7 @@ import {
   type RefObject,
   type WheelEvent,
 } from "react";
-import { fuzzyMatches } from "../services/fuzzySearch";
+import { fuzzyScore, FUZZY_NO_MATCH } from "../services/fuzzySearch";
 
 export interface SelectOption {
   value: string;
@@ -73,9 +73,7 @@ export function SearchableSelect({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
   const selectedOption = options.find((option) => option.value === value);
-  const filteredOptions = options.filter((option) =>
-    fuzzyMatches(option.label, query),
-  );
+  const filteredOptions = rankOptions(options, query);
   const activeIndex = Math.min(highlightedIndex, filteredOptions.length - 1);
   const layout = useDropdownLayout(isOpen, containerRef, menuRef, optionsRef);
   useScrollHighlightedIntoView(isOpen, activeIndex, optionsRef);
@@ -237,9 +235,7 @@ export function MultiSearchableSelect({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
   const selectedValues = new Set(values);
-  const filteredOptions = options.filter((option) =>
-    fuzzyMatches(option.label, query),
-  );
+  const filteredOptions = rankOptions(options, query);
   const selectedCount = values.length;
   const activeIndex = Math.min(highlightedIndex, filteredOptions.length - 1);
   const layout = useDropdownLayout(isOpen, containerRef, menuRef, optionsRef);
@@ -405,6 +401,28 @@ export function MultiSearchableSelect({
 
 export function formatSearchPlaceholder(label: string, count: number): string {
   return `${label} (${count} gefunden)`;
+}
+
+/**
+ * Filters `options` to those matching `query` and sorts them by relevance so
+ * that name/prefix matches surface above incidental matches (e.g. a query that
+ * only appears inside a status suffix). With an empty query the original order
+ * is preserved. Ties keep their original order (stable sort).
+ */
+function rankOptions(options: SelectOption[], query: string): SelectOption[] {
+  if (!query.trim()) {
+    return options;
+  }
+
+  return options
+    .map((option, index) => ({
+      option,
+      index,
+      score: fuzzyScore(option.label, query),
+    }))
+    .filter((entry) => entry.score > FUZZY_NO_MATCH)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((entry) => entry.option);
 }
 
 function handleListNavigationKey(
