@@ -254,8 +254,9 @@ export function CapacityAnalysisPage({
   const [bulkCustomerPercentInput, setBulkCustomerPercentInput] = useState("");
   const [unresolvedProjectHintsByTaskId, setUnresolvedProjectHintsByTaskId] =
     useState<Record<string, string>>({});
-  const [isDetailsTableCollapsed, setIsDetailsTableCollapsed] = useState(false);
-  const [viewMode, setViewMode] = useState<"bar" | "table">("bar");
+  const [viewMode, setViewMode] = useState<"bar" | "table" | "overview">(
+    "bar",
+  );
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -267,7 +268,7 @@ export function CapacityAnalysisPage({
   const [analysisLoadingMessageIndex, setAnalysisLoadingMessageIndex] =
     useState(0);
 
-  function handleViewModeChange(nextViewMode: "bar" | "table") {
+  function handleViewModeChange(nextViewMode: "bar" | "table" | "overview") {
     setViewMode(nextViewMode);
     if (nextViewMode === "table" && showTableViewBadge) {
       void onTableViewSeen();
@@ -1038,6 +1039,7 @@ export function CapacityAnalysisPage({
                             ? "capacity-table-option-pulse"
                             : undefined,
                         },
+                        { value: "overview" as const, label: "Übersicht" },
                       ]}
                       ariaLabel="Ansicht wechseln"
                       onChange={handleViewModeChange}
@@ -1267,119 +1269,104 @@ export function CapacityAnalysisPage({
                   </div>
                 </section>
                 {viewMode === "bar" ? (
-                <>
-                <div className="capacity-chart-legend" aria-label="Legende">
-                  <input
-                    id="analysis-user-search"
-                    className="analysis-user-search"
-                    aria-label="Nutzer suchen"
-                    type="search"
-                    value={chartUserSearch}
-                    placeholder="Nutzer filtern..."
-                    onChange={(event) => setChartUserSearch(event.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="ghost-button capacity-export-all-button"
-                    disabled={visibleSelectedRowSummaries.length === 0}
-                    title="Kapazität aller angezeigten Nutzer als CSV exportieren"
-                    onClick={() =>
-                      exportCapacityCsv(
-                        visibleSelectedRowSummaries,
-                        "kapazitaet-alle-nutzer",
-                      )
-                    }
-                  >
-                    <CsvExportIcon />
-                    CSV exportieren
-                  </button>
-                  <span>
-                    <i className="legend-swatch legend-swatch-capacity" />
-                    Kapazität (Wochenstunden)
-                  </span>
-                  <span>
-                    <i className="legend-swatch legend-swatch-planned" />
-                    Geplante Projektzeit
-                  </span>
-                  <span>
-                    <i className="legend-swatch legend-swatch-target" />
-                    Kunden-Ziel — darüber gilt als überplant
-                  </span>
-                  <span>
-                    <i className="legend-swatch legend-swatch-absent" />
-                    Abwesenheit
-                  </span>
-                  <span>
-                    <i className="legend-swatch legend-swatch-current-week" />
-                    Aktuelle Woche
-                  </span>
-                </div>
-                {visibleSelectedRowSummaries.length > 0 ? (
-                  <div className="capacity-chart">
-                    {visibleSelectedRowSummaries.map((entry) => {
-                      return (
-                        <CapacityChartRow
-                          key={entry.row.user.id}
-                          row={entry.row}
-                          weekRows={entry.weekRows}
-                          expandMode={
-                            expandedViewByUser.get(entry.row.user.id) ?? null
-                          }
-                          showCollapsedRangeBar={showCollapsedRangeBars}
-                          userAbsences={
-                            absencesByUser[entry.row.user.id] ?? []
-                          }
-                          unresolvedHintsByTaskId={
-                            unresolvedProjectHintsByTaskId
-                          }
-                          onSetExpandMode={(mode) =>
-                            toggleUserExpandMode(entry.row.user.id, mode)
-                          }
-                          onInputChange={updateCapacityInput}
-                        />
-                      );
-                    })}
+                  <div className="capacity-chart-legend" aria-label="Legende">
+                    <input
+                      id="analysis-user-search"
+                      className="analysis-user-search"
+                      aria-label="Nutzer suchen"
+                      type="search"
+                      value={chartUserSearch}
+                      placeholder="Nutzer filtern..."
+                      onChange={(event) =>
+                        setChartUserSearch(event.target.value)
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="ghost-button capacity-export-all-button"
+                      disabled={visibleSelectedRowSummaries.length === 0}
+                      title="Kapazität aller angezeigten Nutzer als CSV exportieren"
+                      onClick={() =>
+                        exportCapacityCsv(
+                          visibleSelectedRowSummaries,
+                          "kapazitaet-alle-nutzer",
+                        )
+                      }
+                    >
+                      <CsvExportIcon />
+                      CSV exportieren
+                    </button>
+                    <span>
+                      <i className="legend-swatch legend-swatch-capacity" />
+                      Kapazität (Wochenstunden)
+                    </span>
+                    <span>
+                      <i className="legend-swatch legend-swatch-planned" />
+                      Geplante Projektzeit
+                    </span>
+                    <span>
+                      <i className="legend-swatch legend-swatch-target" />
+                      Kunden-Ziel — darüber gilt als überplant
+                    </span>
+                    <span>
+                      <i className="legend-swatch legend-swatch-absent" />
+                      Abwesenheit
+                    </span>
+                    <span>
+                      <i className="legend-swatch legend-swatch-current-week" />
+                      Aktuelle Woche
+                    </span>
                   </div>
-                ) : (
-                  <div className="empty-state">
-                    <p>
-                      {selectedRows.length === 0
-                        ? "Mindestens einen Nutzer auswählen."
-                        : "Keine Nutzer entsprechen der Suche oder dem Auslastungsfilter."}
-                    </p>
-                  </div>
-                )}
-                </>
-                ) : (
+                ) : null}
+              </section>
+
+              <section
+                className={`panel analysis-chart-panel analysis-content-panel${
+                  viewMode === "bar" ? " analysis-content-panel--plain" : ""
+                }`}
+              >
+                {viewMode === "bar" ? (
+                  visibleSelectedRowSummaries.length > 0 ? (
+                    <div className="capacity-chart">
+                      {visibleSelectedRowSummaries.map((entry) => {
+                        return (
+                          <CapacityChartRow
+                            key={entry.row.user.id}
+                            row={entry.row}
+                            weekRows={entry.weekRows}
+                            expandMode={
+                              expandedViewByUser.get(entry.row.user.id) ?? null
+                            }
+                            showCollapsedRangeBar={showCollapsedRangeBars}
+                            userAbsences={
+                              absencesByUser[entry.row.user.id] ?? []
+                            }
+                            unresolvedHintsByTaskId={
+                              unresolvedProjectHintsByTaskId
+                            }
+                            onSetExpandMode={(mode) =>
+                              toggleUserExpandMode(entry.row.user.id, mode)
+                            }
+                            onInputChange={updateCapacityInput}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="empty-state">
+                      <p>
+                        {selectedRows.length === 0
+                          ? "Mindestens einen Nutzer auswählen."
+                          : "Keine Nutzer entsprechen der Suche oder dem Auslastungsfilter."}
+                      </p>
+                    </div>
+                  )
+                ) : viewMode === "table" ? (
                   <CapacityTableView
                     entries={visibleSelectedRowSummaries}
                     capacityWeeks={capacityWeeks}
                   />
-                )}
-              </section>
-
-              <section className="panel analysis-table-panel">
-                <div className="analysis-section-heading">
-                  <div>
-                    <p className="eyebrow">Details</p>
-                    <h2>Nutzer-Kapazitätstabelle</h2>
-                  </div>
-                  <div className="analysis-inline-actions analysis-inline-actions-end">
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      aria-expanded={!isDetailsTableCollapsed}
-                      onClick={() =>
-                        setIsDetailsTableCollapsed((current) => !current)
-                      }
-                    >
-                      {isDetailsTableCollapsed
-                        ? "Tabelle einblenden"
-                        : "Tabelle einklappen"}
-                    </button>
-                  </div>
-                </div>
-                {!isDetailsTableCollapsed ? (
+                ) : visibleSelectedRowSummaries.length > 0 ? (
                   <div className="analysis-table-wrap">
                     <table className="analysis-table">
                       <thead>
@@ -1419,7 +1406,15 @@ export function CapacityAnalysisPage({
                       </tbody>
                     </table>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="empty-state">
+                    <p>
+                      {selectedRows.length === 0
+                        ? "Mindestens einen Nutzer auswählen."
+                        : "Keine Nutzer entsprechen der Suche oder dem Auslastungsfilter."}
+                    </p>
+                  </div>
+                )}
               </section>
             </>
           ) : null}
@@ -1770,6 +1765,20 @@ function CapacityCombinedBar({
   const absentZonePercent = pct(totals.absentHours);
   const stackWidthPercent = pct(totals.plannedHours);
   const customerMarkerPercent = pct(totals.targetHours);
+  // When the marker sits near a track edge, a centred flag/marker overflows and
+  // gets clipped by the track's overflow. Anchor them to the near edge instead.
+  const markerAtLeft = customerMarkerPercent <= 15;
+  const markerAtRight = customerMarkerPercent >= 85;
+  const flagAlignClass = markerAtLeft
+    ? " capacity-marker-flag--left"
+    : markerAtRight
+      ? " capacity-marker-flag--right"
+      : "";
+  const markerAlignClass = markerAtLeft
+    ? " capacity-marker-target--edge-left"
+    : markerAtRight
+      ? " capacity-marker-target--edge-right"
+      : "";
   const hasAbsent = absentZonePercent > 0;
   const customerTargetTooltip = `Erwartete Projektkapazität | ${formatHours(totals.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der verfügbaren Kapazität`;
   const absentTooltip = `Abwesenheit\n${formatAbsentDays(totals.absentDays)} · ${formatHours(totals.absentHours)} weniger Kapazität`;
@@ -1842,14 +1851,14 @@ function CapacityCombinedBar({
             )}
           </div>
           <span
-            className="capacity-marker capacity-marker-target capacity-marker-target--labeled"
+            className={`capacity-marker capacity-marker-target capacity-marker-target--labeled${markerAlignClass}`}
             style={{ left: `${customerMarkerPercent}%` }}
             aria-label={customerTargetTooltip}
             onMouseEnter={(event) => onTooltip(customerTargetTooltip, event)}
             onMouseMove={(event) => onTooltip(customerTargetTooltip, event)}
             onMouseLeave={onTooltipClear}
           >
-            <span className="capacity-marker-flag">
+            <span className={`capacity-marker-flag${flagAlignClass}`}>
               Kunden-Ziel · {formatHours(totals.targetHours)} /{" "}
               {formatDecimal(customerPercent)} %
             </span>

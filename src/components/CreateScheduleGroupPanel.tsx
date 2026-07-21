@@ -693,7 +693,13 @@ export function CreateScheduleGroupPanel({
     );
 
     if (created) {
+      // Full reset back to "no selection" so nothing stays pre-planned after a
+      // successful create — including the project, task mode and task source,
+      // not just the task and schedule fields.
       resetScheduleFields();
+      setProjectId("");
+      setTaskMode("existing");
+      setAutoTaskSource("new");
       setTaskId("");
       setNewTaskName("");
       setTaskStatusFilter(TASK_FILTER_ALL);

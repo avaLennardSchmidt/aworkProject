@@ -3283,18 +3283,29 @@ button.auto-plan-skipped-day:hover {
   white-space: nowrap;
 }
 
+/* On wide screens the config and data panels break out wider than the normal
+   content column to reclaim empty side space — but stay sidebar-aware so they
+   keep a real gap on both sides (unlike the old calc(50% - 50vw + Npx) trick,
+   which ignored the sidebar and pushed the panel under the navbar / off the
+   right edge).
+
+   --panel-w = content-area width (100vw minus the fixed sidebar) minus a 16px
+   gap on each side — the same gap as the default app-shell column in tablet
+   mode (min(1180px, 100% - 32px)). margin-inline centers it within the 1180px
+   app-shell column (negative when the panel is wider), so it never overshoots
+   regardless of viewport or sidebar state. */
 @media (min-width: 1400px) {
   .analysis-chart-panel {
-    margin-left: calc(50% - 50vw + 110px);
-    margin-right: calc(50% - 50vw + 110px);
+    --panel-w: calc(100vw - 220px - 32px);
+    width: var(--panel-w);
+    margin-inline: calc((100% - var(--panel-w)) / 2);
     transition:
-      margin-left 0.22s ease,
-      margin-right 0.22s ease;
+      width 0.22s ease,
+      margin-inline 0.22s ease;
   }
 
   .app-layout:has(.app-sidebar--collapsed) .analysis-chart-panel {
-    margin-left: calc(50% - 50vw + 28px);
-    margin-right: calc(50% - 50vw + 28px);
+    --panel-w: calc(100vw - 56px - 32px);
   }
 }
 
@@ -3733,9 +3744,22 @@ button.auto-plan-skipped-day:hover {
   background: #f0b429;
 }
 
+/* No container styling in bar view — the white user cards float directly on
+   the app's page background (#f4f6f8), separated by elevation + whitespace.
+   See .analysis-content-panel--plain, which strips the panel frame in bar
+   mode. */
 .capacity-chart {
   display: grid;
-  gap: 12px;
+  gap: 24px;
+}
+
+/* Bar view: drop the panel frame so the user cards sit directly on the app
+   background. Keeps the breakout width/margins from .analysis-chart-panel. */
+.analysis-content-panel--plain {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
 }
 
 .capacity-chart-legend {
@@ -3747,6 +3771,10 @@ button.auto-plan-skipped-day:hover {
   color: var(--color-text-muted);
   font-size: 0.85rem;
   line-height: 1.4;
+}
+
+.capacity-chart-legend:last-child {
+  margin-bottom: 0;
 }
 
 .capacity-chart-legend .analysis-user-search {
@@ -3814,10 +3842,11 @@ button.auto-plan-skipped-day:hover {
   gap: 12px;
   align-items: stretch;
   padding: 14px;
-  background: #f7f9fb;
-  border: 1px solid #e1e7ed;
-  border-left: 3px solid #e1e7ed;
+  background: #ffffff;
+  border: 1px solid #dbe2ea;
+  border-left: 5px solid var(--color-accent);
   border-radius: 8px;
+  box-shadow: 0 3px 10px rgb(29 35 41 / 0.1);
 }
 
 .capacity-row.is-overbooked {
@@ -3874,7 +3903,7 @@ button.auto-plan-skipped-day:hover {
   gap: 7px;
   min-width: 0;
   padding: 9px;
-  background: var(--color-surface);
+  background: #f7f9fb;
   border: 1px solid #dbe4ec;
   border-radius: 8px;
 }
@@ -4003,6 +4032,46 @@ button.auto-plan-skipped-day:hover {
   transform: translateX(-50%) translateY(-2px) scale(1.05);
   background: #fceecb;
   box-shadow: 0 6px 14px rgb(217 148 5 / 0.28);
+}
+
+/* Edge-anchored variants: keep the flag inside the track when the marker is
+   near the far left or right, so the label is never clipped. The small inset
+   leaves a hair of breathing room so the pill border isn't flush to the edge. */
+.capacity-marker-flag--left {
+  left: 2px;
+  transform: none;
+  transform-origin: left center;
+}
+
+.capacity-marker-flag--right {
+  left: auto;
+  right: 2px;
+  transform: none;
+  transform-origin: right center;
+}
+
+.capacity-marker-target--labeled:hover .capacity-marker-flag--left,
+.capacity-marker-target--labeled:hover .capacity-marker-flag--right {
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* Clamp the marker line itself at the edges: it is normally centred with
+   translateX(-50%), so at 0%/100% half of it would spill past the track and
+   get clipped. Pin its inner edge to the track boundary instead. */
+.capacity-marker-target--edge-left {
+  transform: translateX(0);
+}
+
+.capacity-marker-target--edge-right {
+  transform: translateX(-100%);
+}
+
+.capacity-range-track--labeled-marker .capacity-marker-target--edge-left:hover {
+  transform: translateX(0);
+}
+
+.capacity-range-track--labeled-marker .capacity-marker-target--edge-right:hover {
+  transform: translateX(-100%);
 }
 
 .capacity-user {
