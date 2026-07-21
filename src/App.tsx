@@ -63,7 +63,7 @@ import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
 import { SuccessPopup } from "./components/SuccessPopup";
 import type { PlannerWorkflow } from "./components/WorkflowChooser";
 import { Sidebar } from "./components/Sidebar";
-import { BackendStatusIndicator } from "./components/BackendStatusIndicator";
+import { BackendStartupBanner } from "./components/BackendStartupBanner";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
 import { MonitoringModal } from "./components/MonitoringModal";
 import { ModalShell } from "./components/ModalShell";
@@ -742,7 +742,8 @@ function App() {
       } catch (sessionError) {
         lastError = sessionError;
         if (attempt < 2) {
-          setStatusMessage("Backend startet... bitte warten.");
+          // The centered BackendStartupBanner overlay already signals the
+          // "backend starting" state — no extra top-right toast needed here.
           await new Promise((r) => setTimeout(r, 3000));
           continue;
         }
@@ -1381,6 +1382,7 @@ function App() {
   if (isAnalysisRoute) {
     return (
       <div className="app-layout">
+        <BackendStartupBanner backendClient={backendClient} />
         <Sidebar
           activeItem={workflow}
           isCapacityActive={isAnalysisRoute}
@@ -1402,9 +1404,6 @@ function App() {
           onPlannerUserChange={handlePlannerUserChange}
         />
         <div className="app-layout-content">
-          <div className="status-toast-region">
-            <BackendStatusIndicator backendClient={backendClient} />
-          </div>
           <CapacityAnalysisPage
             backendClient={backendClient}
             currentUser={currentUser}
@@ -1426,6 +1425,7 @@ function App() {
 
   return (
     <div className="app-layout">
+      <BackendStartupBanner backendClient={backendClient} />
       <Sidebar
         activeItem={workflow}
         capacityHref={getCapacityAnalysisHref()}
@@ -1999,7 +1999,6 @@ function App() {
           ) : null}
 
           <div className="status-toast-region">
-            <BackendStatusIndicator backendClient={backendClient} />
             <AnimatePresence>
               {error ? (
                 <StatusToast

@@ -74,6 +74,20 @@ export interface MonitoringUserStats {
   last_visit: string | null;
 }
 
+export interface MonitoringTotals {
+  total_events: number;
+  logins: number;
+  session_starts: number;
+  blockers_created: number;
+  blockers_edited: number;
+  blockers_deleted: number;
+  analysis_views: number;
+  unique_users: number;
+  active_days: number;
+  first_event: string | null;
+  last_event: string | null;
+}
+
 type BackendStatusListener = (status: "ok" | "starting") => void;
 
 export class BackendClient {
@@ -251,6 +265,10 @@ export class BackendClient {
 
   async getMonitoringAccess(): Promise<{ hasAccess: boolean }> {
     return this.request<{ hasAccess: boolean }>("/api/monitoring/access");
+  }
+
+  async getMonitoringTotals(): Promise<MonitoringTotals> {
+    return this.request<MonitoringTotals>("/api/monitoring/totals");
   }
 
   async getMonitoringUserStats(

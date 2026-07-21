@@ -2639,8 +2639,22 @@ button.auto-plan-skipped-day:hover {
   display: grid;
   place-items: center;
   padding: 20px;
+  /* Center the dialog within the content area (viewport minus the sidebar),
+     not the full viewport. The scrim still covers everything. */
+  padding-left: calc(220px + 20px);
   background: rgb(17 24 31 / 0.58);
   z-index: 20;
+  transition: padding-left 0.22s ease;
+}
+
+.app-layout:has(.app-sidebar--collapsed) .modal-backdrop {
+  padding-left: calc(56px + 20px);
+}
+
+@media (max-width: 720px) {
+  .modal-backdrop {
+    padding-left: 20px;
+  }
 }
 
 .success-popup {
@@ -4962,7 +4976,49 @@ button.auto-plan-skipped-day:hover {
   border-color: var(--color-danger);
 }
 
-/* .backend-startup-indicator removed — BackendStatusIndicator now uses .status-toast classes */
+/* ── Backend startup overlay (centered spinner over content) ───── */
+
+.backend-startup-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 220px;
+  /* Above page content, but below the modal layer (.modal-backdrop = 20) so an
+     opened modal like What's New still appears on top of the startup overlay. */
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(244 246 248 / 0.82);
+  transition: left 0.22s ease;
+}
+
+.app-layout:has(.app-sidebar--collapsed) .backend-startup-overlay {
+  left: 56px;
+}
+
+.backend-startup-overlay__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.backend-startup-overlay__spinner {
+  width: 56px;
+  height: 56px;
+  border-width: 4px;
+}
+
+.backend-startup-overlay__message {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
 
 /* spinner variant inside the 28px icon bubble */
 .status-toast__spinner {
@@ -5288,6 +5344,10 @@ button.auto-plan-skipped-day:hover {
   --card-color: #f59e3a;
 }
 
+.monitoring-stat-card--aktionen {
+  --card-color: #0891b2;
+}
+
 .monitoring-stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -5329,6 +5389,69 @@ button.auto-plan-skipped-day:hover {
   font-size: 0.88rem;
   font-weight: 700;
   color: var(--color-text-secondary);
+}
+
+.monitoring-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 24px;
+  margin-bottom: 10px;
+}
+
+.monitoring-section-head .monitoring-section-title {
+  margin: 0;
+  padding: 0;
+}
+
+.monitoring-all-toggle {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.monitoring-all-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.monitoring-all-toggle.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.monitoring-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 0 24px 10px;
+}
+
+.monitoring-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.monitoring-chart-legend-swatch {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
 }
 
 .monitoring-chart-wrapper {
@@ -5540,6 +5663,260 @@ button.auto-plan-skipped-day:hover {
 .monitoring-actions-cell {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+}
+
+/* ── Monitoring: all-time totals ("Gesamt-Statistik") ──────────── */
+.monitoring-totals {
+  margin: 0 24px 22px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, #f6f9fb, #fbfcfd);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.monitoring-totals-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.monitoring-totals[data-open="true"] .monitoring-totals-head {
+  margin-bottom: 14px;
+}
+
+.monitoring-totals-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monitoring-totals-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform 0.18s ease;
+}
+
+.monitoring-totals[data-open="true"] .monitoring-totals-chevron {
+  transform: rotate(180deg);
+}
+
+.monitoring-totals-eyebrow {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+}
+
+.monitoring-totals-title {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.monitoring-totals-since {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.monitoring-totals-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .monitoring-totals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.monitoring-total-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--tile-accent, var(--color-accent));
+  border-radius: 8px;
+}
+
+.monitoring-total-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--color-text);
+}
+
+.monitoring-total-label {
+  font-size: 0.73rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Monitoring: insight tiles ("Auf einen Blick") ─────────────── */
+.monitoring-insights {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 0 24px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 640px) {
+  .monitoring-insights {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.monitoring-insight {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  background: #fbfcfd;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--insight-accent, var(--color-accent));
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.monitoring-insight-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+}
+
+.monitoring-insight-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monitoring-insight-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+/* ── Monitoring: activity breakdown ────────────────────────────── */
+.monitoring-breakdown {
+  padding: 0 24px;
+  margin-bottom: 24px;
+}
+
+.monitoring-breakdown-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.monitoring-breakdown-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #eef0f3;
+}
+
+.monitoring-breakdown-seg {
+  height: 100%;
+  min-width: 3px;
+  transition: width 0.3s ease;
+}
+
+.monitoring-breakdown-seg:not(:last-child) {
+  border-right: 1.5px solid var(--color-surface);
+}
+
+.monitoring-breakdown-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 12px;
+}
+
+.monitoring-breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.monitoring-breakdown-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.monitoring-breakdown-name {
+  color: var(--color-text-secondary);
+}
+
+.monitoring-breakdown-count {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* ── Monitoring: section header + sortable table + export ───────── */
+.monitoring-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 24px;
+  margin-bottom: 10px;
+}
+
+.monitoring-section-title--inline {
+  padding: 0;
+  margin: 0;
+}
+
+.monitoring-export-btn {
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+.monitoring-sort-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+}
+
+.monitoring-sort-btn:hover {
+  color: var(--color-accent);
+}
+
+.monitoring-user-table--4col .monitoring-user-row {
+  grid-template-columns: 1fr 90px 90px 80px;
 }
 
 /* ── Projekt einplanen ─────────────────────────────────────────── */
