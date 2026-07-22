@@ -115,6 +115,56 @@ export class BackendClient {
     }
   }
 
+  /** Lightweight, unauthenticated liveness probe against /health. */
+  private async pingHealth(timeoutMs: number): Promise<boolean> {
+    try {
+      const response = await fetch(`${BACKEND_BASE_URL}/health`, {
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Proactively wake the backend on app start and surface the startup banner
+   * while it does. On Render's free tier a sleeping service holds the first
+   * request open for 30-60s (instead of returning 503 or refusing the
+   * connection), so the request-level "starting" path in request() never
+   * fires on a cold start. Here we probe /health with a short timeout: if it
+   * doesn't answer fast the backend is waking, so we flip to "starting" and
+   * poll /health until it responds, then back to "ok".
+   */
+  async warmUp(): Promise<void> {
+    if (this.isBackendStarting) return;
+
+    // Already awake → answers well within a few seconds, no banner.
+    if (await this.pingHealth(4000)) {
+      this.notifyStatusChange("ok");
+      return;
+    }
+
+    // Slow to answer → cold start in progress. Show the banner and poll.
+    this.isBackendStarting = true;
+    this.notifyStatusChange("starting");
+
+    const maxAttempts = 12; // ~12 * (15s probe + 2s wait) — generous ceiling
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (await this.pingHealth(15000)) {
+        this.isBackendStarting = false;
+        this.notifyStatusChange("ok");
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    // Gave up waiting — hide the banner so the UI is usable; any genuine
+    // outage will surface through normal request error handling.
+    this.isBackendStarting = false;
+    this.notifyStatusChange("ok");
+  }
+
   getLoginUrl(): string {
     return `${BACKEND_BASE_URL}/auth/login`;
   }

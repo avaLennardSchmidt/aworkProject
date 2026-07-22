@@ -197,6 +197,12 @@ function App() {
   }
 
   useEffect(() => {
+    // Wake the backend on load and show the startup banner while it spins up.
+    // Runs regardless of auth state so a cold start is visible before login.
+    void backendClient.warmUp();
+  }, []);
+
+  useEffect(() => {
     // Session ID is captured from URL by inline script in index.html (before React loads).
     // Here we just check if we have a stored session and restore it.
     if (getStoredSessionId()) {
