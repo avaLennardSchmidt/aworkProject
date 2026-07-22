@@ -1019,7 +1019,7 @@ export function CapacityAnalysisPage({
                 overloadedUsers={summary.overloadedUsers}
               />
 
-              <section className="panel analysis-chart-panel">
+              <section className="panel">
                 <div className="analysis-section-heading analysis-section-heading-chart">
                   <div>
                     <p className="eyebrow">Projekte und Kapazität</p>
@@ -1163,55 +1163,57 @@ export function CapacityAnalysisPage({
                     </div>
                   </div>
                   <div className="capacity-config-divider" aria-hidden="true" />
-                  <div className="capacity-config-item">
-                    <label
-                      className="capacity-config-label"
-                      htmlFor="bulk-weekly-hours"
-                    >
-                      Wochenstunden
-                    </label>
-                    <input
-                      id="bulk-weekly-hours"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="—"
-                      value={bulkWeeklyHoursInput}
-                      aria-invalid={isInvalidNumberInput(bulkWeeklyHoursInput)}
-                      className={
-                        isInvalidNumberInput(bulkWeeklyHoursInput)
-                          ? "capacity-config-input input-invalid"
-                          : "capacity-config-input"
-                      }
-                      onChange={(event) =>
-                        setBulkWeeklyHoursInput(event.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="capacity-config-item">
-                    <label
-                      className="capacity-config-label"
-                      htmlFor="bulk-customer-percent"
-                    >
-                      Kunden %
-                    </label>
-                    <input
-                      id="bulk-customer-percent"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="70"
-                      value={bulkCustomerPercentInput}
-                      aria-invalid={isInvalidNumberInput(
-                        bulkCustomerPercentInput,
-                      )}
-                      className={
-                        isInvalidNumberInput(bulkCustomerPercentInput)
-                          ? "capacity-config-input input-invalid"
-                          : "capacity-config-input"
-                      }
-                      onChange={(event) =>
-                        setBulkCustomerPercentInput(event.target.value)
-                      }
-                    />
+                  <div className="capacity-config-group">
+                    <div className="capacity-config-item">
+                      <label
+                        className="capacity-config-label"
+                        htmlFor="bulk-weekly-hours"
+                      >
+                        Wochenstunden
+                      </label>
+                      <input
+                        id="bulk-weekly-hours"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="—"
+                        value={bulkWeeklyHoursInput}
+                        aria-invalid={isInvalidNumberInput(bulkWeeklyHoursInput)}
+                        className={
+                          isInvalidNumberInput(bulkWeeklyHoursInput)
+                            ? "capacity-config-input input-invalid"
+                            : "capacity-config-input"
+                        }
+                        onChange={(event) =>
+                          setBulkWeeklyHoursInput(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="capacity-config-item">
+                      <label
+                        className="capacity-config-label"
+                        htmlFor="bulk-customer-percent"
+                      >
+                        Kunden %
+                      </label>
+                      <input
+                        id="bulk-customer-percent"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="70"
+                        value={bulkCustomerPercentInput}
+                        aria-invalid={isInvalidNumberInput(
+                          bulkCustomerPercentInput,
+                        )}
+                        className={
+                          isInvalidNumberInput(bulkCustomerPercentInput)
+                            ? "capacity-config-input input-invalid"
+                            : "capacity-config-input"
+                        }
+                        onChange={(event) =>
+                          setBulkCustomerPercentInput(event.target.value)
+                        }
+                      />
+                    </div>
                   </div>
                   <div className="capacity-config-item">
                     <div className="capacity-config-controls">

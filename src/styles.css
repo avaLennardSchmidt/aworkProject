@@ -3396,23 +3396,19 @@ button.auto-plan-skipped-day:hover {
   gap: 8px;
 }
 
+/* Dissolved into the surrounding panel — the whole card IS the configuration
+   panel now, so this wrapper adds no box of its own (no panel-in-a-panel). */
 .capacity-config-panel {
-  margin-bottom: 18px;
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-accent);
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgb(23 79 64 / 0.08);
-  overflow: hidden;
+  display: contents;
 }
 
 .capacity-config-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 18px;
+  padding: 0;
+  margin: 6px 0 12px;
   color: var(--color-accent-deep);
-  background: var(--color-accent-soft);
-  border-bottom: 1px solid var(--color-accent-border);
 }
 
 .capacity-config-header svg {
@@ -3433,7 +3429,15 @@ button.auto-plan-skipped-day:hover {
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 14px 18px;
-  padding: 14px 18px 16px;
+  padding: 0;
+}
+
+/* Keeps Wochenstunden and Kunden % together as one unit so they never wrap
+   onto separate rows. */
+.capacity-config-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
 }
 
 .capacity-config-item {
@@ -3767,7 +3771,7 @@ button.auto-plan-skipped-day:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 18px;
-  margin: 0 0 14px;
+  margin: 18px 0 14px;
   color: var(--color-text-muted);
   font-size: 0.85rem;
   line-height: 1.4;
