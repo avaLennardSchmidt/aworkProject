@@ -300,7 +300,7 @@ function TotalsSection({ totals }: { totals: MonitoringTotals }) {
     { label: "Events gesamt", value: totals.total_events, accent: "#1d2329" },
     { label: "Logins", value: totals.logins, accent: "#4f7cf7" },
     { label: "Besuche", value: totals.session_starts, accent: "#f59e3a" },
-    { label: "Aktive Nutzer", value: totals.unique_users, accent: "var(--color-accent)" },
+    { label: "Aktive Nutzer (gesamt)", value: totals.unique_users, accent: "var(--color-accent)" },
     { label: "Blocker erstellt", value: totals.blockers_created, accent: "var(--color-accent)" },
     { label: "Blocker bearbeitet", value: totals.blockers_edited, accent: "#4f7cf7" },
     { label: "Blocker gelöscht", value: totals.blockers_deleted, accent: "#b8323a" },
