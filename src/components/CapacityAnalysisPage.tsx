@@ -1271,54 +1271,58 @@ export function CapacityAnalysisPage({
                   </div>
                 </section>
                 {viewMode === "bar" ? (
-                  <div className="capacity-chart-legend" aria-label="Legende">
-                    <input
-                      id="analysis-user-search"
-                      className="analysis-user-search"
-                      aria-label="Nutzer suchen"
-                      type="search"
-                      value={chartUserSearch}
-                      placeholder="Nutzer filtern..."
-                      onChange={(event) =>
-                        setChartUserSearch(event.target.value)
-                      }
-                    />
-                    <button
-                      type="button"
-                      className="ghost-button capacity-export-all-button"
-                      disabled={visibleSelectedRowSummaries.length === 0}
-                      title="Kapazität aller angezeigten Nutzer als CSV exportieren"
-                      onClick={() =>
-                        exportCapacityCsv(
-                          visibleSelectedRowSummaries,
-                          "kapazitaet-alle-nutzer",
-                        )
-                      }
-                    >
-                      <CsvExportIcon />
-                      CSV exportieren
-                    </button>
-                    <span>
-                      <i className="legend-swatch legend-swatch-capacity" />
-                      Kapazität (Wochenstunden)
-                    </span>
-                    <span>
-                      <i className="legend-swatch legend-swatch-planned" />
-                      Geplante Projektzeit
-                    </span>
-                    <span>
-                      <i className="legend-swatch legend-swatch-target" />
-                      Kunden-Ziel — darüber gilt als überplant
-                    </span>
-                    <span>
-                      <i className="legend-swatch legend-swatch-absent" />
-                      Abwesenheit
-                    </span>
-                    <span>
-                      <i className="legend-swatch legend-swatch-current-week" />
-                      Aktuelle Woche
-                    </span>
-                  </div>
+                  <>
+                    <div className="capacity-chart-legend" aria-label="Legende">
+                      <span>
+                        <i className="legend-swatch legend-swatch-capacity" />
+                        Kapazität (Wochenstunden)
+                      </span>
+                      <span>
+                        <i className="legend-swatch legend-swatch-planned" />
+                        Geplante Projektzeit
+                      </span>
+                      <span>
+                        <i className="legend-swatch legend-swatch-target" />
+                        Kunden-Ziel — darüber gilt als überplant
+                      </span>
+                      <span>
+                        <i className="legend-swatch legend-swatch-absent" />
+                        Abwesenheit
+                      </span>
+                      <span>
+                        <i className="legend-swatch legend-swatch-current-week" />
+                        Aktuelle Woche
+                      </span>
+                    </div>
+                    <div className="capacity-chart-toolbar">
+                      <input
+                        id="analysis-user-search"
+                        className="analysis-user-search"
+                        aria-label="Nutzer suchen"
+                        type="search"
+                        value={chartUserSearch}
+                        placeholder="Nutzer filtern..."
+                        onChange={(event) =>
+                          setChartUserSearch(event.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="ghost-button capacity-export-all-button"
+                        disabled={visibleSelectedRowSummaries.length === 0}
+                        aria-label="Kapazität aller angezeigten Nutzer als CSV exportieren"
+                        title="Kapazität aller angezeigten Nutzer als CSV exportieren"
+                        onClick={() =>
+                          exportCapacityCsv(
+                            visibleSelectedRowSummaries,
+                            "kapazitaet-alle-nutzer",
+                          )
+                        }
+                      >
+                        <CsvExportIcon />
+                      </button>
+                    </div>
+                  </>
                 ) : null}
               </section>
 
