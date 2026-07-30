@@ -33,6 +33,7 @@ function mapOneProjectTask(raw: unknown): AworkProjectTask | null {
   return {
     id,
     name: firstString(raw, ["name", "title", "task.name"]),
+    key: firstString(raw, ["taskIdentifier", "key", "taskKey", "task.key"]),
     projectId,
     isPrivate,
     projectName: firstString(raw, [

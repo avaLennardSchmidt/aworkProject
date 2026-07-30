@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { fuzzyMatches } from "../services/fuzzySearch";
 import type { ScheduleGroup } from "../types/planner";
 import { formatMinutesAsHours } from "../services/scheduleTimeCalculator";
+import { useDetailModal } from "../context/DetailModalContext";
 
 interface ScheduleGroupsListProps {
   groups: ScheduleGroup[];
@@ -265,6 +266,12 @@ function ProjectRows({
   onChangeTimeWindow: (group: ScheduleGroup) => void;
   onDeleteGroup: (group: ScheduleGroup) => void;
 }) {
+  const { openProjectDetail, openTaskDetail } = useDetailModal();
+  const projectId =
+    section.projectKey && section.projectKey !== "no-project"
+      ? section.projectKey
+      : undefined;
+
   const projectTotalMinutes = section.groups.reduce(
     (sum, group) => sum + group.totalMinutes,
     0,
@@ -280,11 +287,26 @@ function ProjectRows({
         <th scope="rowgroup" colSpan={8}>
           <span
             className={`collapse-indicator ${collapsed ? "collapsed" : ""}`}
+            aria-hidden="true"
           >
             ▼
           </span>
-          <span>{section.projectName}</span>
-          <small>
+          {projectId ? (
+            <button
+              type="button"
+              className="project-row-name detail-clickable"
+              onClick={(event) => {
+                event.stopPropagation();
+                openProjectDetail(projectId);
+              }}
+              title="Projektdetails anzeigen"
+            >
+              {section.projectName}
+            </button>
+          ) : (
+            <span className="project-row-name">{section.projectName}</span>
+          )}
+          <small className="project-row-summary">
             {section.groups.length} Gruppen · {blockerCount} Blocker ·{" "}
             {formatMinutesAsHours(projectTotalMinutes)}
           </small>
@@ -314,7 +336,14 @@ function ProjectRows({
               <td>
                 <div className="task-cell">
                   <div className="task-cell-name">
-                    <strong>{group.taskName}</strong>
+                    <button
+                      type="button"
+                      className="task-cell-name-button detail-clickable"
+                      onClick={() => openTaskDetail(group.taskId)}
+                      title="Aufgabendetails anzeigen"
+                    >
+                      <strong>{group.taskName}</strong>
+                    </button>
                     {isClosedTaskStatus(group.taskStatusType) && (
                       <span
                         className="task-status-badge"

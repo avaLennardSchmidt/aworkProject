@@ -38,6 +38,7 @@ import {
 import { SegmentedControl } from "./SegmentedControl";
 import { DatePickerInput } from "./DatePickerInput";
 import { TimePickerInput } from "./TimePickerInput";
+import { useDetailModal } from "../context/DetailModalContext";
 
 interface ProjectPlanPanelProps {
   currentUser: AworkUser;
@@ -71,10 +72,25 @@ const distributionOptions = [
   { value: "packed", label: "Gebündelt" },
 ] satisfies Array<{ value: AutoPlanDistributionMode; label: string }>;
 
-function renderHoverTaskName(label: string, textClassName: string) {
+function renderHoverTaskName(
+  label: string,
+  textClassName: string,
+  onClick?: () => void,
+) {
   return (
     <span className="project-plan-name-hover" aria-label={label}>
-      <span className={textClassName}>{label}</span>
+      {onClick ? (
+        <button
+          type="button"
+          className={`${textClassName} detail-clickable project-plan-name-button`}
+          onClick={onClick}
+          title="Aufgabendetails anzeigen"
+        >
+          {label}
+        </button>
+      ) : (
+        <span className={textClassName}>{label}</span>
+      )}
       <span className="project-plan-name-hover-tooltip" role="tooltip">
         {label}
       </span>
@@ -114,6 +130,7 @@ export function ProjectPlanPanel({
   onLoadUserCapacity,
   onCreate,
 }: ProjectPlanPanelProps) {
+  const { openTaskDetail, openProjectDetail } = useDetailModal();
   const [projectId, setProjectId] = useState("");
   const [onlyMyProjects, setOnlyMyProjects] = useState(false);
   const [tasks, setTasks] = useState<AworkProjectTask[]>([]);
@@ -749,7 +766,18 @@ export function ProjectPlanPanel({
               )}
               emptyLabel="Keine Projekte gefunden"
               onChange={(value) => void handleProjectChange(value)}
+              onOptionDetail={(value) => openProjectDetail(value)}
+              optionDetailLabel="Projektdetails anzeigen"
             />
+            {projectId ? (
+              <button
+                type="button"
+                className="project-detail-trigger"
+                onClick={() => openProjectDetail(projectId)}
+              >
+                Projektdetails anzeigen
+              </button>
+            ) : null}
           </div>
           <div className="form-row project-toggle-row">
             <label htmlFor="project-plan-only-my-projects" className="checkbox-row">
@@ -989,6 +1017,7 @@ export function ProjectPlanPanel({
                                 {renderHoverTaskName(
                                   task.name ?? task.id,
                                   "project-plan-task-name",
+                                  () => openTaskDetail(task.id),
                                 )}
                               </label>
                               <div className="project-plan-task-meta">

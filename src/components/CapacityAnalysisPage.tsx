@@ -53,6 +53,9 @@ import {
 import { DatePickerInput } from "./DatePickerInput";
 import { SegmentedControl } from "./SegmentedControl";
 import { CapacityTableView } from "./CapacityTableView";
+import { useDetailModal } from "../context/DetailModalContext";
+import { capacityProjectId, CAPACITY_DETAIL_HINT } from "../services/capacityProject";
+import { UserAvatar } from "./UserAvatar";
 
 interface CapacityAnalysisPageProps {
   backendClient: BackendClient;
@@ -1577,6 +1580,7 @@ function CapacityChartRow({
       <div className="capacity-row-config">
         <div className="capacity-user">
           <div className="capacity-user-name">
+            <UserAvatar user={row.user} size={30} />
             <strong>{formatUserName(row.user)}</strong>
             {totals.customerTargetPercent > 100 && (
               <span className="overbooked-label">Überplant</span>
@@ -1762,6 +1766,7 @@ function CapacityCombinedBar({
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
   onTooltipClear: () => void;
 }) {
+  const { openProjectDetail } = useDetailModal();
   const displayPercent = Math.max(100, totals.workloadPercent);
   const pct = (h: number) =>
     totals.totalCapacityHours > 0
@@ -1829,13 +1834,19 @@ function CapacityCombinedBar({
           >
             {projectTotals.length > 0 && totals.plannedHours > 0 ? (
               projectTotals.map((project) => {
-                const tooltipText = `${project.name}\n${formatHours(project.minutes / 60)} geplant\n${project.blockerCount} Blocker${project.unresolvedHint ? `\nHinweis: ${project.unresolvedHint}` : ""}`;
+                const projectId = capacityProjectId(project.key);
+                const baseTooltip = `${project.name}\n${formatHours(project.minutes / 60)} geplant\n${project.blockerCount} Blocker${project.unresolvedHint ? `\nHinweis: ${project.unresolvedHint}` : ""}`;
+                const tooltipText = projectId
+                  ? `${baseTooltip}\n${CAPACITY_DETAIL_HINT}`
+                  : baseTooltip;
 
                 return (
                   <span
                     key={project.key}
-                    className="capacity-segment"
+                    className={`capacity-segment${projectId ? " capacity-segment-clickable" : ""}`}
                     aria-label={tooltipText}
+                    role={projectId ? "button" : undefined}
+                    tabIndex={projectId ? 0 : undefined}
                     style={{
                       width: `${(project.minutes / (totals.plannedHours * 60)) * 100}%`,
                       background: projectColorFor(project.key),
@@ -1843,6 +1854,17 @@ function CapacityCombinedBar({
                     onMouseEnter={(event) => onTooltip(tooltipText, event)}
                     onMouseMove={(event) => onTooltip(tooltipText, event)}
                     onMouseLeave={onTooltipClear}
+                    onClick={projectId ? () => openProjectDetail(projectId) : undefined}
+                    onKeyDown={
+                      projectId
+                        ? (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              openProjectDetail(projectId);
+                            }
+                          }
+                        : undefined
+                    }
                   />
                 );
               })
@@ -1890,6 +1912,7 @@ function CapacityWeekBar({
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
   onTooltipClear: () => void;
 }) {
+  const { openProjectDetail } = useDetailModal();
   const displayPercent = Math.max(100, weekRow.utilizationPercent);
   const pct = (h: number) =>
     weekRow.totalCapacityHours > 0
@@ -1981,13 +2004,19 @@ function CapacityWeekBar({
           >
             {weekRow.projectTotals.length > 0 && weekRow.plannedMinutes > 0 ? (
               weekRow.projectTotals.map((project) => {
-                const tooltipText = `${project.name}\n${formatHours(project.minutes / 60)} geplant\n${project.blockerCount} Blocker${project.unresolvedHint ? `\nHinweis: ${project.unresolvedHint}` : ""}`;
+                const projectId = capacityProjectId(project.key);
+                const baseTooltip = `${project.name}\n${formatHours(project.minutes / 60)} geplant\n${project.blockerCount} Blocker${project.unresolvedHint ? `\nHinweis: ${project.unresolvedHint}` : ""}`;
+                const tooltipText = projectId
+                  ? `${baseTooltip}\n${CAPACITY_DETAIL_HINT}`
+                  : baseTooltip;
 
                 return (
                   <span
                     key={project.key}
-                    className="capacity-segment"
+                    className={`capacity-segment${projectId ? " capacity-segment-clickable" : ""}`}
                     aria-label={tooltipText}
+                    role={projectId ? "button" : undefined}
+                    tabIndex={projectId ? 0 : undefined}
                     style={{
                       width: `${(project.minutes / weekRow.plannedMinutes) * 100}%`,
                       background: projectColorFor(project.key),
@@ -1995,6 +2024,17 @@ function CapacityWeekBar({
                     onMouseEnter={(event) => onTooltip(tooltipText, event)}
                     onMouseMove={(event) => onTooltip(tooltipText, event)}
                     onMouseLeave={onTooltipClear}
+                    onClick={projectId ? () => openProjectDetail(projectId) : undefined}
+                    onKeyDown={
+                      projectId
+                        ? (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              openProjectDetail(projectId);
+                            }
+                          }
+                        : undefined
+                    }
                   />
                 );
               })

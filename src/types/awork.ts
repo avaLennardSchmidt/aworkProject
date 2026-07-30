@@ -9,6 +9,8 @@ export interface AworkUser {
 export interface AworkProject {
   id: string;
   name: string;
+  // awork project key (e.g. "APUA") — used for the awork web deep link.
+  key?: string;
   statusId?: string;
   statusName?: string;
   statusType?: string;
@@ -20,6 +22,8 @@ export interface AworkProject {
 export interface AworkProjectTask {
   id: string;
   name?: string;
+  // awork task key (e.g. "HAUS-6") — used for the awork web deep link.
+  key?: string;
   // Missing for private tasks — they belong to a user, not a project.
   projectId?: string;
   projectName?: string;
