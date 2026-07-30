@@ -62,13 +62,15 @@ export function DetailModalFrame({
         </button>
       </div>
 
-      {isLoading ? (
-        <p className="loading-text-hint">Details werden geladen…</p>
-      ) : error ? (
-        <div className="alert alert-error">{error}</div>
-      ) : (
-        <div className="detail-rows">{children}</div>
-      )}
+      <div className="detail-modal-body">
+        {isLoading ? (
+          <p className="loading-text-hint">Details werden geladen…</p>
+        ) : error ? (
+          <div className="alert alert-error">{error}</div>
+        ) : (
+          <div className="detail-rows">{children}</div>
+        )}
+      </div>
 
       <div className="detail-modal-footer">
         {openHref ? (

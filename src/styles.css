@@ -7890,9 +7890,10 @@ button.auto-plan-skipped-day:hover {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-top: 18px;
-  padding-top: 14px;
+  flex-shrink: 0;
+  padding: 14px 26px;
   border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .awork-open-link {
@@ -8126,9 +8127,6 @@ button.auto-plan-skipped-day:hover {
   color: var(--color-text-secondary);
   font-size: 0.9rem;
   line-height: 1.55;
-  max-height: 320px;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .detail-richtext > *:first-child {
@@ -8235,7 +8233,26 @@ button.auto-plan-skipped-day:hover {
   border: 1.5px solid var(--color-accent-border);
 }
 
-/* Give project/task detail modals a bit more width for readable descriptions. */
+/* Give project/task detail modals more width for readable descriptions, and a
+   fixed header + sticky footer with a single scrolling body in between. */
 .detail-modal {
-  width: min(780px, calc(100vw - 32px));
+  width: min(920px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.detail-modal .modal-header {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 26px 26px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 26px 18px;
 }
