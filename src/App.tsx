@@ -80,7 +80,15 @@ const FEATURE_KEYS = {
   projectPlanIntro: "feature-project-einplanen-v1",
   autoPlanIntro: "feature-auto-plan-v1",
   detailViews: "feature-detail-modals-v1",
+  // Marker that a user has completed onboarding. Absent only for a brand-new
+  // user's first-ever login (all pre-existing users were backfilled with it),
+  // which is how we suppress the whole "What's New" backlog for new users.
+  onboardingComplete: "onboarding-complete-v1",
 } as const;
+
+// Every announcement key a first-time user should start already "seen" on, so
+// they only ever get FUTURE announcements — never the existing backlog.
+const ALL_ANNOUNCEMENT_KEYS = Object.values(FEATURE_KEYS);
 
 type FeatureModalType = "whats-new" | "project-plan" | "auto-plan";
 
@@ -136,6 +144,8 @@ function App() {
   const [detailAnnouncementOpen, setDetailAnnouncementOpen] = useState(false);
   const [detailAnnouncementHandled, setDetailAnnouncementHandled] =
     useState(false);
+  // True for a brand-new user's first session — suppresses every announcement.
+  const [isNewUserSession, setIsNewUserSession] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [createSuccess, setCreateSuccess] = useState<{
     count: number;
@@ -266,7 +276,21 @@ function App() {
       .getSeenFeatureKeys()
       .then((remoteKeys) => {
         if (cancelled) return;
-        setSeenFeatureKeys(new Set(remoteKeys));
+        const seen = new Set(remoteKeys);
+        // First-ever login: the onboarding marker is absent (all pre-existing
+        // users were backfilled with it). Silently mark every current
+        // announcement as seen and persist it, so a brand-new user never gets
+        // the backlog of "What's New" popups — only future updates.
+        if (!seen.has(FEATURE_KEYS.onboardingComplete)) {
+          setIsNewUserSession(true);
+          for (const key of ALL_ANNOUNCEMENT_KEYS) {
+            seen.add(key);
+          }
+          setSeenFeatureKeys(seen);
+          void acknowledgeFeatures(ALL_ANNOUNCEMENT_KEYS);
+        } else {
+          setSeenFeatureKeys(seen);
+        }
       })
       .catch(() => {
         if (cancelled) return;
@@ -292,6 +316,7 @@ function App() {
     }
     setDetailAnnouncementHandled(true);
     if (
+      !isNewUserSession &&
       !activeFeatureModal &&
       !seenFeatureKeys.has(FEATURE_KEYS.detailViews)
     ) {
@@ -302,6 +327,7 @@ function App() {
     featureKeysLoaded,
     currentUser,
     detailAnnouncementHandled,
+    isNewUserSession,
     activeFeatureModal,
     seenFeatureKeys,
   ]);
