@@ -175,11 +175,10 @@ export function ProjectPlanPanel({
     [projects, onlyMyProjects, myAssignedProjectIds],
   );
 
-  // Only tasks that are not yet scheduled at all ("ungeplant").
-  const plannableTasks = useMemo(
-    () => tasks.filter((task) => (task.scheduledCount ?? 0) === 0),
-    [tasks],
-  );
+  // Show every task of the project (like "Blocker anlegen"), including tasks
+  // that already have an awork schedule and subtasks. Previously this filtered
+  // to `scheduledCount === 0`, which hid already-scheduled tasks/subtasks.
+  const plannableTasks = useMemo(() => tasks, [tasks]);
 
   const groups = useMemo(() => groupByList(plannableTasks), [plannableTasks]);
 
@@ -894,7 +893,7 @@ export function ProjectPlanPanel({
             <p className="loading-text-hint">Aufgaben werden geladen...</p>
           ) : plannableTasks.length === 0 ? (
             <p className="project-plan-empty">
-              Keine ungeplanten Aufgaben in diesem Projekt gefunden.
+              Keine Aufgaben in diesem Projekt gefunden.
             </p>
           ) : (
             <>
