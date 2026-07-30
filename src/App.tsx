@@ -67,6 +67,7 @@ import { BackendStartupBanner } from "./components/BackendStartupBanner";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
 import { MonitoringModal } from "./components/MonitoringModal";
 import { ModalShell } from "./components/ModalShell";
+import { DetailModalsAnnouncement } from "./components/DetailModalsAnnouncement";
 import { useConfetti } from "./components/Confetti";
 import { clearFeatureAccessCache } from "./config/featureAccess";
 import { AnimatePresence, motion } from "motion/react";
@@ -78,6 +79,7 @@ const FEATURE_KEYS = {
   capacityTableView: "feature-capacity-tabellenansicht-v1",
   projectPlanIntro: "feature-project-einplanen-v1",
   autoPlanIntro: "feature-auto-plan-v1",
+  detailViews: "feature-detail-modals-v1",
 } as const;
 
 type FeatureModalType = "whats-new" | "project-plan" | "auto-plan";
@@ -131,6 +133,9 @@ function App() {
   );
   const [featureKeysLoaded, setFeatureKeysLoaded] = useState(false);
   const [confettiTick, setConfettiTick] = useState(0);
+  const [detailAnnouncementOpen, setDetailAnnouncementOpen] = useState(false);
+  const [detailAnnouncementHandled, setDetailAnnouncementHandled] =
+    useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [createSuccess, setCreateSuccess] = useState<{
     count: number;
@@ -277,6 +282,29 @@ function App() {
       cancelled = true;
     };
   }, [currentUser]);
+
+  // Auto-show the "detail modals" announcement once per user on load, after the
+  // seen-keys have been fetched. The DB is the single source of truth, so it
+  // reappears only if the row is removed there.
+  useEffect(() => {
+    if (!featureKeysLoaded || !currentUser || detailAnnouncementHandled) {
+      return;
+    }
+    setDetailAnnouncementHandled(true);
+    if (
+      !activeFeatureModal &&
+      !seenFeatureKeys.has(FEATURE_KEYS.detailViews)
+    ) {
+      setDetailAnnouncementOpen(true);
+      fireConfetti();
+    }
+  }, [
+    featureKeysLoaded,
+    currentUser,
+    detailAnnouncementHandled,
+    activeFeatureModal,
+    seenFeatureKeys,
+  ]);
 
   async function acknowledgeFeature(featureKey: string) {
     if (!currentUser) return;
@@ -1582,6 +1610,15 @@ function App() {
               </div>
             </section>
           ) : null}
+
+          <DetailModalsAnnouncement
+            open={detailAnnouncementOpen}
+            onClose={() => setDetailAnnouncementOpen(false)}
+            onDismiss={() => {
+              void acknowledgeFeature(FEATURE_KEYS.detailViews);
+              setDetailAnnouncementOpen(false);
+            }}
+          />
 
           {activeFeatureModal ? (
             <ModalShell

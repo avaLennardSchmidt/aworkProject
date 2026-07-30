@@ -30,6 +30,10 @@ interface SearchableSelectProps {
   menuWidth?: "default" | "compact";
   disabled?: boolean;
   onChange: (value: string) => void;
+  /** When set, each option shows a trailing "details" trigger calling this. */
+  onOptionDetail?: (value: string) => void;
+  /** Accessible verb for the detail trigger, e.g. "Projektdetails anzeigen". */
+  optionDetailLabel?: string;
 }
 
 interface MultiSearchableSelectProps {
@@ -63,6 +67,8 @@ export function SearchableSelect({
   menuWidth = "default",
   disabled,
   onChange,
+  onOptionDetail,
+  optionDetailLabel = "Details anzeigen",
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -202,6 +208,25 @@ export function SearchableSelect({
                   <span className="select-option-icon">{option.icon}</span>
                 ) : null}
                 {option.label}
+                {onOptionDetail ? (
+                  <span
+                    className="select-option-detail"
+                    role="button"
+                    tabIndex={-1}
+                    aria-label={`${optionDetailLabel}: ${option.label}`}
+                    title={optionDetailLabel}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOptionDetail(option.value);
+                    }}
+                  >
+                    <span aria-hidden="true">ⓘ</span>
+                  </span>
+                ) : null}
               </button>
             ))}
             {filteredOptions.length === 0 ? (

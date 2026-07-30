@@ -1,6 +1,9 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import { format } from "date-fns";
 import type { AworkUser } from "../types/awork";
+import { useDetailModal } from "../context/DetailModalContext";
+import { capacityProjectId, CAPACITY_DETAIL_HINT } from "../services/capacityProject";
+import { UserAvatar } from "./UserAvatar";
 
 // Minimal structural types matching CapacityAnalysisPage internals
 interface CapacityWeek {
@@ -129,11 +132,6 @@ function formatUserName(user: AworkUser): string {
   return name || user.email || user.id;
 }
 
-function getUserInitials(user: AworkUser): string {
-  const first = user.firstName?.[0] ?? "";
-  const last = user.lastName?.[0] ?? "";
-  return (first + last).toUpperCase() || (user.email?.[0] ?? "?").toUpperCase();
-}
 
 function currentIsoWeekKey(): string {
   const now = new Date();
@@ -150,6 +148,7 @@ export function CapacityTableView({
   entries,
   capacityWeeks,
 }: CapacityTableViewProps) {
+  const { openProjectDetail } = useDetailModal();
   const currentWeekKey = useMemo(() => currentIsoWeekKey(), []);
   const [tooltip, setTooltip] = useState<CapacityTableTooltip>();
 
@@ -214,9 +213,7 @@ export function CapacityTableView({
               <tr key={row.user.id} className="cap-table-row">
                 <td className="cap-table-td cap-table-td--user">
                   <div className="cap-table-user">
-                    <div className="cap-table-avatar" aria-hidden="true">
-                      {getUserInitials(row.user)}
-                    </div>
+                    <UserAvatar user={row.user} size={32} className="cap-table-avatar" />
                     <div className="cap-table-user-info">
                       <span className="cap-table-user-name">
                         {formatUserName(row.user)}
@@ -325,13 +322,16 @@ export function CapacityTableView({
                           {weekRow.projectTotals.length > 0 && (
                             <div className="cap-cell-projects">
                               {weekRow.projectTotals.slice(0, 4).map((project) => {
-                                const projectTooltip = `${project.name}: ${formatHours(project.minutes / 60)} · ${project.blockerCount} Blocker`;
+                                const projectId = capacityProjectId(project.key);
+                                const projectTooltip = `${project.name}: ${formatHours(project.minutes / 60)} · ${project.blockerCount} Blocker${projectId ? ` · ${CAPACITY_DETAIL_HINT}` : ""}`;
                                 return (
                                   <div
                                     key={project.key}
-                                    className="cap-cell-project-bar"
+                                    className={`cap-cell-project-bar${projectId ? " cap-cell-project-bar-clickable" : ""}`}
                                     style={{ backgroundColor: colorMap.get(project.key) ?? "#52606d" }}
                                     aria-label={projectTooltip}
+                                    role={projectId ? "button" : undefined}
+                                    tabIndex={projectId ? 0 : undefined}
                                     onMouseEnter={(event) =>
                                       showTooltip(projectTooltip, event)
                                     }
@@ -339,6 +339,17 @@ export function CapacityTableView({
                                       showTooltip(projectTooltip, event)
                                     }
                                     onMouseLeave={() => setTooltip(undefined)}
+                                    onClick={projectId ? () => openProjectDetail(projectId) : undefined}
+                                    onKeyDown={
+                                      projectId
+                                        ? (event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                              event.preventDefault();
+                                              openProjectDetail(projectId);
+                                            }
+                                          }
+                                        : undefined
+                                    }
                                   >
                                     <span className="cap-cell-project-name">
                                       {project.name}

@@ -251,6 +251,18 @@ export class BackendClient {
     return this.request<unknown>("/api/projects");
   }
 
+  async getProject(projectId: string): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}`,
+    );
+  }
+
+  async getCompany(companyId: string): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/companies/${encodeURIComponent(companyId)}`,
+    );
+  }
+
   async getProjectTasks(projectId: string): Promise<unknown> {
     return this.request<unknown>(
       `/api/projects/${encodeURIComponent(projectId)}/projecttasks`,
@@ -468,6 +480,9 @@ async function safeReadError(response: Response): Promise<string> {
 export function getProfileImageUrl(userId: string): string {
   return `${BACKEND_BASE_URL}/api/users/${encodeURIComponent(userId)}/profile-image`;
 }
+
+/** Shared client instance for callers that don't receive one via props. */
+export const backendClient = new BackendClient();
 
 export function mapUser(rawUser: unknown): AworkUser {
   const userRecord = unwrapRecord(rawUser);

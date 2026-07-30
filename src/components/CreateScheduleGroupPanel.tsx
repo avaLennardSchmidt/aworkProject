@@ -44,6 +44,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { StatusIcon } from "./StatusIcon";
 import { ModalShell } from "./ModalShell";
 import { StatusToast } from "./StatusToast";
+import { useDetailModal } from "../context/DetailModalContext";
 
 export interface CreateGroupOptions {
   projectId: string;
@@ -253,6 +254,7 @@ export function CreateScheduleGroupPanel({
   onLoadUserCapacity,
   onCreate,
 }: CreateScheduleGroupPanelProps) {
+  const { openTaskDetail, openProjectDetail } = useDetailModal();
   const defaults = getDefaultScheduleFields();
   const taskModeOptions = useMemo(
     () =>
@@ -874,6 +876,8 @@ export function CreateScheduleGroupPanel({
               )}
               emptyLabel="Keine Projekte gefunden"
               onChange={(value) => void handleProjectChange(value)}
+              onOptionDetail={(value) => openProjectDetail(value)}
+              optionDetailLabel="Projektdetails anzeigen"
             />
           </div>
         </div>
@@ -960,6 +964,8 @@ export function CreateScheduleGroupPanel({
                   )}
                   emptyLabel="Keine Aufgaben gefunden"
                   onChange={setTaskId}
+                  onOptionDetail={(value) => openTaskDetail(value)}
+                  optionDetailLabel="Aufgabendetails anzeigen"
                 />
               </div>
             </>
@@ -1080,6 +1086,8 @@ export function CreateScheduleGroupPanel({
                       )}
                       emptyLabel="Keine Aufgaben gefunden"
                       onChange={setTaskId}
+                      onOptionDetail={(value) => openTaskDetail(value)}
+                      optionDetailLabel="Aufgabendetails anzeigen"
                     />
                   </div>
                 </>

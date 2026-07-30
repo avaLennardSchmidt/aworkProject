@@ -2090,10 +2090,16 @@ button.auto-plan-skipped-day:hover {
   background: linear-gradient(180deg, #35546f 0%, #29445c 100%);
 }
 
-.searchable-select-options button:has(.select-option-icon) {
+.searchable-select-options button:has(.select-option-icon),
+.searchable-select-options button:has(.select-option-detail) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Keep the detail trigger visible against the active-option gradient. */
+.searchable-select-options button.active .select-option-detail {
+  color: var(--color-surface);
 }
 
 .select-option-icon {
@@ -7732,4 +7738,504 @@ button.auto-plan-skipped-day:hover {
   font-size: 0.68rem;
   color: var(--color-text-muted);
   white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+   Project & task detail modals (generic, shared structure)
+   --------------------------------------------------------------------------- */
+.detail-modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.detail-modal-heading h2 {
+  margin: 0;
+  word-break: break-word;
+}
+
+.detail-modal-heading-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-modal-subtitle {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.detail-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-border);
+}
+
+.detail-status.is-done {
+  color: var(--color-text-muted);
+  background: #eef1f4;
+  border-color: var(--color-border);
+}
+
+.detail-modal-close {
+  align-self: flex-start;
+}
+
+.detail-rows {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row-label {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.detail-row-value {
+  color: var(--color-text);
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+.detail-empty {
+  color: var(--color-text-muted);
+}
+
+.detail-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-border);
+}
+
+.detail-assignees {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.detail-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-assignee-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-border);
+}
+
+.detail-description {
+  display: block;
+  white-space: pre-wrap;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.detail-link-value {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.detail-link-value:hover,
+.detail-link-value:focus-visible {
+  text-decoration: underline;
+}
+
+.detail-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.awork-open-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.awork-open-link:hover,
+.awork-open-link:focus-visible {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
+.detail-modal-footer-hint {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+/* Clickable project/task names across the app open a detail modal. */
+.detail-clickable {
+  cursor: pointer;
+}
+
+.detail-clickable:hover,
+.detail-clickable:focus-visible {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+/* Per-option "details" trigger inside SearchableSelect dropdowns. */
+.select-option-detail {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.select-option-detail:hover,
+.select-option-detail:focus-visible {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  outline: none;
+}
+
+/* Button-reset for clickable project/task names in the blocker table. */
+.collapse-indicator-button,
+.project-row-name,
+.task-cell-name-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.collapse-indicator-button {
+  line-height: 1;
+}
+
+.project-row-name {
+  font-weight: inherit;
+}
+
+.task-cell-name-button {
+  text-align: left;
+}
+
+/* Projekt einplanen: clickable task name + project-details link. */
+.project-plan-name-button {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.project-detail-trigger {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.project-detail-trigger:hover,
+.project-detail-trigger:focus-visible {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
+/* Clickable capacity segments open the project detail modal. */
+.capacity-segment-clickable,
+.cap-cell-project-bar-clickable {
+  cursor: pointer;
+}
+
+.capacity-segment-clickable:focus-visible,
+.cap-cell-project-bar-clickable:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Reusable round user avatar (photo, or initials fallback). */
+.user-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-accent-soft);
+  border: 1.5px solid var(--color-accent-border);
+}
+
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.user-avatar-initials {
+  color: var(--color-accent);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* Capacity bar view: avatar sits left of the user name. */
+.capacity-user-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* awork-style time cards in the task detail modal. */
+.detail-time-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-time-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+}
+
+.detail-time-card-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.detail-time-card-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.detail-time-card--due {
+  background: #fdeef6;
+  border-color: #f3c8e0;
+}
+.detail-time-card--due .detail-time-card-label {
+  color: #c0268a;
+}
+
+.detail-time-card--start {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+}
+.detail-time-card--start .detail-time-card-label {
+  color: var(--color-accent-deep);
+}
+
+.detail-time-card--planned {
+  background: #fdf4e3;
+  border-color: #f0dca6;
+}
+.detail-time-card--planned .detail-time-card-label {
+  color: #b7791f;
+}
+
+.detail-time-card--tracked {
+  background: #e7f6ee;
+  border-color: #b8e2ca;
+}
+.detail-time-card--tracked .detail-time-card-label {
+  color: #1c7d4d;
+}
+
+.detail-time-card--calendar {
+  background: #f0ecfb;
+  border-color: #d6c9f2;
+}
+.detail-time-card--calendar .detail-time-card-label {
+  color: #6d3fc4;
+}
+
+/* Full-width detail row (label above value) for rich/long content. */
+.detail-row--full {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+/* Rendered awork rich-text description. */
+.detail-richtext {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.detail-richtext > *:first-child {
+  margin-top: 0;
+}
+
+.detail-richtext h1,
+.detail-richtext h2,
+.detail-richtext h3,
+.detail-richtext h4,
+.detail-richtext h5,
+.detail-richtext h6 {
+  margin: 16px 0 6px;
+  color: var(--color-text);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.detail-richtext h1 { font-size: 1.05rem; }
+.detail-richtext h2 { font-size: 1rem; }
+.detail-richtext h3 { font-size: 0.95rem; }
+.detail-richtext h4,
+.detail-richtext h5,
+.detail-richtext h6 { font-size: 0.9rem; }
+
+.detail-richtext p {
+  margin: 0 0 8px;
+}
+
+.detail-richtext ul,
+.detail-richtext ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.detail-richtext li {
+  margin: 2px 0;
+}
+
+.detail-richtext a {
+  color: var(--color-accent);
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.detail-richtext a:hover,
+.detail-richtext a:focus-visible {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
+.detail-richtext blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.detail-richtext code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: #eef1f4;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.detail-richtext pre {
+  background: #eef1f4;
+  padding: 10px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0 0 8px;
+}
+
+.detail-richtext hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 12px 0;
+}
+
+/* Space between the project name and its "N Gruppen · …" summary. */
+.project-row-summary {
+  margin-left: 10px;
+}
+
+/* Icon badge for the detail-modals "What's New" announcement header. */
+.feature-announcement-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.feature-announcement-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border: 1.5px solid var(--color-accent-border);
+}
+
+/* Give project/task detail modals a bit more width for readable descriptions. */
+.detail-modal {
+  width: min(780px, calc(100vw - 32px));
 }

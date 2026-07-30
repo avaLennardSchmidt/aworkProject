@@ -29,6 +29,7 @@ function mapOneProject(raw: unknown): AworkProject | null {
   return {
     id,
     name,
+    key: firstString(raw, ["key", "projectKey"]),
     statusId,
     statusName,
     statusType,
