@@ -10,11 +10,13 @@ import "./styles.css";
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
-      <MotionConfig reducedMotion="user">
-        <DetailModalProvider>
-          <App />
-        </DetailModalProvider>
-      </MotionConfig>
+      <HashRouter>
+        <MotionConfig reducedMotion="user">
+          <DetailModalProvider>
+            <App />
+          </DetailModalProvider>
+        </MotionConfig>
+      </HashRouter>
     </ErrorBoundary>
   </StrictMode>,
 );
