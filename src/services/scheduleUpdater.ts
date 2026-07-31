@@ -1,17 +1,22 @@
 import type { AworkUser } from "../types/awork";
 import type { PreviewChange, UpdateResult } from "../types/planner";
+import type { BatchTaskSchedulesResult } from "./backendClient";
 import { isOwnSchedule } from "./scheduleMapper";
 
-interface TaskScheduleUpdater {
-  updateTaskSchedule(scheduleId: string, payload: unknown, userId?: string): Promise<unknown>;
+interface TaskScheduleBatchClient {
+  batchTaskSchedules(request: {
+    userId?: string;
+    update?: Array<{ id: string } & Record<string, unknown>>;
+  }): Promise<BatchTaskSchedulesResult>;
 }
 
 export async function updateScheduleChanges(
-  client: TaskScheduleUpdater,
+  client: TaskScheduleBatchClient,
   currentUser: AworkUser,
   changes: PreviewChange[],
 ): Promise<UpdateResult[]> {
   const results: UpdateResult[] = [];
+  const updatable: PreviewChange[] = [];
 
   for (const change of changes) {
     if (!isOwnSchedule(change.schedule, currentUser)) {
@@ -22,16 +27,46 @@ export async function updateScheduleChanges(
       });
       continue;
     }
+    updatable.push(change);
+  }
 
-    try {
-      const payload = buildUpdatePayload(change);
-      await client.updateTaskSchedule(change.schedule.id, payload, currentUser.id);
-      results.push({ scheduleId: change.schedule.id, success: true });
-    } catch (error) {
+  if (updatable.length === 0) {
+    return results;
+  }
+
+  try {
+    const response = await client.batchTaskSchedules({
+      userId: currentUser.id,
+      update: updatable.map((change) => ({
+        // Spread first, then pin id: the raw payload contains its own id field
+        // and the batch route must key on the schedule id we intend to update.
+        ...asRecord(buildUpdatePayload(change)),
+        id: change.schedule.id,
+      })),
+    });
+
+    const failedById = new Map(
+      response.failed
+        .filter((entry) => entry.id)
+        .map((entry) => [entry.id as string, entry.error]),
+    );
+
+    for (const change of updatable) {
+      const error = failedById.get(change.schedule.id);
+      results.push(
+        error
+          ? { scheduleId: change.schedule.id, success: false, error }
+          : { scheduleId: change.schedule.id, success: true },
+      );
+    }
+  } catch (error) {
+    // Whole-batch failure (network, 4xx envelope): every item fails alike.
+    const message = error instanceof Error ? error.message : "Update failed.";
+    for (const change of updatable) {
       results.push({
         scheduleId: change.schedule.id,
         success: false,
-        error: error instanceof Error ? error.message : "Update failed.",
+        error: message,
       });
     }
   }
@@ -68,6 +103,10 @@ export function buildUpdatePayload(change: PreviewChange): unknown {
   }
 
   return payload;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

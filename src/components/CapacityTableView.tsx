@@ -3,16 +3,19 @@ import { format } from "date-fns";
 import type { AworkUser } from "../types/awork";
 import { useDetailModal } from "../context/DetailModalContext";
 import { capacityProjectId, CAPACITY_DETAIL_HINT } from "../services/capacityProject";
+import {
+  buildColorMap,
+  currentIsoWeekKey,
+  formatHours,
+  formatPercent,
+  getWorkloadColor,
+  getWorkloadSurface,
+  // TableView's local formatUserName omitted the email suffix — identical to
+  // the shared shortUserName, which is used here to keep the display the same.
+  shortUserName,
+} from "../services/capacityFormat";
+import type { CapacityWeek } from "../services/capacityModel";
 import { UserAvatar } from "./UserAvatar";
-
-// Minimal structural types matching CapacityAnalysisPage internals
-interface CapacityWeek {
-  key: string;
-  label: string;
-  from: Date;
-  to: Date;
-  dayCount: number;
-}
 
 interface ProjectEntry {
   key: string;
@@ -50,99 +53,10 @@ interface CapacityTableTooltip {
   y: number;
 }
 
-const TABLE_PROJECT_COLORS = [
-  "#1e7a5f",
-  "#3567a8",
-  "#b45b2c",
-  "#7d5bc7",
-  "#2b7d8f",
-  "#a13f5f",
-  "#67752e",
-  "#8c6d1f",
-  "#226f7a",
-  "#9c4f2f",
-];
-
-function getProjectColor(index: number): string {
-  if (index < TABLE_PROJECT_COLORS.length) {
-    return TABLE_PROJECT_COLORS[index];
-  }
-  const hue = ((index - TABLE_PROJECT_COLORS.length) * 47) % 360;
-  return `hsl(${hue}, 58%, 44%)`;
-}
-
-function buildColorMap(projectEntries: ProjectEntry[]): Map<string, string> {
-  const sorted = [...projectEntries].sort((a, b) => a.key.localeCompare(b.key));
-  const map = new Map<string, string>();
-  sorted.forEach((p, i) => map.set(p.key, getProjectColor(i)));
-  return map;
-}
-
-function formatHours(hours: number): string {
-  const val = Math.round(hours * 10) / 10;
-  return Number.isInteger(val) ? `${val} h` : `${val.toFixed(1).replace(".", ",")} h`;
-}
-
-function formatPercent(value: number): string {
-  const rounded = Math.round(value * 10) / 10;
-  return Number.isInteger(rounded)
-    ? `${rounded}%`
-    : `${rounded.toFixed(1).replace(".", ",")}%`;
-}
-
-function getWorkloadColor(
-  workloadPercent: number,
-  customerTargetPercent = 100,
-): string {
-  const target = Math.max(1, Math.min(100, customerTargetPercent));
-  const clamped = Math.max(0, workloadPercent);
-
-  let progress: number;
-  if (clamped <= target) {
-    progress = clamped / target;
-  } else {
-    const overshoot = (clamped - target) / target;
-    progress = Math.max(0, 1 - overshoot);
-  }
-
-  const hue = 18 + progress * 110;
-  const saturation = 58 - progress * 12;
-  const lightness = 56 - progress * 14;
-  return `hsl(${Math.round(hue)} ${Math.round(saturation)}% ${Math.round(lightness)}%)`;
-}
-
-function getWorkloadSurface(
-  workloadPercent: number,
-  customerTargetPercent = 100,
-): string {
-  const target = Math.max(1, Math.min(100, customerTargetPercent));
-  const clamped = Math.max(0, workloadPercent);
-  const isOverbooked = clamped > 100;
-
-  if (isOverbooked) {
-    return "linear-gradient(180deg, #fff3f1 0%, #ffe7e3 100%)";
-  }
-
-  const workloadColor = getWorkloadColor(workloadPercent, customerTargetPercent);
-  return `color-mix(in srgb, ${workloadColor} 12%, white)`;
-}
-
-function formatUserName(user: AworkUser): string {
-  const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
-  return name || user.email || user.id;
-}
-
-
-function currentIsoWeekKey(): string {
-  const now = new Date();
-  const jan4 = new Date(now.getFullYear(), 0, 4);
-  const startOfWeek1 = new Date(jan4);
-  startOfWeek1.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-  const diff = Math.floor((now.getTime() - startOfWeek1.getTime()) / (7 * 86400000));
-  const isoWeek = diff + 1;
-  const year = now.getFullYear();
-  return `${year}-${isoWeek}`;
-}
+// Shared helpers now come from ../services/capacityFormat. Note: the previous
+// local currentIsoWeekKey combined the calendar year with the ISO week number
+// and was wrong at ISO-year boundaries; the canonical shared version (ISO
+// week-numbering year via date-fns "RRRR") is the intended bug fix.
 
 export function CapacityTableView({
   entries,
@@ -216,7 +130,7 @@ export function CapacityTableView({
                     <UserAvatar user={row.user} size={32} className="cap-table-avatar" />
                     <div className="cap-table-user-info">
                       <span className="cap-table-user-name">
-                        {formatUserName(row.user)}
+                        {shortUserName(row.user)}
                       </span>
                       <span className="cap-table-user-meta">
                         {row.inputs.weeklyHours} h/Woche · {row.inputs.customerPercent} % Kunden
