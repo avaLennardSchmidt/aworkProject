@@ -256,13 +256,6 @@ export class BackendClient {
     );
   }
 
-  /** Milestones of one project (Kapazität deadline overlay). */
-  async getProjectMilestones(projectId: string): Promise<unknown> {
-    return this.request<unknown>(
-      `/api/projects/${encodeURIComponent(projectId)}/milestones`,
-    );
-  }
-
   /** All time entries of one project (project modal burn-down). */
   async getProjectTimeEntries(projectId: string): Promise<unknown> {
     return this.request<unknown>(

@@ -4,10 +4,7 @@ import { de } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import type { AworkTaskSchedule, AworkUser } from "../../types/awork";
-import type {
-  DeadlineRisk,
-  UserCapacityWeek,
-} from "../../services/capacityModel";
+import type { UserCapacityWeek } from "../../services/capacityModel";
 import {
   formatDecimal,
   formatHours,
@@ -26,7 +23,6 @@ export function WeekDetailPanel({
   user,
   weekRow,
   schedules,
-  risks = [],
   isBusy,
   onClose,
   onDelete,
@@ -35,8 +31,6 @@ export function WeekDetailPanel({
   user: AworkUser;
   weekRow: UserCapacityWeek;
   schedules: AworkTaskSchedule[];
-  /** Termin-Risiken, deren Fälligkeit in diese Woche fällt. */
-  risks?: DeadlineRisk[];
   isBusy: boolean;
   onClose: () => void;
   onDelete: (scheduleIds: string[]) => Promise<void>;
@@ -132,29 +126,6 @@ export function WeekDetailPanel({
           ×
         </button>
       </div>
-
-      {risks.length > 0 && (
-        <div className="week-detail-risks" role="note">
-          <strong>⚠ Termin-Risiko in dieser Woche</strong>
-          <ul>
-            {risks.map((risk) => (
-              <li key={risk.taskId}>
-                <button
-                  type="button"
-                  className="detail-link-value"
-                  onClick={() => openTaskDetail(risk.taskId)}
-                >
-                  {risk.taskName ?? risk.taskId}
-                </button>{" "}
-                fällig {risk.dueOn.slice(8, 10)}.{risk.dueOn.slice(5, 7)}. —
-                nur {formatHours(risk.scheduledMinutesInRange / 60)} von{" "}
-                {formatHours(risk.plannedSeconds / 3600)} im Zeitraum
-                eingeplant
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {sortedSchedules.length === 0 ? (
         <p className="week-detail-empty">Keine Blocker in dieser Woche.</p>

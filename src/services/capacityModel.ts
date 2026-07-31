@@ -137,123 +137,11 @@ export interface SelectedRowSummary {
 export interface LoadSchedulesForUsersResult {
   schedulesByUser: Record<string, AworkTaskSchedule[]>;
   unresolvedHintsByTaskId: Record<string, string>;
-  /** The users' assigned tasks (already fetched for project resolution) —
-   * reused for deadline-risk computation. */
-  assignedTasksByUser: Record<string, AworkProjectTask[]>;
 }
 
 export interface MissingTaskResolutionResult {
   projectTasks: AworkProjectTask[];
   unresolvedHintsByTaskId: Record<string, string>;
-}
-
-export interface DeadlineRisk {
-  taskId: string;
-  taskName?: string;
-  projectId?: string;
-  projectName?: string;
-  /** ISO due date of the task. */
-  dueOn: string;
-  plannedSeconds: number;
-  /** Minutes already scheduled for this task within the analysis range. */
-  scheduledMinutesInRange: number;
-}
-
-/**
- * Termin-Risiko: assigned tasks due within the analysis range whose planned
- * workload is not fully scheduled (within the range). The scheduled sum only
- * sees the loaded range, so pre-range blockers are not counted — the hint
- * wording reflects that ("im Zeitraum eingeplant").
- */
-export function computeDeadlineRisks(
-  tasks: AworkProjectTask[],
-  schedules: AworkTaskSchedule[],
-  from: string,
-  to: string,
-): DeadlineRisk[] {
-  const scheduledMinutesByTask = new Map<string, number>();
-  for (const schedule of schedules) {
-    const minutes = Math.max(
-      0,
-      Math.round(
-        (parseISO(schedule.end).getTime() -
-          parseISO(schedule.start).getTime()) /
-          60000,
-      ),
-    );
-    scheduledMinutesByTask.set(
-      schedule.taskId,
-      (scheduledMinutesByTask.get(schedule.taskId) ?? 0) + minutes,
-    );
-  }
-
-  const risks: DeadlineRisk[] = [];
-  for (const task of tasks) {
-    if (!task.dueOn || !task.plannedDurationSeconds) continue;
-    const dueDay = task.dueOn.slice(0, 10);
-    if (dueDay < from || dueDay > to) continue;
-    // Closed tasks are no longer a risk.
-    const statusType = task.statusType?.trim().toLowerCase();
-    if (statusType && ["done", "closed", "completed"].includes(statusType)) {
-      continue;
-    }
-    const scheduledMinutes = scheduledMinutesByTask.get(task.id) ?? 0;
-    if (scheduledMinutes * 60 < task.plannedDurationSeconds) {
-      risks.push({
-        taskId: task.id,
-        taskName: task.name,
-        projectId: task.projectId,
-        projectName: task.projectName,
-        dueOn: task.dueOn,
-        plannedSeconds: task.plannedDurationSeconds,
-        scheduledMinutesInRange: scheduledMinutes,
-      });
-    }
-  }
-
-  return risks.sort((a, b) => a.dueOn.localeCompare(b.dueOn));
-}
-
-export interface ProjectMilestone {
-  id: string;
-  name: string;
-  /** Milestone day as yyyy-MM-dd. */
-  day: string;
-  color?: string;
-  projectId: string;
-  projectName?: string;
-}
-
-/** Maps a raw awork /projects/{id}/milestones response. */
-export function mapProjectMilestones(
-  raw: unknown,
-  projectId: string,
-  projectName?: string,
-): ProjectMilestone[] {
-  const items = Array.isArray(raw)
-    ? raw
-    : isRecord(raw) && Array.isArray(raw.items)
-      ? raw.items
-      : [];
-  const milestones: ProjectMilestone[] = [];
-  for (const item of items) {
-    if (!isRecord(item)) continue;
-    const id = typeof item.id === "string" ? item.id : undefined;
-    const name = typeof item.name === "string" ? item.name : undefined;
-    const dateValue = [item.dueDate, item.date, item.dueOn].find(
-      (value): value is string => typeof value === "string" && value.length > 0,
-    );
-    if (!id || !name || !dateValue) continue;
-    milestones.push({
-      id,
-      name,
-      day: dateValue.slice(0, 10),
-      color: typeof item.color === "string" ? item.color : undefined,
-      projectId,
-      projectName,
-    });
-  }
-  return milestones;
 }
 
 export const DEFAULT_WEEKLY_HOURS = 40;
@@ -471,7 +359,6 @@ export async function loadSchedulesForUsers(
   to: string,
 ): Promise<LoadSchedulesForUsersResult> {
   const schedulesByUser: Record<string, AworkTaskSchedule[]> = {};
-  const assignedTasksByUser: Record<string, AworkProjectTask[]> = {};
   const allSchedules: AworkTaskSchedule[] = [];
   const allProjectTasks: AworkProjectTask[] = [];
 
@@ -496,7 +383,6 @@ export async function loadSchedulesForUsers(
       const userProjectTasks = mapProjectTasksResponse(projectTaskResponse);
 
       schedulesByUser[user.id] = schedules;
-      assignedTasksByUser[user.id] = userProjectTasks;
       allSchedules.push(...schedules);
       allProjectTasks.push(...userProjectTasks);
     }),
@@ -517,7 +403,6 @@ export async function loadSchedulesForUsers(
   return {
     schedulesByUser,
     unresolvedHintsByTaskId: missingTaskResolution.unresolvedHintsByTaskId,
-    assignedTasksByUser,
   };
 }
 

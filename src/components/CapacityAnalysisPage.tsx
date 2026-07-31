@@ -47,12 +47,8 @@ import {
   saveCapacityInputs,
   summarizeWeekProjectTotals,
   summarizeWeekRows,
-  computeDeadlineRisks,
-  mapProjectMilestones,
   toTeamLabel,
   type CapacityInputs,
-  type DeadlineRisk,
-  type ProjectMilestone,
   type ProjectTotal,
   type SelectedRowSummary,
   type UserCapacityRow,
@@ -79,7 +75,6 @@ import { DatePickerInput } from "./DatePickerInput";
 import { SegmentedControl } from "./SegmentedControl";
 import { CapacityTableView } from "./CapacityTableView";
 import { WeekDetailPanel } from "./capacity/WeekDetailPanel";
-import { useDetailModal } from "../context/DetailModalContext";
 import { SummaryCards } from "./capacity/SummaryCards";
 import { CapacityChartRow } from "./capacity/CapacityChartRow";
 import { CsvExportIcon } from "./capacity/icons";
@@ -188,7 +183,6 @@ export function CapacityAnalysisPage({
   onLogin,
   onDisconnect,
 }: CapacityAnalysisPageProps) {
-  const { openProjectDetail } = useDetailModal();
   const hasInitializedDefaultSelectionRef = useRef(false);
   const appliedCapacityDefaultUserIdsRef = useRef<Set<string>>(new Set());
   // View state initialisation order: URL params win, then the last-used
@@ -533,41 +527,6 @@ export function CapacityAnalysisPage({
     };
   }, [visibleSelectedRowSummaries]);
 
-  // --- Deadline & milestone risk (Phase G). ---
-  const [deadlineRisksByUser, setDeadlineRisksByUser] = useState<
-    Record<string, DeadlineRisk[]>
-  >({});
-  const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
-
-  // Milestones of the projects present in the analysis (best-effort, capped).
-  async function loadMilestones(
-    schedulesForUsers: Record<string, AworkTaskSchedule[]>,
-  ) {
-    const projects = new Map<string, string | undefined>();
-    for (const schedules of Object.values(schedulesForUsers)) {
-      for (const schedule of schedules) {
-        if (schedule.projectId && !projects.has(schedule.projectId)) {
-          projects.set(schedule.projectId, schedule.projectName);
-        }
-      }
-    }
-    const projectEntries = Array.from(projects.entries()).slice(0, 15);
-    const collected: ProjectMilestone[] = [];
-    for (const [projectId, projectName] of projectEntries) {
-      try {
-        const raw = await backendClient.getProjectMilestones(projectId);
-        collected.push(...mapProjectMilestones(raw, projectId, projectName));
-      } catch {
-        // Milestones are an overlay — missing access just leaves them out.
-      }
-    }
-    setMilestones(
-      collected
-        .filter((milestone) => milestone.day >= from && milestone.day <= to)
-        .sort((a, b) => a.day.localeCompare(b.day)),
-    );
-  }
-
   // --- Plan vs. Actual (Phase F): opt-in tracked-time overlay. ---
   const [showTracked, setShowTracked] = useState(false);
   const [isLoadingTracked, setIsLoadingTracked] = useState(false);
@@ -663,15 +622,6 @@ export function CapacityAnalysisPage({
     setUnresolvedProjectHintsByTaskId((current) => ({
       ...current,
       ...result.unresolvedHintsByTaskId,
-    }));
-    setDeadlineRisksByUser((current) => ({
-      ...current,
-      [userId]: computeDeadlineRisks(
-        result.assignedTasksByUser[userId] ?? [],
-        result.schedulesByUser[userId] ?? [],
-        from,
-        to,
-      ),
     }));
   }
 
@@ -802,19 +752,6 @@ export function CapacityAnalysisPage({
       );
       setAbsencesByUser(newAbsencesByUser);
       setAbsenceLoadFailed(!absenceLoadSucceeded);
-
-      // Termin-Risiko: tasks due in range with unscheduled planned workload.
-      const risks: Record<string, DeadlineRisk[]> = {};
-      for (const user of usersToAnalyze) {
-        risks[user.id] = computeDeadlineRisks(
-          schedulesResult.assignedTasksByUser[user.id] ?? [],
-          schedulesResult.schedulesByUser[user.id] ?? [],
-          from,
-          to,
-        );
-      }
-      setDeadlineRisksByUser(risks);
-      void loadMilestones(schedulesResult.schedulesByUser);
 
       setSelectedUserIds(new Set(usersToAnalyze.map((user) => user.id)));
       setExpandedViewByUser(new Map());
@@ -1666,31 +1603,6 @@ export function CapacityAnalysisPage({
                 {viewMode === "bar" ? (
                   visibleSelectedRowSummaries.length > 0 ? (
                     <div className="capacity-chart">
-                      {milestones.length > 0 && (
-                        <div
-                          className="milestone-strip"
-                          aria-label="Meilensteine im Zeitraum"
-                        >
-                          <span className="milestone-strip-label">
-                            Meilensteine:
-                          </span>
-                          {milestones.map((milestone) => (
-                            <button
-                              key={milestone.id}
-                              type="button"
-                              className="milestone-chip"
-                              title={`${milestone.name} · ${milestone.projectName ?? "Projekt"} · ${milestone.day.split("-").reverse().join(".")} — Projektdetails anzeigen`}
-                              onClick={() =>
-                                openProjectDetail(milestone.projectId)
-                              }
-                            >
-                              <span aria-hidden="true">◆</span>{" "}
-                              {milestone.day.slice(8, 10)}.
-                              {milestone.day.slice(5, 7)}. {milestone.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                       {visibleSelectedRowSummaries.map((entry) => {
                         return (
                           <CapacityChartRow
@@ -1721,9 +1633,6 @@ export function CapacityAnalysisPage({
                               showTracked
                                 ? trackedMinutesByUserWeek[entry.row.user.id]
                                 : undefined
-                            }
-                            deadlineRisks={
-                              deadlineRisksByUser[entry.row.user.id] ?? []
                             }
                           />
                         );
@@ -1808,18 +1717,6 @@ export function CapacityAnalysisPage({
           user={weekDetailData.entry.row.user}
           weekRow={weekDetailData.weekRow}
           schedules={weekDetailData.weekSchedules}
-          risks={(deadlineRisksByUser[weekDetailData.entry.row.user.id] ?? []).filter(
-            (risk) => {
-              const day = risk.dueOn.slice(0, 10);
-              const weekFrom = weekDetailData.weekRow.week.from
-                .toISOString()
-                .slice(0, 10);
-              const weekTo = weekDetailData.weekRow.week.to
-                .toISOString()
-                .slice(0, 10);
-              return day >= weekFrom && day <= weekTo;
-            },
-          )}
           isBusy={isWeekActionBusy}
           onClose={() => setWeekDetail(null)}
           onDelete={deleteWeekSchedules}

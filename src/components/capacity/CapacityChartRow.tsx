@@ -17,7 +17,6 @@ import {
   summarizeWeekProjectTotals,
   summarizeWeekRows,
   type CapacityInputs,
-  type DeadlineRisk,
   type UserCapacityRow,
   type UserCapacityWeek,
   type UserExpandMode,
@@ -43,7 +42,6 @@ export function CapacityChartRow({
   onInputChange,
   onWeekDetail,
   trackedMinutesByWeek,
-  deadlineRisks = [],
 }: {
   row: UserCapacityRow;
   weekRows: UserCapacityWeek[];
@@ -60,8 +58,6 @@ export function CapacityChartRow({
   onWeekDetail?: (weekKey: string) => void;
   /** Erfasste Minuten pro Wochen-Key (Plan vs. Actual overlay). */
   trackedMinutesByWeek?: Record<string, number>;
-  /** Termin-Risiken dieses Nutzers (Tasks mit unverplanter Zeit vor Fällig). */
-  deadlineRisks?: DeadlineRisk[];
 }) {
   const isExpanded = expandMode !== null;
   const totals = summarizeWeekRows(weekRows);
@@ -145,21 +141,6 @@ export function CapacityChartRow({
                 title={`${formatHours(totals.absentHours)} Kapazität durch Abwesenheit reduziert`}
               >
                 {formatAbsentDays(totals.absentDays)} Urlaub
-              </span>
-            )}
-            {deadlineRisks.length > 0 && (
-              <span
-                className="deadline-risk-badge"
-                title={deadlineRisks
-                  .slice(0, 3)
-                  .map(
-                    (risk) =>
-                      `${risk.taskName ?? risk.taskId} fällig ${risk.dueOn.slice(8, 10)}.${risk.dueOn.slice(5, 7)}. — nur ${formatHours(risk.scheduledMinutesInRange / 60)} von ${formatHours(risk.plannedSeconds / 3600)} im Zeitraum eingeplant`,
-                  )
-                  .join("\n")}
-              >
-                ⚠ {deadlineRisks.length} Termin-Risiko
-                {deadlineRisks.length === 1 ? "" : "s"}
               </span>
             )}
             <button
