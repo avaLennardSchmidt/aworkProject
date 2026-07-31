@@ -48,6 +48,18 @@ interface CapacityAnalysisQuery {
   to: string;
 }
 
+export type BatchScheduleOp = "create" | "update" | "delete";
+
+export interface BatchTaskSchedulesResult {
+  succeeded: Array<{ op: BatchScheduleOp; id?: string; result?: unknown }>;
+  failed: Array<{
+    op: BatchScheduleOp;
+    id?: string;
+    error: string;
+    status?: number;
+  }>;
+}
+
 export interface FeatureSeenResponse {
   keys: string[];
 }
@@ -323,6 +335,23 @@ export class BackendClient {
         method: "DELETE",
       },
     );
+  }
+
+  /**
+   * Batch create/update/delete task schedules in one request. The backend
+   * performs the same per-item ownership checks as the single-item routes and
+   * reports partial failures instead of aborting the batch.
+   */
+  async batchTaskSchedules(request: {
+    userId?: string;
+    create?: Array<Record<string, unknown>>;
+    update?: Array<{ id: string } & Record<string, unknown>>;
+    delete?: string[];
+  }): Promise<BatchTaskSchedulesResult> {
+    return this.request<BatchTaskSchedulesResult>("/api/taskschedules/batch", {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
   }
 
   async getMonitoringAccess(): Promise<{ hasAccess: boolean }> {

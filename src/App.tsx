@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  CAPACITY_PATH,
+  WORKFLOW_PATHS,
+  isCapacityPath,
+  pathToWorkflow,
+} from "./services/routes";
 import {
   endOfDay,
   endOfYear,
@@ -65,6 +72,7 @@ import type { PlannerWorkflow } from "./components/WorkflowChooser";
 import { Sidebar } from "./components/Sidebar";
 import { BackendStartupBanner } from "./components/BackendStartupBanner";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MonitoringModal } from "./components/MonitoringModal";
 import { ModalShell } from "./components/ModalShell";
 import { DetailModalsAnnouncement } from "./components/DetailModalsAnnouncement";
@@ -118,8 +126,10 @@ function App() {
   const sessionActivityTrackedRef = useRef(false);
   const [currentUser, setCurrentUser] = useState<AworkUser>();
   const [selectedPlannerUserId, setSelectedPlannerUserId] = useState("");
-  const [workflow, setWorkflow] = useState<PlannerWorkflow>("manage");
-  const [forceMainView, setForceMainView] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Route is the single source of truth for which view is active.
+  const workflow = pathToWorkflow(location.pathname);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [scheduleRefreshNotice, setScheduleRefreshNotice] = useState("");
@@ -200,7 +210,29 @@ function App() {
     new Set(),
   );
   const [isMultiEditAvailable] = useState(true);
-  const isAnalysisRoute = !forceMainView && isCapacityAnalysisRoute();
+  const isAnalysisRoute = isCapacityPath(location.pathname);
+
+  // Legacy links (pre-router): "?view=analysis" or a "/analysis" path open the
+  // capacity page. Redirect once on mount; strip ONLY the "view" param so the
+  // OAuth/session params from the login redirect stay intact.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const legacyAnalysis =
+      params.get("view") === "analysis" ||
+      window.location.pathname.replace(/\/$/, "").endsWith("/analysis");
+    if (legacyAnalysis) {
+      params.delete("view");
+      const search = params.toString();
+      const base = import.meta.env.BASE_URL || "/";
+      window.history.replaceState(
+        {},
+        "",
+        `${base}${search ? `?${search}` : ""}${window.location.hash}`,
+      );
+      navigate(CAPACITY_PATH, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function consumeLoginRedirectFlag(): boolean {
     const wasRedirect =
@@ -373,13 +405,7 @@ function App() {
   }
 
   function handleWorkflowChange(nextWorkflow: PlannerWorkflow) {
-    setWorkflow(nextWorkflow);
-    if (isAnalysisRoute) {
-      const url = new URL(globalThis.location.href);
-      url.searchParams.delete("view");
-      history.pushState({}, "", url.toString());
-      setForceMainView(true);
-    }
+    navigate(WORKFLOW_PATHS[nextWorkflow]);
     if (
       nextWorkflow === "project" &&
       featureKeysLoaded &&
@@ -1112,20 +1138,22 @@ function App() {
     const failures: string[] = [];
 
     try {
-      for (const payload of payloads) {
-        try {
-          await backendClient.createTaskSchedule({
+      try {
+        const response = await backendClient.batchTaskSchedules({
+          userId: plannerUser.id,
+          create: payloads.map((payload) => ({
             ...payload,
             userId: plannerUser.id,
-          });
-          successCount += 1;
-        } catch (createError) {
-          failures.push(
-            createError instanceof Error
-              ? createError.message
-              : "Anlegen fehlgeschlagen.",
-          );
-        }
+          })),
+        });
+        successCount = response.succeeded.length;
+        failures.push(...response.failed.map((entry) => entry.error));
+      } catch (createError) {
+        failures.push(
+          createError instanceof Error
+            ? createError.message
+            : "Anlegen fehlgeschlagen.",
+        );
       }
 
       setStatusMessage(
@@ -1233,6 +1261,7 @@ function App() {
         ]);
       }
 
+      const creatable: CreateTaskSchedulePayload[] = [];
       for (const payload of payloads) {
         if (payload.userId !== plannerUser?.id) {
           failures.push(
@@ -1246,9 +1275,17 @@ function App() {
           continue;
         }
 
+        creatable.push({ ...payload, taskId });
+      }
+
+      if (creatable.length > 0) {
         try {
-          await backendClient.createTaskSchedule({ ...payload, taskId });
-          successCount += 1;
+          const response = await backendClient.batchTaskSchedules({
+            userId: plannerUser?.id,
+            create: creatable.map((payload) => ({ ...payload })),
+          });
+          successCount = response.succeeded.length;
+          failures.push(...response.failed.map((entry) => entry.error));
         } catch (createError) {
           failures.push(
             createError instanceof Error
@@ -1446,7 +1483,7 @@ function App() {
         <Sidebar
           activeItem={workflow}
           isCapacityActive={isAnalysisRoute}
-          capacityHref={getCapacityAnalysisHref()}
+          capacityHref={`#${CAPACITY_PATH}`}
           pulseProject={pulseProjectWorkflow}
           showWhatsNewDot={showWhatsNewDot}
           onNavigate={handleWorkflowChange}
@@ -1464,19 +1501,21 @@ function App() {
           onPlannerUserChange={handlePlannerUserChange}
         />
         <div className="app-layout-content">
-          <CapacityAnalysisPage
-            backendClient={backendClient}
-            currentUser={currentUser}
-            isConnecting={isConnecting}
-            isAuthorized
-            isCheckingAccess={false}
-            showTableViewBadge={showCapacityTableBadge}
-            onTableViewSeen={() =>
-              acknowledgeFeature(FEATURE_KEYS.capacityTableView)
-            }
-            onLogin={handleLogin}
-            onDisconnect={handleDisconnect}
-          />
+          <ErrorBoundary fallbackTitle="Kapazitätsansicht konnte nicht geladen werden.">
+            <CapacityAnalysisPage
+              backendClient={backendClient}
+              currentUser={currentUser}
+              isConnecting={isConnecting}
+              isAuthorized
+              isCheckingAccess={false}
+              showTableViewBadge={showCapacityTableBadge}
+              onTableViewSeen={() =>
+                acknowledgeFeature(FEATURE_KEYS.capacityTableView)
+              }
+              onLogin={handleLogin}
+              onDisconnect={handleDisconnect}
+            />
+          </ErrorBoundary>
           {featureAnnouncementModal}
         </div>
       </div>
@@ -1488,7 +1527,7 @@ function App() {
       <BackendStartupBanner backendClient={backendClient} />
       <Sidebar
         activeItem={workflow}
-        capacityHref={getCapacityAnalysisHref()}
+        capacityHref={`#${CAPACITY_PATH}`}
         pulseProject={pulseProjectWorkflow}
         showWhatsNewDot={showWhatsNewDot}
         onNavigate={handleWorkflowChange}
@@ -2111,18 +2150,3 @@ function getPlannerSchedules(
   return schedules.filter((schedule) => isOwnSchedule(schedule, plannerUser));
 }
 
-function isCapacityAnalysisRoute(): boolean {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("view") === "analysis") {
-    return true;
-  }
-
-  const path = window.location.pathname.replace(/\/$/, "");
-  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
-  return path === `${base}/analysis` || path === "/analysis";
-}
-
-function getCapacityAnalysisHref(): string {
-  const base = import.meta.env.BASE_URL || "/";
-  return `${base}?view=analysis`;
-}
