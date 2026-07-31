@@ -670,6 +670,27 @@ export function CapacityAnalysisPage({
         // Absence data unavailable — analysis continues without holiday correction
       }
 
+      // Workspace absences (public holidays, offsites) apply to every user.
+      // Best-effort: the endpoint needs elevated awork rights and may 403 —
+      // capacity then simply lacks the holiday correction.
+      try {
+        const workspaceRaw = await backendClient.getWorkspaceAbsences();
+        const workspaceAbsences = mapAbsencesResponse(workspaceRaw);
+        if (workspaceAbsences.length > 0) {
+          for (const user of usersToAnalyze) {
+            newAbsencesByUser[user.id] = [
+              ...(newAbsencesByUser[user.id] ?? []),
+              ...workspaceAbsences.map((absence) => ({
+                ...absence,
+                userId: user.id,
+              })),
+            ];
+          }
+        }
+      } catch {
+        // No workspace-absence access — skip holiday correction silently.
+      }
+
       setUsers(usersToAnalyze);
       setSchedulesByUser(schedulesResult.schedulesByUser);
       setUnresolvedProjectHintsByTaskId(

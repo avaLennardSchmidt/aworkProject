@@ -232,6 +232,12 @@ export class BackendClient {
     return this.request<unknown>(`/api/analysis/capacity?${params.toString()}`);
   }
 
+  /** Workspace-wide absences (public holidays). May 403 without admin /
+   * user-planning-data rights — callers treat failure as "no holiday data". */
+  async getWorkspaceAbsences(): Promise<unknown> {
+    return this.request<unknown>("/api/workspace-absences");
+  }
+
   async getAbsences(): Promise<unknown> {
     return this.request<unknown>("/api/absences");
   }
