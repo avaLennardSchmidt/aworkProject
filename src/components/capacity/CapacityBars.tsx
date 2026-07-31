@@ -219,7 +219,8 @@ export function CapacityWeekBar({
           <button
             type="button"
             className="capacity-week-detail-trigger detail-clickable"
-            title="Blocker dieser Woche anzeigen & bearbeiten"
+            aria-label={`${weekRow.week.label}: Blocker anzeigen`}
+            title="Blocker dieser Woche anzeigen"
             onClick={onWeekDetail}
           >
             <strong>{weekRow.week.label}</strong>

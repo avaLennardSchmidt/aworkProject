@@ -42,6 +42,7 @@ export function CapacityChartRow({
   onSetExpandMode,
   onInputChange,
   onWeekDetail,
+  onDeadlineDetail,
   trackedMinutesByWeek,
   deadlineRisks = [],
 }: {
@@ -58,9 +59,10 @@ export function CapacityChartRow({
     value: number,
   ) => void;
   onWeekDetail?: (weekKey: string) => void;
+  onDeadlineDetail?: () => void;
   /** Erfasste Minuten pro Wochen-Key (Plan vs. Actual overlay). */
   trackedMinutesByWeek?: Record<string, number>;
-  /** Termin-Risiken dieses Nutzers (Tasks mit unverplanter Zeit vor Fällig). */
+  /** Fällige Termine dieses Nutzers für diese und nächste Woche. */
   deadlineRisks?: DeadlineRisk[];
 }) {
   const isExpanded = expandMode !== null;
@@ -122,6 +124,29 @@ export function CapacityChartRow({
     `Kundenziel-Erfüllung: ${formatHours(totals.plannedHours)} von ${formatHours(totals.targetHours)} Ziel (${formatDecimal(row.inputs.customerPercent)} % Kunden-Anteil) = ${formatDecimal(totals.kundenzielPercent)} %`,
     `Überbucht, sobald die geplante Zeit das Kunden-Ziel überschreitet.`,
   ].join("\n");
+  const visibleDeadlineRisks = deadlineRisks.slice(0, 8);
+  const hasThisWeekDeadlineRisk = deadlineRisks.some(
+    (risk) => risk.urgency === "this-week",
+  );
+  const deadlineRiskTooltip = [
+    `Fällige Termine (${deadlineRisks.length})`,
+    ...visibleDeadlineRisks.map((risk) => {
+      const scheduledSeconds = risk.scheduledMinutesInRange * 60;
+      const openSeconds = Math.max(0, risk.plannedSeconds - scheduledSeconds);
+      const horizon =
+        risk.urgency === "this-week" ? "Diese Woche" : "Nächste Woche";
+      const scheduleStatus =
+        risk.plannedSeconds <= 0
+          ? "Kein Zeitbudget hinterlegt"
+          : openSeconds <= 0
+            ? `${formatHours(risk.plannedSeconds / 3600)} vollständig eingeplant`
+            : `${formatHours(openSeconds / 3600)} noch nicht eingeplant`;
+      return `• ${horizon} · ${risk.taskName ?? risk.taskId} — fällig ${formatRiskDueDate(risk.dueOn)}\n  ${scheduleStatus}`;
+    }),
+    ...(deadlineRisks.length > visibleDeadlineRisks.length
+      ? [`+ ${deadlineRisks.length - visibleDeadlineRisks.length} weitere`]
+      : []),
+  ].join("\n");
 
   return (
     <article
@@ -133,11 +158,29 @@ export function CapacityChartRow({
             <UserAvatar user={row.user} size={30} />
             <strong>{formatUserName(row.user)}</strong>
             {totals.isOverCapacity ? (
-              <span className="overbooked-label overbooked-label--capacity">
+              <button
+                type="button"
+                className="overbooked-label overbooked-label--capacity overbooked-label-action"
+                aria-expanded={expandMode === "weeks"}
+                title="Überbuchte Wochen und ihre Blocker anzeigen"
+                onClick={() => {
+                  if (expandMode !== "weeks") onSetExpandMode("weeks");
+                }}
+              >
                 Über Kapazität
-              </span>
+              </button>
             ) : totals.isOverbooked ? (
-              <span className="overbooked-label">Überbucht</span>
+              <button
+                type="button"
+                className="overbooked-label overbooked-label-action"
+                aria-expanded={expandMode === "weeks"}
+                title="Überbuchte Wochen und ihre Blocker anzeigen"
+                onClick={() => {
+                  if (expandMode !== "weeks") onSetExpandMode("weeks");
+                }}
+              >
+                Überbucht
+              </button>
             ) : null}
             {totals.absentDays > 0 && (
               <span
@@ -148,19 +191,40 @@ export function CapacityChartRow({
               </span>
             )}
             {deadlineRisks.length > 0 && (
-              <span
-                className="deadline-risk-badge"
-                title={deadlineRisks
-                  .slice(0, 3)
-                  .map(
-                    (risk) =>
-                      `${risk.taskName ?? risk.taskId} fällig ${risk.dueOn.slice(8, 10)}.${risk.dueOn.slice(5, 7)}. — nur ${formatHours(risk.scheduledMinutesInRange / 60)} von ${formatHours(risk.plannedSeconds / 3600)} im Zeitraum eingeplant`,
-                  )
-                  .join("\n")}
+              <button
+                type="button"
+                className={`deadline-risk-badge${hasThisWeekDeadlineRisk ? " deadline-risk-badge--critical" : ""}`}
+                aria-label={`${deadlineRisks.length} fällige ${deadlineRisks.length === 1 ? "Termin" : "Termine"} von ${formatUserName(row.user)} anzeigen. ${deadlineRiskTooltip}`}
+                onMouseEnter={(event) =>
+                  showProjectTooltip(deadlineRiskTooltip, event)
+                }
+                onMouseMove={(event) =>
+                  showProjectTooltip(deadlineRiskTooltip, event)
+                }
+                onMouseLeave={() => setTooltip(undefined)}
+                onFocus={(event) => {
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const tooltipWidth = 360;
+                  setTooltip({
+                    text: deadlineRiskTooltip,
+                    x: Math.max(
+                      12,
+                      Math.min(bounds.left, window.innerWidth - tooltipWidth - 12),
+                    ),
+                    y: bounds.bottom + 8,
+                  });
+                }}
+                onBlur={() => setTooltip(undefined)}
+                onClick={() => {
+                  setTooltip(undefined);
+                  onDeadlineDetail?.();
+                }}
               >
-                ⚠ {deadlineRisks.length} Termin-Risiko
-                {deadlineRisks.length === 1 ? "" : "s"}
-              </span>
+                ⚠ {deadlineRisks.length}{" "}
+                {deadlineRisks.length === 1
+                  ? "Termin"
+                  : "Termine"}
+              </button>
             )}
             <button
               type="button"
@@ -337,4 +401,10 @@ export function CapacityChartRow({
       ) : null}
     </article>
   );
+}
+
+function formatRiskDueDate(value: string): string {
+  const isoDay = value.slice(0, 10);
+  const [year, month, day] = isoDay.split("-");
+  return year && month && day ? `${day}.${month}.${year}` : value;
 }

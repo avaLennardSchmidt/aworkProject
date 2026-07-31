@@ -157,20 +157,30 @@ export interface DeadlineRisk {
   plannedSeconds: number;
   /** Minutes already scheduled for this task within the analysis range. */
   scheduledMinutesInRange: number;
+  /** Calendar urgency relative to the current Monday–Sunday week. */
+  urgency: "this-week" | "next-week";
 }
 
 /**
- * Termin-Risiko: assigned tasks due within the analysis range whose planned
- * workload is not fully scheduled (within the range). The scheduled sum only
- * sees the loaded range, so pre-range blockers are not counted — the hint
- * wording reflects that ("im Zeitraum eingeplant").
+ * Deadline reminder: every incomplete assigned task due this or next calendar
+ * week. Scheduling coverage is attached as context, but never determines
+ * whether the task appears. Later due dates are intentionally not reminders,
+ * even when the analysis range spans months.
  */
 export function computeDeadlineRisks(
   tasks: AworkProjectTask[],
   schedules: AworkTaskSchedule[],
   from: string,
   to: string,
+  today = new Date(),
 ): DeadlineRisk[] {
+  const currentWeekStart = format(
+    startOfWeek(today, { weekStartsOn: 1 }),
+    "yyyy-MM-dd",
+  );
+  const currentWeekEndDate = endOfWeek(today, { weekStartsOn: 1 });
+  const currentWeekEnd = format(currentWeekEndDate, "yyyy-MM-dd");
+  const nextWeekEnd = format(addDays(currentWeekEndDate, 7), "yyyy-MM-dd");
   const scheduledMinutesByTask = new Map<string, number>();
   for (const schedule of schedules) {
     const minutes = Math.max(
@@ -189,26 +199,26 @@ export function computeDeadlineRisks(
 
   const risks: DeadlineRisk[] = [];
   for (const task of tasks) {
-    if (!task.dueOn || !task.plannedDurationSeconds) continue;
+    if (!task.dueOn) continue;
     const dueDay = task.dueOn.slice(0, 10);
     if (dueDay < from || dueDay > to) continue;
+    if (dueDay < currentWeekStart || dueDay > nextWeekEnd) continue;
     // Closed tasks are no longer a risk.
     const statusType = task.statusType?.trim().toLowerCase();
     if (statusType && ["done", "closed", "completed"].includes(statusType)) {
       continue;
     }
     const scheduledMinutes = scheduledMinutesByTask.get(task.id) ?? 0;
-    if (scheduledMinutes * 60 < task.plannedDurationSeconds) {
-      risks.push({
-        taskId: task.id,
-        taskName: task.name,
-        projectId: task.projectId,
-        projectName: task.projectName,
-        dueOn: task.dueOn,
-        plannedSeconds: task.plannedDurationSeconds,
-        scheduledMinutesInRange: scheduledMinutes,
-      });
-    }
+    risks.push({
+      taskId: task.id,
+      taskName: task.name,
+      projectId: task.projectId,
+      projectName: task.projectName,
+      dueOn: task.dueOn,
+      plannedSeconds: task.plannedDurationSeconds ?? 0,
+      scheduledMinutesInRange: scheduledMinutes,
+      urgency: dueDay <= currentWeekEnd ? "this-week" : "next-week",
+    });
   }
 
   return risks.sort((a, b) => a.dueOn.localeCompare(b.dueOn));

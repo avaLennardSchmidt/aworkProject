@@ -4160,6 +4160,22 @@ button.auto-plan-skipped-day:hover {
   letter-spacing: 0.2px;
 }
 
+.overbooked-label-action {
+  cursor: pointer;
+}
+
+.overbooked-label-action:hover {
+  filter: brightness(0.96);
+}
+
+.capacity-week-detail-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .capacity-user-workload,
 .capacity-user-capacity {
   overflow: hidden;
@@ -8470,10 +8486,6 @@ button.auto-plan-skipped-day:hover {
   cursor: pointer;
 }
 
-.week-detail-manage {
-  flex-shrink: 0;
-}
-
 .week-detail-actions {
   display: flex;
   flex-wrap: wrap;
@@ -8497,10 +8509,64 @@ button.auto-plan-skipped-day:hover {
   text-align: center;
 }
 
+.week-detail-action-button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.8rem;
+}
+
+.week-detail-delete {
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+}
+
 .week-detail-delete.is-confirming {
   color: var(--color-danger);
   border-color: var(--color-danger-border);
   background: var(--color-danger-soft);
+}
+
+.week-detail-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.week-detail-feedback > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-weight: 800;
+}
+
+.week-detail-feedback--success {
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-border);
+}
+
+.week-detail-feedback--success > span {
+  color: var(--color-surface);
+  background: var(--color-accent);
+}
+
+.week-detail-feedback--error {
+  color: var(--color-danger-hover);
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger-border);
+}
+
+.week-detail-feedback--error > span {
+  color: var(--color-surface);
+  background: var(--color-danger);
 }
 
 .week-detail-hint {
@@ -8510,12 +8576,25 @@ button.auto-plan-skipped-day:hover {
 }
 
 .capacity-week-detail-trigger {
-  border: none;
-  background: none;
-  padding: 0;
+  border: 1px solid var(--color-accent-border);
+  border-radius: 5px;
+  background: var(--color-accent-soft);
+  padding: 2px 5px;
   font: inherit;
   color: inherit;
   cursor: pointer;
+}
+
+.capacity-week-detail-trigger:hover {
+  border-color: var(--color-accent);
+  background: #ddf0e8;
+  text-decoration: none;
+}
+
+.capacity-week-detail-trigger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  text-decoration: none;
 }
 
 .cap-cell-hours--clickable {
@@ -8611,6 +8690,36 @@ button.auto-plan-skipped-day:hover {
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.deadline-risk-badge:hover,
+.deadline-risk-badge:focus-visible {
+  border-color: #d7b45c;
+  background: #faedcf;
+}
+
+.deadline-risk-badge:focus-visible {
+  outline: 2px solid #b7791f;
+  outline-offset: 2px;
+}
+
+.deadline-risk-badge--critical {
+  color: var(--color-danger-hover);
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
+}
+
+.deadline-risk-badge--critical:hover,
+.deadline-risk-badge--critical:focus-visible {
+  color: var(--color-danger-hover);
+  background: #f9dede;
+  border-color: var(--color-danger);
+}
+
+.deadline-risk-badge--critical:focus-visible {
+  outline-color: var(--color-danger);
 }
 
 .week-detail-risks {
@@ -8623,6 +8732,11 @@ button.auto-plan-skipped-day:hover {
   color: var(--color-text-secondary);
 }
 
+.week-detail-risks--critical {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
+}
+
 .week-detail-risks strong {
   color: #b7791f;
 }
@@ -8630,4 +8744,120 @@ button.auto-plan-skipped-day:hover {
 .week-detail-risks ul {
   margin: 6px 0 0;
   padding-left: 18px;
+}
+
+.deadline-overview-hint {
+  margin: 14px 0 2px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.deadline-overview-group {
+  margin-top: 18px;
+}
+
+.deadline-overview-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+}
+
+.deadline-overview-group-title span {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.deadline-overview-group-title--this-week {
+  color: var(--color-danger-hover);
+}
+
+.deadline-overview-group-title--this-week span {
+  background: var(--color-danger-soft);
+}
+
+.deadline-overview-group-title--next-week {
+  color: #8a5a12;
+}
+
+.deadline-overview-group-title--next-week span {
+  background: #fdf4e3;
+}
+
+.deadline-overview-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deadline-overview-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 11px;
+  border: 1px solid;
+  border-radius: 8px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.deadline-overview-item--this-week {
+  color: var(--color-danger-hover);
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+}
+
+.deadline-overview-item--next-week {
+  color: #7a4d0b;
+  border-color: #f0dca6;
+  background: #fdf4e3;
+}
+
+.deadline-overview-item:hover {
+  filter: brightness(0.98);
+}
+
+.deadline-overview-item:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.deadline-overview-item-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.deadline-overview-item-main strong {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.deadline-overview-item-main span {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.deadline-overview-date {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.deadline-overview-date span {
+  font-size: 0.72rem;
+  font-weight: 650;
 }

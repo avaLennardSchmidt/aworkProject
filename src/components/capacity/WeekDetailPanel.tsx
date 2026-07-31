@@ -1,8 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
-import { useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import type { AworkTaskSchedule, AworkUser } from "../../types/awork";
 import type {
   DeadlineRisk,
@@ -14,13 +13,11 @@ import {
   formatUserName,
 } from "../../services/capacityFormat";
 import { useDetailModal } from "../../context/DetailModalContext";
-import { WORKFLOW_PATHS } from "../../services/routes";
 
 /**
  * Drill-down for one user + week in the Kapazität view: lists the week's
  * blockers and offers remediation right here — open task/project details,
- * shift blockers by days, delete them, or jump to "Blocker bearbeiten"
- * prefiltered to the task.
+ * shift blockers by days, or delete them.
  */
 export function WeekDetailPanel({
   user,
@@ -35,18 +32,28 @@ export function WeekDetailPanel({
   user: AworkUser;
   weekRow: UserCapacityWeek;
   schedules: AworkTaskSchedule[];
-  /** Termin-Risiken, deren Fälligkeit in diese Woche fällt. */
+  /** Unfertige Aufgaben, deren Fälligkeit in diese Woche fällt. */
   risks?: DeadlineRisk[];
   isBusy: boolean;
   onClose: () => void;
-  onDelete: (scheduleIds: string[]) => Promise<void>;
-  onShift: (scheduleIds: string[], dayOffset: number) => Promise<void>;
+  onDelete: (scheduleIds: string[]) => Promise<boolean>;
+  onShift: (scheduleIds: string[], dayOffset: number) => Promise<boolean>;
 }) {
-  const navigate = useNavigate();
   const { openTaskDetail, openProjectDetail } = useDetailModal();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [shiftDaysInput, setShiftDaysInput] = useState("7");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    id: number;
+    variant: "success" | "error";
+    message: string;
+  }>();
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = window.setTimeout(() => setFeedback(undefined), 3200);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
 
   const sortedSchedules = useMemo(
     () =>
@@ -87,13 +94,31 @@ export function WeekDetailPanel({
       return;
     }
     setConfirmDelete(false);
-    await onDelete(Array.from(selectedIds));
+    const selectedCount = selectedIds.size;
+    const succeeded = await onDelete(Array.from(selectedIds));
+    setFeedback({
+      id: Date.now(),
+      variant: succeeded ? "success" : "error",
+      message: succeeded
+        ? `${selectedCount} ${selectedCount === 1 ? "Blocker wurde" : "Blocker wurden"} gelöscht.`
+        : "Löschen fehlgeschlagen. Bitte erneut versuchen.",
+    });
     setSelectedIds(new Set());
   }
 
   async function handleShift() {
     if (!canShift) return;
-    await onShift(Array.from(selectedIds), shiftDays);
+    const selectedCount = selectedIds.size;
+    const succeeded = await onShift(Array.from(selectedIds), shiftDays);
+    const absoluteDays = Math.abs(shiftDays);
+    const direction = shiftDays > 0 ? "später" : "früher";
+    setFeedback({
+      id: Date.now(),
+      variant: succeeded ? "success" : "error",
+      message: succeeded
+        ? `${selectedCount} ${selectedCount === 1 ? "Blocker wurde" : "Blocker wurden"} ${absoluteDays} ${absoluteDays === 1 ? "Tag" : "Tage"} ${direction} verschoben.`
+        : "Verschieben fehlgeschlagen. Bitte erneut versuchen.",
+    });
     setSelectedIds(new Set());
   }
 
@@ -134,8 +159,13 @@ export function WeekDetailPanel({
       </div>
 
       {risks.length > 0 && (
-        <div className="week-detail-risks" role="note">
-          <strong>⚠ Termin-Risiko in dieser Woche</strong>
+        <div
+          className={`week-detail-risks${risks.some((risk) => risk.urgency === "this-week") ? " week-detail-risks--critical" : ""}`}
+          role="note"
+        >
+          <strong>
+            ⚠ Fällige Termine {risks[0]?.urgency === "this-week" ? "diese" : "nächste"} Woche
+          </strong>
           <ul>
             {risks.map((risk) => (
               <li key={risk.taskId}>
@@ -146,10 +176,12 @@ export function WeekDetailPanel({
                 >
                   {risk.taskName ?? risk.taskId}
                 </button>{" "}
-                fällig {risk.dueOn.slice(8, 10)}.{risk.dueOn.slice(5, 7)}. —
-                nur {formatHours(risk.scheduledMinutesInRange / 60)} von{" "}
-                {formatHours(risk.plannedSeconds / 3600)} im Zeitraum
-                eingeplant
+                fällig {risk.dueOn.slice(8, 10)}.{risk.dueOn.slice(5, 7)}.
+                {risk.plannedSeconds <= 0
+                  ? " — kein Zeitbudget hinterlegt"
+                  : risk.scheduledMinutesInRange * 60 >= risk.plannedSeconds
+                    ? ` — ${formatHours(risk.plannedSeconds / 3600)} vollständig eingeplant`
+                    : ` — nur ${formatHours(risk.scheduledMinutesInRange / 60)} von ${formatHours(risk.plannedSeconds / 3600)} eingeplant`}
               </li>
             ))}
           </ul>
@@ -222,19 +254,6 @@ export function WeekDetailPanel({
                       {formatHours(minutes / 60)}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="capacity-icon-button week-detail-manage"
-                    title="In Blocker bearbeiten öffnen (vorgefiltert)"
-                    aria-label="In Blocker bearbeiten öffnen"
-                    onClick={() =>
-                      navigate(
-                        `${WORKFLOW_PATHS.manage}?q=${encodeURIComponent(schedule.taskName ?? "")}`,
-                      )
-                    }
-                  >
-                    ✎
-                  </button>
                 </li>
               );
             })}
@@ -253,7 +272,7 @@ export function WeekDetailPanel({
               <span>Tage</span>
               <button
                 type="button"
-                className="ghost-button"
+                className="ghost-button week-detail-action-button"
                 disabled={!canShift || isBusy}
                 onClick={() => void handleShift()}
               >
@@ -262,7 +281,7 @@ export function WeekDetailPanel({
             </div>
             <button
               type="button"
-              className={`ghost-button week-detail-delete${confirmDelete ? " is-confirming" : ""}`}
+              className={`ghost-button ghost-button-danger week-detail-action-button week-detail-delete${confirmDelete ? " is-confirming" : ""}`}
               disabled={!hasSelection || isBusy}
               onClick={() => void handleDelete()}
             >
@@ -271,6 +290,25 @@ export function WeekDetailPanel({
                 : "Auswahl löschen"}
             </button>
           </div>
+          <AnimatePresence initial={false}>
+            {feedback ? (
+              <motion.div
+                key={feedback.id}
+                className={`week-detail-feedback week-detail-feedback--${feedback.variant}`}
+                role={feedback.variant === "error" ? "alert" : "status"}
+                aria-live={feedback.variant === "error" ? "assertive" : "polite"}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                <span aria-hidden="true">
+                  {feedback.variant === "success" ? "✓" : "×"}
+                </span>
+                {feedback.message}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
           <p className="week-detail-hint">
             Verschieben: positive Werte = später, negative = früher (z. B. 7 =
             eine Woche nach hinten).

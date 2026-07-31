@@ -190,7 +190,10 @@ function buildTaskTimeCards(
   ];
 }
 
-/** Sums raw awork task schedules (start/end ISO pairs) into seconds. */
+/**
+ * Sums awork's own plannedDuration value for every calendar schedule.
+ * Date differences are only a compatibility fallback for older response shapes.
+ */
 function sumScheduleSeconds(raw: unknown): number {
   const items = Array.isArray(raw)
     ? raw
@@ -201,8 +204,19 @@ function sumScheduleSeconds(raw: unknown): number {
   for (const item of items) {
     if (!item || typeof item !== "object") continue;
     const record = item as Record<string, unknown>;
-    const start = typeof record.start === "string" ? record.start : undefined;
-    const end = typeof record.end === "string" ? record.end : undefined;
+
+    const plannedDuration = record.plannedDuration;
+    if (
+      typeof plannedDuration === "number" &&
+      Number.isFinite(plannedDuration) &&
+      plannedDuration > 0
+    ) {
+      seconds += plannedDuration;
+      continue;
+    }
+
+    const start = firstScheduleDate(record, ["startDate", "start"]);
+    const end = firstScheduleDate(record, ["endDate", "end"]);
     if (start && end) {
       const diff = (new Date(end).getTime() - new Date(start).getTime()) / 1000;
       if (Number.isFinite(diff) && diff > 0) {
@@ -211,6 +225,18 @@ function sumScheduleSeconds(raw: unknown): number {
     }
   }
   return seconds;
+}
+
+function firstScheduleDate(
+  record: Record<string, unknown>,
+  keys: string[],
+): string | undefined {
+  for (const key of keys) {
+    if (typeof record[key] === "string") {
+      return record[key];
+    }
+  }
+  return undefined;
 }
 
 function unwrap(value: unknown): unknown {

@@ -79,6 +79,7 @@ import { DatePickerInput } from "./DatePickerInput";
 import { SegmentedControl } from "./SegmentedControl";
 import { CapacityTableView } from "./CapacityTableView";
 import { WeekDetailPanel } from "./capacity/WeekDetailPanel";
+import { DeadlineOverviewPanel } from "./capacity/DeadlineOverviewPanel";
 import { useDetailModal } from "../context/DetailModalContext";
 import { SummaryCards } from "./capacity/SummaryCards";
 import { CapacityChartRow } from "./capacity/CapacityChartRow";
@@ -627,6 +628,9 @@ export function CapacityAnalysisPage({
     userId: string;
     weekKey: string;
   } | null>(null);
+  const [deadlineDetailUserId, setDeadlineDetailUserId] = useState<
+    string | null
+  >(null);
   const [isWeekActionBusy, setIsWeekActionBusy] = useState(false);
 
   const weekDetailData = useMemo(() => {
@@ -645,6 +649,39 @@ export function CapacityAnalysisPage({
     );
     return { entry, weekRow, weekSchedules };
   }, [weekDetail, selectedRowSummaries]);
+
+  const deadlineDetailData = useMemo(() => {
+    if (!deadlineDetailUserId) return null;
+    const entry = selectedRowSummaries.find(
+      (candidate) => candidate.row.user.id === deadlineDetailUserId,
+    );
+    if (!entry) return null;
+    return {
+      entry,
+      deadlines: deadlineRisksByUser[deadlineDetailUserId] ?? [],
+    };
+  }, [deadlineDetailUserId, deadlineRisksByUser, selectedRowSummaries]);
+
+  function openDeadlineWeek(userId: string, deadline: DeadlineRisk) {
+    const entry = selectedRowSummaries.find(
+      (candidate) => candidate.row.user.id === userId,
+    );
+    const dueDay = deadline.dueOn.slice(0, 10);
+    const weekRow = entry?.weekRows.find(
+      (candidate) =>
+        dueDay >= format(candidate.week.from, "yyyy-MM-dd") &&
+        dueDay <= format(candidate.week.to, "yyyy-MM-dd"),
+    );
+    if (!weekRow) return;
+
+    setExpandedViewByUser((current) => {
+      const next = new Map(current);
+      next.set(userId, "weeks");
+      return next;
+    });
+    setDeadlineDetailUserId(null);
+    setWeekDetail({ userId, weekKey: weekRow.week.key });
+  }
 
   async function refreshUserSchedules(userId: string) {
     const user = availableUsers.find((candidate) => candidate.id === userId);
@@ -675,8 +712,8 @@ export function CapacityAnalysisPage({
     }));
   }
 
-  async function deleteWeekSchedules(scheduleIds: string[]) {
-    if (!weekDetail || scheduleIds.length === 0) return;
+  async function deleteWeekSchedules(scheduleIds: string[]): Promise<boolean> {
+    if (!weekDetail || scheduleIds.length === 0) return false;
     setIsWeekActionBusy(true);
     setError("");
     try {
@@ -690,19 +727,24 @@ export function CapacityAnalysisPage({
         );
       }
       await refreshUserSchedules(weekDetail.userId);
+      return response.failed.length === 0;
     } catch (actionError) {
       setError(
         actionError instanceof Error
           ? actionError.message
           : "Blocker konnten nicht gelöscht werden.",
       );
+      return false;
     } finally {
       setIsWeekActionBusy(false);
     }
   }
 
-  async function shiftWeekSchedules(scheduleIds: string[], dayOffset: number) {
-    if (!weekDetail || !weekDetailData || scheduleIds.length === 0) return;
+  async function shiftWeekSchedules(
+    scheduleIds: string[],
+    dayOffset: number,
+  ): Promise<boolean> {
+    if (!weekDetail || !weekDetailData || scheduleIds.length === 0) return false;
     setIsWeekActionBusy(true);
     setError("");
     try {
@@ -732,12 +774,14 @@ export function CapacityAnalysisPage({
         );
       }
       await refreshUserSchedules(weekDetail.userId);
+      return response.failed.length === 0;
     } catch (actionError) {
       setError(
         actionError instanceof Error
           ? actionError.message
           : "Blocker konnten nicht verschoben werden.",
       );
+      return false;
     } finally {
       setIsWeekActionBusy(false);
     }
@@ -803,7 +847,7 @@ export function CapacityAnalysisPage({
       setAbsencesByUser(newAbsencesByUser);
       setAbsenceLoadFailed(!absenceLoadSucceeded);
 
-      // Termin-Risiko: tasks due in range with unscheduled planned workload.
+      // Termin-Erinnerung: all incomplete tasks due this or next calendar week.
       const risks: Record<string, DeadlineRisk[]> = {};
       for (const user of usersToAnalyze) {
         risks[user.id] = computeDeadlineRisks(
@@ -1712,11 +1756,18 @@ export function CapacityAnalysisPage({
                             }
                             onInputChange={updateCapacityInput}
                             onWeekDetail={(weekKey) =>
-                              setWeekDetail({
-                                userId: entry.row.user.id,
-                                weekKey,
-                              })
+                              {
+                                setDeadlineDetailUserId(null);
+                                setWeekDetail({
+                                  userId: entry.row.user.id,
+                                  weekKey,
+                                });
+                              }
                             }
+                            onDeadlineDetail={() => {
+                              setWeekDetail(null);
+                              setDeadlineDetailUserId(entry.row.user.id);
+                            }}
                             trackedMinutesByWeek={
                               showTracked
                                 ? trackedMinutesByUserWeek[entry.row.user.id]
@@ -1743,7 +1794,10 @@ export function CapacityAnalysisPage({
                     entries={visibleSelectedRowSummaries}
                     capacityWeeks={capacityWeeks}
                     onWeekDetail={(userId, weekKey) =>
-                      setWeekDetail({ userId, weekKey })
+                      {
+                        setDeadlineDetailUserId(null);
+                        setWeekDetail({ userId, weekKey });
+                      }
                     }
                     trackedMinutesByUserWeek={
                       showTracked ? trackedMinutesByUserWeek : undefined
@@ -1824,6 +1878,16 @@ export function CapacityAnalysisPage({
           onClose={() => setWeekDetail(null)}
           onDelete={deleteWeekSchedules}
           onShift={shiftWeekSchedules}
+        />
+      ) : null}
+      {deadlineDetailData ? (
+        <DeadlineOverviewPanel
+          user={deadlineDetailData.entry.row.user}
+          deadlines={deadlineDetailData.deadlines}
+          onSelect={(deadline) =>
+            openDeadlineWeek(deadlineDetailData.entry.row.user.id, deadline)
+          }
+          onClose={() => setDeadlineDetailUserId(null)}
         />
       ) : null}
     </main>
