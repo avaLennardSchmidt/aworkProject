@@ -18,6 +18,12 @@ import {
 } from "./absenceMapper";
 import { BackendClient, mapUser } from "./backendClient";
 import {
+  auslastungPercent,
+  isOverCapacity,
+  isOverbooked,
+  kundenzielPercent,
+} from "./capacityMetrics";
+import {
   mapProjectTaskResponse,
   mapProjectTasksResponse,
 } from "./projectTaskMapper";
@@ -72,8 +78,14 @@ export interface UserCapacityWeek {
   effectiveCapacityHours: number;
   targetHours: number;
   plannedMinutes: number;
+  /** Auslastung: planned / effective capacity × 100. */
   utilizationPercent: number;
-  customerTargetPercent: number;
+  /** Kundenziel-Erfüllung: planned / targetHours × 100 (100 % = on target). */
+  kundenzielPercent: number;
+  /** Überbucht: planned exceeds the Kunden-Ziel share of available time. */
+  isOverbooked: boolean;
+  /** Über Kapazität: planned exceeds the full available capacity. */
+  isOverCapacity: boolean;
   projectTotals: WeekProjectTotal[];
 }
 
@@ -552,18 +564,6 @@ export function buildUserCapacityWeeks(
     const targetHours =
       effectiveCapacityHours * (row.inputs.customerPercent / 100);
     const plannedHours = plannedMinutes / 60;
-    const utilizationPercent =
-      effectiveCapacityHours > 0
-        ? (plannedHours / effectiveCapacityHours) * 100
-        : plannedMinutes > 0
-          ? 100
-          : 0;
-    const customerTargetPercent =
-      effectiveCapacityHours > 0
-        ? (plannedHours / effectiveCapacityHours) * 100
-        : plannedMinutes > 0
-          ? 100
-          : 0;
 
     return {
       week,
@@ -573,8 +573,13 @@ export function buildUserCapacityWeeks(
       effectiveCapacityHours,
       targetHours,
       plannedMinutes,
-      utilizationPercent,
-      customerTargetPercent,
+      utilizationPercent: auslastungPercent(
+        plannedHours,
+        effectiveCapacityHours,
+      ),
+      kundenzielPercent: kundenzielPercent(plannedHours, targetHours),
+      isOverbooked: isOverbooked(plannedHours, targetHours),
+      isOverCapacity: isOverCapacity(plannedHours, effectiveCapacityHours),
       projectTotals: Array.from(projectTotalsByKey.values()).sort(
         (a, b) => b.minutes - a.minutes,
       ),
@@ -667,12 +672,10 @@ export function buildUserCapacityDays(
         dayCapacityHours - absentHours,
       );
       const plannedHours = plannedMinutes / 60;
-      const utilizationPercent =
-        effectiveCapacityHours > 0
-          ? (plannedHours / effectiveCapacityHours) * 100
-          : plannedMinutes > 0
-            ? 100
-            : 0;
+      const utilizationPercent = auslastungPercent(
+        plannedHours,
+        effectiveCapacityHours,
+      );
 
       days.push({
         key: dayKey,
@@ -726,18 +729,13 @@ export function summarizeWeekRows(weekRows: UserCapacityWeek[]) {
     absentDays,
     effectiveCapacityHours,
     targetHours,
-    workloadPercent:
-      effectiveCapacityHours > 0
-        ? (plannedHours / effectiveCapacityHours) * 100
-        : 0,
-    customerTargetPercent:
-      effectiveCapacityHours > 0 ? (plannedHours / effectiveCapacityHours) * 100 : 0,
+    workloadPercent: auslastungPercent(plannedHours, effectiveCapacityHours),
+    kundenzielPercent: kundenzielPercent(plannedHours, targetHours),
     blockerCount,
-    // Overloaded = the planned share of effective capacity exceeds the
-    // Kunden-Ziel percentage (e.g. 50 % planned vs. 40 % goal). No
-    // targetHours > 0 guard: a fully absent user with planned hours (or a
-    // 0 %-goal user with any planning) is overloaded too.
-    isOverloaded: plannedHours > targetHours,
+    // Überbucht per confirmed formula: planned exceeds the Kunden-Ziel share
+    // of available time (e.g. 77 % planned at 70 % goal).
+    isOverbooked: isOverbooked(plannedHours, targetHours),
+    isOverCapacity: isOverCapacity(plannedHours, effectiveCapacityHours),
   };
 }
 

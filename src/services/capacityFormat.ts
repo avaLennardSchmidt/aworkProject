@@ -157,13 +157,15 @@ export function getWorkloadColor(
 export function getWorkloadSurface(
   workloadPercent: number,
   customerTargetPercent = 100,
+  flags?: { isOverbooked?: boolean; isOverCapacity?: boolean },
 ): string {
-  const target = Math.max(1, Math.min(100, customerTargetPercent));
-  const clamped = Math.max(0, workloadPercent);
-  const isOverbooked = clamped > 100;
-
-  if (isOverbooked) {
+  // Über Kapazität (planned > available) gets the strongest warning surface;
+  // Überbucht (planned > Kunden-Ziel) a lighter one.
+  if (flags?.isOverCapacity ?? Math.max(0, workloadPercent) > 100) {
     return "linear-gradient(180deg, #fff3f1 0%, #ffe7e3 100%)";
+  }
+  if (flags?.isOverbooked) {
+    return "linear-gradient(180deg, #fff8f0 0%, #ffeeda 100%)";
   }
 
   const workloadColor = getWorkloadColor(workloadPercent, customerTargetPercent);
@@ -197,6 +199,8 @@ export function exportCapacityCsv(
     "Abwesenheit (h)",
     "Kundenziel (h)",
     "Auslastung (%)",
+    "Kundenziel-Erfüllung (%)",
+    "Überbucht",
   ];
 
   const rows: (string | number)[][] = [];
@@ -212,7 +216,9 @@ export function exportCapacityCsv(
         csvNumber(week.effectiveCapacityHours),
         csvNumber(week.absentHours),
         csvNumber(week.targetHours),
-        csvNumber(week.customerTargetPercent),
+        csvNumber(week.utilizationPercent),
+        csvNumber(week.kundenzielPercent),
+        week.isOverbooked ? "ja" : "nein",
       ]);
     });
   });

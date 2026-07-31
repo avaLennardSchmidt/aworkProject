@@ -28,7 +28,14 @@ interface UserCapacityWeekEntry {
   week: CapacityWeek;
   effectiveCapacityHours: number;
   plannedMinutes: number;
-  customerTargetPercent: number;
+  /** Auslastung: planned / effective capacity × 100. */
+  utilizationPercent: number;
+  /** Kundenziel-Erfüllung: planned / targetHours × 100. */
+  kundenzielPercent: number;
+  /** Überbucht: planned exceeds the Kunden-Ziel share of available time. */
+  isOverbooked: boolean;
+  /** Über Kapazität: planned exceeds the full available capacity. */
+  isOverCapacity: boolean;
   absentDays: number;
   absentHours: number;
   projectTotals: ProjectEntry[];
@@ -153,26 +160,30 @@ export function CapacityTableView({
 
                   const isAbsent = weekRow.absentDays >= 4.5;
                   const plannedHours = weekRow.plannedMinutes / 60;
-                  const utilPct = weekRow.customerTargetPercent;
+                  const utilPct = weekRow.utilizationPercent;
                   const customerGoalPercent = row.inputs.customerPercent;
                   const workloadColor = getWorkloadColor(utilPct, customerGoalPercent);
-                  const cellSurface = getWorkloadSurface(utilPct, customerGoalPercent);
-                  const isOverbooked = utilPct > 100;
+                  const cellSurface = getWorkloadSurface(utilPct, customerGoalPercent, {
+                    isOverbooked: weekRow.isOverbooked,
+                    isOverCapacity: weekRow.isOverCapacity,
+                  });
                   const hasData = plannedHours > 0;
                   const targetHours =
                     weekRow.effectiveCapacityHours * (customerGoalPercent / 100);
                   const plannedHoursTooltip = hasData
-                    ? `Geplante Projektzeit: ${formatHours(plannedHours)}\nKunden-Auslastung: ${formatPercent(utilPct)} von ${formatPercent(customerGoalPercent)} Ziel\n${formatHours(targetHours)} Kunden-Ziel in dieser Woche`
+                    ? `Geplante Projektzeit: ${formatHours(plannedHours)}\nAuslastung: ${formatPercent(utilPct)} der verfügbaren Zeit\nKundenziel-Erfüllung: ${formatPercent(weekRow.kundenzielPercent)} (${formatHours(targetHours)} Ziel bei ${formatPercent(customerGoalPercent)} Kunden-Anteil)`
                     : undefined;
-                  const percentageTooltip = `Kunden-Auslastung: ${formatPercent(utilPct)} von ${formatPercent(customerGoalPercent)} Ziel\nGeplant: ${formatHours(plannedHours)} von ${formatHours(targetHours)} Kunden-Ziel\n(${formatHours(weekRow.effectiveCapacityHours)} verfügbar × ${formatPercent(customerGoalPercent)} Kunden)`;
+                  const percentageTooltip = `Auslastung: ${formatPercent(utilPct)} der verfügbaren Zeit\nKundenziel-Erfüllung: ${formatPercent(weekRow.kundenzielPercent)}\nGeplant: ${formatHours(plannedHours)} von ${formatHours(targetHours)} Kunden-Ziel\n(${formatHours(weekRow.effectiveCapacityHours)} verfügbar × ${formatPercent(customerGoalPercent)} Kunden)`;
 
                   let hoursMod = " cap-cell-hours--empty";
-                  if (isOverbooked) hoursMod = " cap-cell-hours--over-severe";
+                  if (weekRow.isOverCapacity) hoursMod = " cap-cell-hours--over-severe";
+                  else if (weekRow.isOverbooked) hoursMod = " cap-cell-hours--over-severe";
                   else if (hasData) hoursMod = " cap-cell-hours--normal";
 
                   let cellClass = "cap-table-td cap-table-td--cell";
                   if (isAbsent) cellClass += " cap-table-td--absent";
-                  else if (isOverbooked) cellClass += " cap-table-td--over-severe";
+                  else if (weekRow.isOverCapacity) cellClass += " cap-table-td--over-severe";
+                  else if (weekRow.isOverbooked) cellClass += " cap-table-td--overbooked";
                   else if (hasData) cellClass += " cap-table-td--normal";
                   if (isCurrent) cellClass += " cap-table-td--current-week";
 
@@ -210,7 +221,7 @@ export function CapacityTableView({
                             {hasData && (() => {
                               return (
                                 <span
-                                  className={`cap-cell-pct${isOverbooked ? " cap-cell-pct--over-severe" : ""}`}
+                                  className={`cap-cell-pct${weekRow.isOverCapacity || weekRow.isOverbooked ? " cap-cell-pct--over-severe" : ""}`}
                                   style={{ color: workloadColor }}
                                   aria-label={percentageTooltip}
                                   onMouseEnter={(event) =>

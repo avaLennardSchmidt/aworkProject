@@ -8294,3 +8294,25 @@ button.auto-plan-skipped-day:hover {
   padding: 10px 12px;
   border-radius: 8px;
 }
+
+/* Metric model: Überbucht (planned > Kunden-Ziel) vs. Über Kapazität (>100 %). */
+.overbooked-label--capacity {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #ffffff;
+}
+
+/* Überbucht weeks get an amber zone; Über Kapazität keeps the red one. */
+.capacity-week.is-overbooked:not(.is-over-capacity) .capacity-zone {
+  background: #fff8ec;
+  border-color: #ecd3a2;
+}
+
+.capacity-week.is-over-capacity .capacity-zone {
+  background: #fff1f1;
+  border-color: #efb9bb;
+}
+
+.cap-table-td--overbooked {
+  background: #fffaf1;
+}
