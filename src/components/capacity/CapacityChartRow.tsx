@@ -81,6 +81,7 @@ export function CapacityChartRow({
   const workloadColor = getWorkloadColor(totals.workloadPercent, row.inputs.customerPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
   const [copied, setCopied] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
 
   function copyCapacitySummary() {
     const text = `${formatUserName(row.user)} — ${formatDecimal(totals.workloadPercent)}% (${formatHours(totals.plannedHours)} / ${formatHours(totals.effectiveCapacityHours)})`;
@@ -262,15 +263,28 @@ export function CapacityChartRow({
             ))}
           </div>
           <div className="capacity-legend">
-            {projectTotals.slice(0, 4).map((project) => (
-              <span
-                key={project.key}
-                title={`${project.name}: ${project.blockerCount} Blocker, ${formatHours(project.minutes / 60)} geplant`}
+            {(showAllProjects ? projectTotals : projectTotals.slice(0, 4)).map(
+              (project) => (
+                <span
+                  key={project.key}
+                  title={`${project.name}: ${project.blockerCount} Blocker, ${formatHours(project.minutes / 60)} geplant`}
+                >
+                  <i style={{ background: projectColorFor(project.key) }} />
+                  {project.name}
+                </span>
+              ),
+            )}
+            {projectTotals.length > 4 && (
+              <button
+                type="button"
+                className="capacity-legend-more"
+                onClick={() => setShowAllProjects((value) => !value)}
               >
-                <i style={{ background: projectColorFor(project.key) }} />
-                {project.name}
-              </span>
-            ))}
+                {showAllProjects
+                  ? "Weniger anzeigen"
+                  : `+${projectTotals.length - 4} weitere`}
+              </button>
+            )}
             {totals.absentHours > 0 && (
               <span
                 title={`${formatHours(totals.absentHours)} durch Abwesenheit nicht verfügbar`}

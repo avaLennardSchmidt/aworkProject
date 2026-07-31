@@ -8316,3 +8316,54 @@ button.auto-plan-skipped-day:hover {
 .cap-table-td--overbooked {
   background: #fffaf1;
 }
+
+/* Kapazität quick wins: legend/cell expanders + clickable summary cards. */
+.capacity-legend-more,
+.cap-cell-more-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.capacity-legend-more:hover,
+.capacity-legend-more:focus-visible,
+.cap-cell-more-button:hover,
+.cap-cell-more-button:focus-visible {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
+.cap-cell-more-button {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+}
+
+.analysis-summary-filter-hint {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.analysis-summary-card--clickable {
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.analysis-summary-card--clickable:hover,
+.analysis-summary-card--clickable:focus-visible {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
+.analysis-summary-card--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}

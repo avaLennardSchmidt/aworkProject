@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   addDays,
   endOfMonth,
@@ -85,6 +86,65 @@ interface CapacityAnalysisPageProps {
 
 type WorkloadFilterMode = "all" | "gt" | "lt";
 
+// ---------------------------------------------------------------------------
+// View-state persistence: URL params (shareable) + localStorage (fallback).
+// ---------------------------------------------------------------------------
+const VIEW_STATE_STORAGE_KEY = "awork_capacity_view";
+
+interface StoredViewState {
+  viewMode?: "bar" | "table" | "overview";
+  workloadFilterMode?: WorkloadFilterMode;
+  workloadFilterValue?: number;
+}
+
+function loadStoredViewState(): StoredViewState {
+  try {
+    const raw = localStorage.getItem(VIEW_STATE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as StoredViewState;
+    return {
+      viewMode: readViewMode(parsed.viewMode ?? null) ?? undefined,
+      workloadFilterMode:
+        readWorkloadMode(parsed.workloadFilterMode ?? null) ?? undefined,
+      workloadFilterValue:
+        typeof parsed.workloadFilterValue === "number" &&
+        Number.isFinite(parsed.workloadFilterValue)
+          ? parsed.workloadFilterValue
+          : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function saveStoredViewState(state: StoredViewState): void {
+  try {
+    localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage unavailable (private mode) — view state just isn't remembered.
+  }
+}
+
+function readDateParam(value: string | null): string | undefined {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+function readViewMode(
+  value: string | null | undefined,
+): "bar" | "table" | "overview" | undefined {
+  return value === "bar" || value === "table" || value === "overview"
+    ? value
+    : undefined;
+}
+
+function readWorkloadMode(
+  value: string | null | undefined,
+): WorkloadFilterMode | undefined {
+  return value === "all" || value === "gt" || value === "lt"
+    ? value
+    : undefined;
+}
+
 const workloadFilterOptions = [
   { value: "all" as const, label: "Alle" },
   { value: "gt" as const, label: "Über" },
@@ -112,9 +172,20 @@ export function CapacityAnalysisPage({
 }: CapacityAnalysisPageProps) {
   const hasInitializedDefaultSelectionRef = useRef(false);
   const appliedCapacityDefaultUserIdsRef = useRef<Set<string>>(new Set());
-  const [from, setFrom] = useState(() => format(new Date(), "yyyy-MM-dd"));
-  const [to, setTo] = useState(() =>
-    format(endOfYear(new Date()), "yyyy-MM-dd"),
+  // View state initialisation order: URL params win, then the last-used
+  // localStorage snapshot, then defaults — so shared links restore exactly
+  // what the sender saw.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storedView = useRef(loadStoredViewState()).current;
+  const [from, setFrom] = useState(
+    () =>
+      readDateParam(searchParams.get("from")) ??
+      format(new Date(), "yyyy-MM-dd"),
+  );
+  const [to, setTo] = useState(
+    () =>
+      readDateParam(searchParams.get("to")) ??
+      format(endOfYear(new Date()), "yyyy-MM-dd"),
   );
   const [availableUsers, setAvailableUsers] = useState<AworkUser[]>([]);
   const [users, setUsers] = useState<AworkUser[]>([]);
@@ -133,20 +204,37 @@ export function CapacityAnalysisPage({
   const [capacityDefaultsByUser, setCapacityDefaultsByUser] = useState<
     Record<string, number>
   >({});
-  const [chartUserSearch, setChartUserSearch] = useState("");
+  const [chartUserSearch, setChartUserSearch] = useState(
+    () => searchParams.get("q") ?? "",
+  );
   const [expandedViewByUser, setExpandedViewByUser] = useState<
     Map<string, UserExpandMode>
   >(new Map());
   const [showCollapsedRangeBars, setShowCollapsedRangeBars] = useState(true);
   const [workloadFilterMode, setWorkloadFilterMode] =
-    useState<WorkloadFilterMode>("all");
-  const [workloadFilterValue, setWorkloadFilterValue] = useState(80);
+    useState<WorkloadFilterMode>(
+      () =>
+        readWorkloadMode(searchParams.get("wf")) ??
+        storedView.workloadFilterMode ??
+        "all",
+    );
+  const [workloadFilterValue, setWorkloadFilterValue] = useState(() => {
+    const fromUrl = Number(searchParams.get("wfv"));
+    if (Number.isFinite(fromUrl) && fromUrl > 0) {
+      return fromUrl;
+    }
+    return storedView.workloadFilterValue ?? 80;
+  });
+  const [showOnlyOverbooked, setShowOnlyOverbooked] = useState(
+    () => searchParams.get("ob") === "1",
+  );
   const [bulkWeeklyHoursInput, setBulkWeeklyHoursInput] = useState("");
   const [bulkCustomerPercentInput, setBulkCustomerPercentInput] = useState("");
   const [unresolvedProjectHintsByTaskId, setUnresolvedProjectHintsByTaskId] =
     useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<"bar" | "table" | "overview">(
-    "bar",
+    () =>
+      readViewMode(searchParams.get("view")) ?? storedView.viewMode ?? "bar",
   );
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -165,6 +253,68 @@ export function CapacityAnalysisPage({
       void onTableViewSeen();
     }
   }
+
+  // Persist the view state: URL params for shareable deep links (replace, so
+  // filter tweaks don't spam the history) + localStorage as the fallback for
+  // the next visit without params.
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const params = new URLSearchParams();
+      params.set("from", from);
+      params.set("to", to);
+      if (viewMode !== "bar") params.set("view", viewMode);
+      if (workloadFilterMode !== "all") {
+        params.set("wf", workloadFilterMode);
+        params.set("wfv", String(workloadFilterValue));
+      }
+      if (chartUserSearch) params.set("q", chartUserSearch);
+      if (showOnlyOverbooked) params.set("ob", "1");
+      setSearchParams(params, { replace: true });
+      saveStoredViewState({
+        viewMode,
+        workloadFilterMode,
+        workloadFilterValue,
+      });
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [
+    from,
+    to,
+    viewMode,
+    workloadFilterMode,
+    workloadFilterValue,
+    chartUserSearch,
+    showOnlyOverbooked,
+    setSearchParams,
+  ]);
+
+  // Auto-run: once users and the default selection are ready, start the
+  // analysis without requiring the "Analyse starten" click. The button stays
+  // as the manual re-run.
+  const hasAutoRunRef = useRef(false);
+  useEffect(() => {
+    if (
+      hasAutoRunRef.current ||
+      hasLoaded ||
+      isLoading ||
+      isLoadingUsers ||
+      !currentUser ||
+      availableUsers.length === 0 ||
+      selectedUserIds.size === 0
+    ) {
+      return;
+    }
+    hasAutoRunRef.current = true;
+    void loadAnalysis();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    availableUsers,
+    selectedUserIds,
+    hasLoaded,
+    isLoading,
+    isLoadingUsers,
+    currentUser,
+  ]);
 
   useEffect(() => {
     saveCapacityInputs(capacityInputs);
@@ -301,6 +451,10 @@ export function CapacityAnalysisPage({
           return false;
         }
 
+        if (showOnlyOverbooked && !entry.totals.isOverbooked) {
+          return false;
+        }
+
         if (workloadFilterMode === "all") {
           return true;
         }
@@ -314,6 +468,7 @@ export function CapacityAnalysisPage({
     [
       chartUserSearch,
       selectedRowSummaries,
+      showOnlyOverbooked,
       workloadFilterMode,
       workloadFilterValue,
     ],
@@ -325,20 +480,25 @@ export function CapacityAnalysisPage({
       expandedViewByUser.has(entry.row.user.id),
     );
 
+  // Summary cards mirror the FILTERED view so the on-screen numbers always
+  // agree with the visible rows; "(gefiltert)" flags a narrowed set.
+  const isSummaryFiltered =
+    visibleSelectedRowSummaries.length !== selectedRowSummaries.length;
   const summary = useMemo(() => {
-    const totalPlannedHours = selectedRowSummaries.reduce(
+    const entries = visibleSelectedRowSummaries;
+    const totalPlannedHours = entries.reduce(
       (sum, entry) => sum + entry.totals.plannedHours,
       0,
     );
-    const totalCapacityHours = selectedRowSummaries.reduce(
+    const totalCapacityHours = entries.reduce(
       (sum, entry) => sum + entry.totals.effectiveCapacityHours,
       0,
     );
-    const totalAbsentHours = selectedRowSummaries.reduce(
+    const totalAbsentHours = entries.reduce(
       (sum, entry) => sum + entry.totals.absentHours,
       0,
     );
-    const overloadedUsers = selectedRowSummaries.filter(
+    const overloadedUsers = entries.filter(
       (entry) => entry.totals.isOverbooked,
     ).length;
 
@@ -348,11 +508,11 @@ export function CapacityAnalysisPage({
       totalAbsentHours,
       overloadedUsers,
       averageWorkload:
-        selectedRowSummaries.length > 0 && totalCapacityHours > 0
+        entries.length > 0 && totalCapacityHours > 0
           ? (totalPlannedHours / totalCapacityHours) * 100
           : 0,
     };
-  }, [selectedRowSummaries]);
+  }, [visibleSelectedRowSummaries]);
 
   async function loadAnalysis() {
     setIsLoading(true);
@@ -908,6 +1068,11 @@ export function CapacityAnalysisPage({
                 totalAbsentHours={summary.totalAbsentHours}
                 averageWorkload={summary.averageWorkload}
                 overloadedUsers={summary.overloadedUsers}
+                isFiltered={isSummaryFiltered}
+                overbookedFilterActive={showOnlyOverbooked}
+                onToggleOverbookedFilter={() =>
+                  setShowOnlyOverbooked((value) => !value)
+                }
               />
 
               <section className="panel">

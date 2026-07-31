@@ -245,47 +245,13 @@ export function CapacityTableView({
                             </div>
                           )}
                           {weekRow.projectTotals.length > 0 && (
-                            <div className="cap-cell-projects">
-                              {weekRow.projectTotals.slice(0, 4).map((project) => {
-                                const projectId = capacityProjectId(project.key);
-                                const projectTooltip = `${project.name}: ${formatHours(project.minutes / 60)} · ${project.blockerCount} Blocker${projectId ? ` · ${CAPACITY_DETAIL_HINT}` : ""}`;
-                                return (
-                                  <div
-                                    key={project.key}
-                                    className={`cap-cell-project-bar${projectId ? " cap-cell-project-bar-clickable" : ""}`}
-                                    style={{ backgroundColor: colorMap.get(project.key) ?? "#52606d" }}
-                                    aria-label={projectTooltip}
-                                    role={projectId ? "button" : undefined}
-                                    tabIndex={projectId ? 0 : undefined}
-                                    onMouseEnter={(event) =>
-                                      showTooltip(projectTooltip, event)
-                                    }
-                                    onMouseMove={(event) =>
-                                      showTooltip(projectTooltip, event)
-                                    }
-                                    onMouseLeave={() => setTooltip(undefined)}
-                                    onClick={projectId ? () => openProjectDetail(projectId) : undefined}
-                                    onKeyDown={
-                                      projectId
-                                        ? (event) => {
-                                            if (event.key === "Enter" || event.key === " ") {
-                                              event.preventDefault();
-                                              openProjectDetail(projectId);
-                                            }
-                                          }
-                                        : undefined
-                                    }
-                                  >
-                                    <span className="cap-cell-project-name">
-                                      {project.name}
-                                    </span>
-                                    <span className="cap-cell-project-hours">
-                                      {formatHours(project.minutes / 60)}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            <CellProjects
+                              projects={weekRow.projectTotals}
+                              colorMap={colorMap}
+                              showTooltip={showTooltip}
+                              clearTooltip={() => setTooltip(undefined)}
+                              openProjectDetail={openProjectDetail}
+                            />
                           )}
                           {!hasData && weekRow.effectiveCapacityHours > 0 && (
                             <div className="cap-cell-empty-hint">
@@ -311,6 +277,74 @@ export function CapacityTableView({
           {tooltip.text}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Project bars inside a table cell. Shows the top 4 with a "+N weitere"
+ * expander instead of silently hiding the rest.
+ */
+function CellProjects({
+  projects,
+  colorMap,
+  showTooltip,
+  clearTooltip,
+  openProjectDetail,
+}: {
+  projects: ProjectEntry[];
+  colorMap: Map<string, string>;
+  showTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
+  clearTooltip: () => void;
+  openProjectDetail: (projectId: string) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? projects : projects.slice(0, 4);
+
+  return (
+    <div className="cap-cell-projects">
+      {visible.map((project) => {
+        const projectId = capacityProjectId(project.key);
+        const projectTooltip = `${project.name}: ${formatHours(project.minutes / 60)} · ${project.blockerCount} Blocker${projectId ? ` · ${CAPACITY_DETAIL_HINT}` : ""}`;
+        return (
+          <div
+            key={project.key}
+            className={`cap-cell-project-bar${projectId ? " cap-cell-project-bar-clickable" : ""}`}
+            style={{ backgroundColor: colorMap.get(project.key) ?? "#52606d" }}
+            aria-label={projectTooltip}
+            role={projectId ? "button" : undefined}
+            tabIndex={projectId ? 0 : undefined}
+            onMouseEnter={(event) => showTooltip(projectTooltip, event)}
+            onMouseMove={(event) => showTooltip(projectTooltip, event)}
+            onMouseLeave={clearTooltip}
+            onClick={projectId ? () => openProjectDetail(projectId) : undefined}
+            onKeyDown={
+              projectId
+                ? (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openProjectDetail(projectId);
+                    }
+                  }
+                : undefined
+            }
+          >
+            <span className="cap-cell-project-name">{project.name}</span>
+            <span className="cap-cell-project-hours">
+              {formatHours(project.minutes / 60)}
+            </span>
+          </div>
+        );
+      })}
+      {projects.length > 4 && (
+        <button
+          type="button"
+          className="cap-cell-more-button"
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll ? "Weniger anzeigen" : `+${projects.length - 4} weitere`}
+        </button>
+      )}
     </div>
   );
 }
