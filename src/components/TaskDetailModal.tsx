@@ -4,6 +4,10 @@ import { extractTaskDetail, type TaskDetail } from "../services/aworkDetail";
 import { taskWebUrl } from "../services/aworkWebLinks";
 import { formatDetailDate, formatDetailHours } from "../services/detailFormat";
 import {
+  mapTimeEntriesResponse,
+  sumTimeEntrySeconds,
+} from "../services/timeEntryMapper";
+import {
   DetailAssignees,
   DetailLinkValue,
   DetailModalFrame,
@@ -28,12 +32,16 @@ export function TaskDetailModal({
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [trackedSeconds, setTrackedSeconds] = useState<number | undefined>();
+  const [calendarSeconds, setCalendarSeconds] = useState<number | undefined>();
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     setError(undefined);
     setDetail(null);
+    setTrackedSeconds(undefined);
+    setCalendarSeconds(undefined);
 
     (async () => {
       try {
@@ -53,6 +61,25 @@ export function TaskDetailModal({
         }
       }
     })();
+
+    // Best-effort side loads for the awork-style time cards; failures just
+    // leave the card at "—".
+    void backendClient
+      .getTaskTimeEntries(taskId)
+      .then((raw) => {
+        if (!cancelled) {
+          setTrackedSeconds(sumTimeEntrySeconds(mapTimeEntriesResponse(raw)));
+        }
+      })
+      .catch(() => {});
+    void backendClient
+      .getSchedulesForTask(taskId)
+      .then((raw) => {
+        if (!cancelled) {
+          setCalendarSeconds(sumScheduleSeconds(raw));
+        }
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
@@ -74,7 +101,9 @@ export function TaskDetailModal({
     >
       {detail ? (
         <>
-          <DetailTimeCards cards={buildTaskTimeCards(detail)} />
+          <DetailTimeCards
+            cards={buildTaskTimeCards(detail, trackedSeconds, calendarSeconds)}
+          />
           <DetailRow label="Key">{detail.key}</DetailRow>
           <DetailRow label="Projekt">
             {detail.projectName ? (
@@ -134,8 +163,12 @@ export function TaskDetailModal({
   );
 }
 
-/** awork-style time cards for a task: Fällig bis · Start · Geplant. */
-function buildTaskTimeCards(detail: TaskDetail): TimeCard[] {
+/** awork-style time cards: Fällig bis · Geplant · Erfasst · Im Kalender. */
+function buildTaskTimeCards(
+  detail: TaskDetail,
+  trackedSeconds: number | undefined,
+  calendarSeconds: number | undefined,
+): TimeCard[] {
   return [
     { label: "Fällig bis", value: formatDetailDate(detail.dueOn) ?? "—", tone: "due" },
     { label: "Start", value: formatDetailDate(detail.startOn) ?? "—", tone: "start" },
@@ -144,7 +177,40 @@ function buildTaskTimeCards(detail: TaskDetail): TimeCard[] {
       value: formatDetailHours(detail.plannedSeconds) ?? "0h",
       tone: "planned",
     },
+    {
+      label: "Erfasst",
+      value: formatDetailHours(trackedSeconds) ?? "—",
+      tone: "tracked",
+    },
+    {
+      label: "Im Kalender",
+      value: formatDetailHours(calendarSeconds) ?? "—",
+      tone: "calendar",
+    },
   ];
+}
+
+/** Sums raw awork task schedules (start/end ISO pairs) into seconds. */
+function sumScheduleSeconds(raw: unknown): number {
+  const items = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown[] }).items)
+      ? ((raw as { items: unknown[] }).items)
+      : [];
+  let seconds = 0;
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    const start = typeof record.start === "string" ? record.start : undefined;
+    const end = typeof record.end === "string" ? record.end : undefined;
+    if (start && end) {
+      const diff = (new Date(end).getTime() - new Date(start).getTime()) / 1000;
+      if (Number.isFinite(diff) && diff > 0) {
+        seconds += diff;
+      }
+    }
+  }
+  return seconds;
 }
 
 function unwrap(value: unknown): unknown {

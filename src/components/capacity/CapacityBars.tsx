@@ -175,6 +175,7 @@ export function CapacityWeekBar({
   onTooltip,
   onTooltipClear,
   onWeekDetail,
+  trackedMinutes,
 }: {
   weekRow: UserCapacityWeek;
   dayRows?: UserCapacityDay[];
@@ -183,6 +184,8 @@ export function CapacityWeekBar({
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
   onTooltipClear: () => void;
   onWeekDetail?: () => void;
+  /** Erfasste Minuten dieser Woche (Plan vs. Actual overlay). */
+  trackedMinutes?: number;
 }) {
   const { openProjectDetail } = useDetailModal();
   const displayPercent = Math.max(100, weekRow.utilizationPercent);
@@ -348,6 +351,15 @@ export function CapacityWeekBar({
             {" "}
             / {formatHours(weekRow.effectiveCapacityHours)}
           </span>
+          {trackedMinutes !== undefined && (
+            <span
+              className="capacity-week-tracked"
+              title="Erfasste Zeit (awork Zeiterfassung) in dieser Woche"
+            >
+              {" "}
+              · erfasst {formatHours(trackedMinutes / 60)}
+            </span>
+          )}
         </span>
         <span
           style={{ color: getWorkloadColor(weekRow.utilizationPercent, customerPercent) }}

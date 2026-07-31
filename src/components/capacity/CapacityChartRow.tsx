@@ -41,6 +41,7 @@ export function CapacityChartRow({
   onSetExpandMode,
   onInputChange,
   onWeekDetail,
+  trackedMinutesByWeek,
 }: {
   row: UserCapacityRow;
   weekRows: UserCapacityWeek[];
@@ -55,6 +56,8 @@ export function CapacityChartRow({
     value: number,
   ) => void;
   onWeekDetail?: (weekKey: string) => void;
+  /** Erfasste Minuten pro Wochen-Key (Plan vs. Actual overlay). */
+  trackedMinutesByWeek?: Record<string, number>;
 }) {
   const isExpanded = expandMode !== null;
   const totals = summarizeWeekRows(weekRows);
@@ -266,6 +269,7 @@ export function CapacityChartRow({
                     ? () => onWeekDetail(weekRow.week.key)
                     : undefined
                 }
+                trackedMinutes={trackedMinutesByWeek?.[weekRow.week.key]}
               />
             ))}
           </div>

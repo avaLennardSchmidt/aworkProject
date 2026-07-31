@@ -4,6 +4,10 @@ import { extractProjectDetail, type ProjectDetail } from "../services/aworkDetai
 import { projectWebUrl } from "../services/aworkWebLinks";
 import { formatDetailDate, formatDetailHours } from "../services/detailFormat";
 import {
+  mapTimeEntriesResponse,
+  sumTimeEntrySeconds,
+} from "../services/timeEntryMapper";
+import {
   DetailModalFrame,
   DetailRow,
   DetailTags,
@@ -20,6 +24,7 @@ export function ProjectDetailModal({ projectId, onClose }: ProjectDetailModalPro
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [trackedSeconds, setTrackedSeconds] = useState<number | undefined>();
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +66,16 @@ export function ProjectDetailModal({ projectId, onClose }: ProjectDetailModalPro
       }
     })();
 
+    // Best-effort tracked-time sum for the burn-down row.
+    void backendClient
+      .getProjectTimeEntries(projectId)
+      .then((raw) => {
+        if (!cancelled) {
+          setTrackedSeconds(sumTimeEntrySeconds(mapTimeEntriesResponse(raw)));
+        }
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -93,7 +108,28 @@ export function ProjectDetailModal({ projectId, onClose }: ProjectDetailModalPro
           <DetailRow label="Start">{formatDetailDate(detail.startOn)}</DetailRow>
           <DetailRow label="Fällig">{formatDetailDate(detail.dueOn)}</DetailRow>
           <DetailRow label="Zeitbudget">
-            {formatDetailHours(detail.timeBudgetSeconds)}
+            {detail.timeBudgetSeconds !== undefined ||
+            trackedSeconds !== undefined ? (
+              <span className="detail-burndown">
+                <span>
+                  {formatDetailHours(detail.timeBudgetSeconds) ?? "—"} Budget
+                  {" · "}
+                  {formatDetailHours(trackedSeconds) ?? "—"} erfasst
+                </span>
+                {detail.timeBudgetSeconds !== undefined &&
+                detail.timeBudgetSeconds > 0 &&
+                trackedSeconds !== undefined ? (
+                  <span className="detail-burndown-track" aria-hidden="true">
+                    <span
+                      className={`detail-burndown-fill${trackedSeconds > detail.timeBudgetSeconds ? " is-over" : ""}`}
+                      style={{
+                        width: `${Math.min(100, (trackedSeconds / detail.timeBudgetSeconds) * 100)}%`,
+                      }}
+                    />
+                  </span>
+                ) : null}
+              </span>
+            ) : undefined}
           </DetailRow>
           <DetailRow label="Abrechenbar">
             {detail.isBillable === undefined
