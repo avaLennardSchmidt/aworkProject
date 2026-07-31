@@ -40,6 +40,7 @@ export function CapacityChartRow({
   unresolvedHintsByTaskId,
   onSetExpandMode,
   onInputChange,
+  onWeekDetail,
 }: {
   row: UserCapacityRow;
   weekRows: UserCapacityWeek[];
@@ -53,6 +54,7 @@ export function CapacityChartRow({
     field: keyof CapacityInputs,
     value: number,
   ) => void;
+  onWeekDetail?: (weekKey: string) => void;
 }) {
   const isExpanded = expandMode !== null;
   const totals = summarizeWeekRows(weekRows);
@@ -259,6 +261,11 @@ export function CapacityChartRow({
                 customerPercent={row.inputs.customerPercent}
                 onTooltip={showProjectTooltip}
                 onTooltipClear={() => setTooltip(undefined)}
+                onWeekDetail={
+                  onWeekDetail
+                    ? () => onWeekDetail(weekRow.week.key)
+                    : undefined
+                }
               />
             ))}
           </div>

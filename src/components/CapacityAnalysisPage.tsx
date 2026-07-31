@@ -35,6 +35,7 @@ import {
   DEFAULT_WEEKLY_HOURS,
   defaultInputs,
   getInputsForUser,
+  getScheduleOverlapMinutes,
   getUserTeamNames,
   isInvalidNumberInput,
   loadCapacityInputs,
@@ -53,7 +54,11 @@ import {
   type UserCapacityRow,
   type UserExpandMode,
 } from "../services/capacityModel";
-import { calculateDurationMinutes } from "../services/scheduleTimeCalculator";
+import {
+  calculateDurationMinutes,
+  shiftIsoByDays,
+} from "../services/scheduleTimeCalculator";
+import { buildUpdatePayload } from "../services/scheduleUpdater";
 import type {
   AworkAbsence,
   AworkTaskSchedule,
@@ -68,6 +73,7 @@ import {
 import { DatePickerInput } from "./DatePickerInput";
 import { SegmentedControl } from "./SegmentedControl";
 import { CapacityTableView } from "./CapacityTableView";
+import { WeekDetailPanel } from "./capacity/WeekDetailPanel";
 import { SummaryCards } from "./capacity/SummaryCards";
 import { CapacityChartRow } from "./capacity/CapacityChartRow";
 import { CsvExportIcon } from "./capacity/icons";
@@ -143,6 +149,12 @@ function readWorkloadMode(
   return value === "all" || value === "gt" || value === "lt"
     ? value
     : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 const workloadFilterOptions = [
@@ -513,6 +525,119 @@ export function CapacityAnalysisPage({
           : 0,
     };
   }, [visibleSelectedRowSummaries]);
+
+  // --- Week drill-down (Phase D): click a week → panel with that week's
+  // blockers and remediation actions (shift/delete/jump to manage). ---
+  const [weekDetail, setWeekDetail] = useState<{
+    userId: string;
+    weekKey: string;
+  } | null>(null);
+  const [isWeekActionBusy, setIsWeekActionBusy] = useState(false);
+
+  const weekDetailData = useMemo(() => {
+    if (!weekDetail) return null;
+    const entry = selectedRowSummaries.find(
+      (candidate) => candidate.row.user.id === weekDetail.userId,
+    );
+    const weekRow = entry?.weekRows.find(
+      (candidate) => candidate.week.key === weekDetail.weekKey,
+    );
+    if (!entry || !weekRow) return null;
+    const weekSchedules = entry.row.schedules.filter(
+      (schedule) =>
+        getScheduleOverlapMinutes(schedule, weekRow.week.from, weekRow.week.to) >
+        0,
+    );
+    return { entry, weekRow, weekSchedules };
+  }, [weekDetail, selectedRowSummaries]);
+
+  async function refreshUserSchedules(userId: string) {
+    const user = availableUsers.find((candidate) => candidate.id === userId);
+    if (!user) return;
+    const result = await loadSchedulesForUsers(
+      backendClient,
+      [user],
+      currentUser,
+      from,
+      to,
+    );
+    setSchedulesByUser((current) => ({
+      ...current,
+      ...result.schedulesByUser,
+    }));
+    setUnresolvedProjectHintsByTaskId((current) => ({
+      ...current,
+      ...result.unresolvedHintsByTaskId,
+    }));
+  }
+
+  async function deleteWeekSchedules(scheduleIds: string[]) {
+    if (!weekDetail || scheduleIds.length === 0) return;
+    setIsWeekActionBusy(true);
+    setError("");
+    try {
+      const response = await backendClient.batchTaskSchedules({
+        userId: weekDetail.userId,
+        delete: scheduleIds,
+      });
+      if (response.failed.length > 0) {
+        setError(
+          `${response.failed.length} Blocker konnten nicht gelöscht werden: ${response.failed[0]?.error ?? ""}`,
+        );
+      }
+      await refreshUserSchedules(weekDetail.userId);
+    } catch (actionError) {
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : "Blocker konnten nicht gelöscht werden.",
+      );
+    } finally {
+      setIsWeekActionBusy(false);
+    }
+  }
+
+  async function shiftWeekSchedules(scheduleIds: string[], dayOffset: number) {
+    if (!weekDetail || !weekDetailData || scheduleIds.length === 0) return;
+    setIsWeekActionBusy(true);
+    setError("");
+    try {
+      const byId = new Map(
+        weekDetailData.weekSchedules.map((schedule) => [schedule.id, schedule]),
+      );
+      const updates = scheduleIds
+        .map((scheduleId) => byId.get(scheduleId))
+        .filter((schedule): schedule is AworkTaskSchedule => Boolean(schedule))
+        .map((schedule) => ({
+          ...asRecord(
+            buildUpdatePayload({
+              schedule,
+              newStartIso: shiftIsoByDays(schedule.start, dayOffset),
+              newEndIso: shiftIsoByDays(schedule.end, dayOffset),
+            }),
+          ),
+          id: schedule.id,
+        }));
+      const response = await backendClient.batchTaskSchedules({
+        userId: weekDetail.userId,
+        update: updates,
+      });
+      if (response.failed.length > 0) {
+        setError(
+          `${response.failed.length} Blocker konnten nicht verschoben werden: ${response.failed[0]?.error ?? ""}`,
+        );
+      }
+      await refreshUserSchedules(weekDetail.userId);
+    } catch (actionError) {
+      setError(
+        actionError instanceof Error
+          ? actionError.message
+          : "Blocker konnten nicht verschoben werden.",
+      );
+    } finally {
+      setIsWeekActionBusy(false);
+    }
+  }
 
   async function loadAnalysis() {
     setIsLoading(true);
@@ -1410,6 +1535,12 @@ export function CapacityAnalysisPage({
                               toggleUserExpandMode(entry.row.user.id, mode)
                             }
                             onInputChange={updateCapacityInput}
+                            onWeekDetail={(weekKey) =>
+                              setWeekDetail({
+                                userId: entry.row.user.id,
+                                weekKey,
+                              })
+                            }
                           />
                         );
                       })}
@@ -1427,6 +1558,9 @@ export function CapacityAnalysisPage({
                   <CapacityTableView
                     entries={visibleSelectedRowSummaries}
                     capacityWeeks={capacityWeeks}
+                    onWeekDetail={(userId, weekKey) =>
+                      setWeekDetail({ userId, weekKey })
+                    }
                   />
                 ) : visibleSelectedRowSummaries.length > 0 ? (
                   <div className="analysis-table-wrap">
@@ -1482,6 +1616,17 @@ export function CapacityAnalysisPage({
           ) : null}
         </>
       )}
+      {weekDetailData ? (
+        <WeekDetailPanel
+          user={weekDetailData.entry.row.user}
+          weekRow={weekDetailData.weekRow}
+          schedules={weekDetailData.weekSchedules}
+          isBusy={isWeekActionBusy}
+          onClose={() => setWeekDetail(null)}
+          onDelete={deleteWeekSchedules}
+          onShift={shiftWeekSchedules}
+        />
+      ) : null}
     </main>
   );
 }
