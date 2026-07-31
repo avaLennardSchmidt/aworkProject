@@ -70,7 +70,7 @@ export function CapacityCombinedBar({
         <strong>Gewählter Zeitraum</strong>
         <span>
           {formatHours(totals.plannedHours)} geplant ·{" "}
-          {formatDecimal(totals.customerTargetPercent)}%
+          {formatDecimal(totals.workloadPercent)}%
         </span>
       </div>
       <div
@@ -193,19 +193,18 @@ export function CapacityWeekBar({
   const stackWidthPercent = pct(weekRow.plannedMinutes / 60);
   const customerMarkerPercent = pct(weekRow.targetHours);
   const hasAbsent = absentZonePercent > 0;
-  const isOverbooked = weekRow.customerTargetPercent > 100;
   const weekWorkingDays = countWorkingDaysInRange(
     weekRow.week.from,
     weekRow.week.to,
   );
   const isPartialWeek = weekWorkingDays < 5;
   const isCurrentWeek = weekRow.week.key === currentIsoWeekKey();
-  const customerTargetTooltip = `Erwartete Projektkapazät | ${formatHours(weekRow.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der Wochenstunden`;
+  const customerTargetTooltip = `Erwartete Projektkapazität | ${formatHours(weekRow.targetHours)}\nDieser Balken repräsentiert ${customerPercent} % der Wochenstunden`;
   const absentTooltip = `Abwesenheit\n${formatAbsentDays(weekRow.absentDays)} · ${formatHours(weekRow.absentHours)} weniger Kap.`;
 
   return (
     <div
-      className={`capacity-week ${isOverbooked ? "is-overbooked" : ""} ${isCurrentWeek ? "is-current-week" : ""}`}
+      className={`capacity-week ${weekRow.isOverbooked ? "is-overbooked" : ""} ${weekRow.isOverCapacity ? "is-over-capacity" : ""} ${isCurrentWeek ? "is-current-week" : ""}`}
     >
       <div
         className="capacity-week-label"
@@ -338,9 +337,9 @@ export function CapacityWeekBar({
           </span>
         </span>
         <span
-          style={{ color: getWorkloadColor(weekRow.customerTargetPercent, customerPercent) }}
+          style={{ color: getWorkloadColor(weekRow.utilizationPercent, customerPercent) }}
         >
-          {formatDecimal(weekRow.customerTargetPercent)}%
+          {formatDecimal(weekRow.utilizationPercent)}%
         </span>
       </div>
     </div>

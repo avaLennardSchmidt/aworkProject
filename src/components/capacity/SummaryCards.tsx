@@ -36,9 +36,9 @@ export function SummaryCards({
           title="Summe aller Abwesenheitsstunden (Urlaub, Feiertage) aller ausgewählten Nutzer im Zeitraum."
         />
         <SummaryCard
-          label="Überlastete Nutzer"
+          label="Überbuchte Nutzer"
           value={String(overloadedUsers)}
-          title="Nutzer, deren geplante Auslastung das Kunden-Ziel übersteigt (z. B. 50 % geplant bei 40 % Ziel)."
+          title="Nutzer, deren geplante Zeit das Kunden-Ziel übersteigt (z. B. 77 % der verfügbaren Zeit geplant bei 70 % Kunden-Anteil)."
         />
       </div>
     </section>

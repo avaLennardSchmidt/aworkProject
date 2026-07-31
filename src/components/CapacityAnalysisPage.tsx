@@ -306,10 +306,10 @@ export function CapacityAnalysisPage({
         }
 
         if (workloadFilterMode === "gt") {
-          return entry.totals.customerTargetPercent >= workloadFilterValue;
+          return entry.totals.workloadPercent >= workloadFilterValue;
         }
 
-        return entry.totals.customerTargetPercent <= workloadFilterValue;
+        return entry.totals.workloadPercent <= workloadFilterValue;
       }),
     [
       chartUserSearch,
@@ -339,7 +339,7 @@ export function CapacityAnalysisPage({
       0,
     );
     const overloadedUsers = selectedRowSummaries.filter(
-      (entry) => entry.totals.isOverloaded,
+      (entry) => entry.totals.isOverbooked,
     ).length;
 
     return {
@@ -1290,7 +1290,7 @@ export function CapacityAnalysisPage({
                                 <td>{formatHours(row.inputs.weeklyHours)}</td>
                                 <td>{formatHours(totals.targetHours)}</td>
                                 <td>
-                                  {formatDecimal(totals.customerTargetPercent)}%
+                                  {formatDecimal(totals.workloadPercent)}%
                                 </td>
                                 <td>{totals.blockerCount}</td>
                                 <td title={unresolvedDetails}>

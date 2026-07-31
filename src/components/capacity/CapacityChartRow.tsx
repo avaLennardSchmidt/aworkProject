@@ -78,12 +78,12 @@ export function CapacityChartRow({
         : null,
     [expandMode, weekRows, row, userAbsences, unresolvedHintsByTaskId],
   );
-  const workloadColor = getWorkloadColor(totals.customerTargetPercent, row.inputs.customerPercent);
+  const workloadColor = getWorkloadColor(totals.workloadPercent, row.inputs.customerPercent);
   const [tooltip, setTooltip] = useState<ChartTooltip>();
   const [copied, setCopied] = useState(false);
 
   function copyCapacitySummary() {
-    const text = `${formatUserName(row.user)} — ${formatDecimal(totals.customerTargetPercent)}% (${formatHours(totals.plannedHours)} / ${formatHours(totals.effectiveCapacityHours)})`;
+    const text = `${formatUserName(row.user)} — ${formatDecimal(totals.workloadPercent)}% (${formatHours(totals.plannedHours)} / ${formatHours(totals.effectiveCapacityHours)})`;
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -107,20 +107,28 @@ export function CapacityChartRow({
     setTooltip({ text, x, y });
   }
 
-  const workloadTooltip = `Auslastung\n${formatHours(totals.plannedHours)} geplant / ${formatHours(totals.effectiveCapacityHours)} verfügbar = ${formatDecimal(totals.customerTargetPercent)}%\nDas ist belegte Arbeitszeit, nicht die Erfüllung des Kunden-Ziels (${formatHours(totals.targetHours)}).`;
+  const workloadTooltip = [
+    `Auslastung: ${formatHours(totals.plannedHours)} geplant / ${formatHours(totals.effectiveCapacityHours)} verfügbar = ${formatDecimal(totals.workloadPercent)} %`,
+    `Kundenziel-Erfüllung: ${formatHours(totals.plannedHours)} von ${formatHours(totals.targetHours)} Ziel (${formatDecimal(row.inputs.customerPercent)} % Kunden-Anteil) = ${formatDecimal(totals.kundenzielPercent)} %`,
+    `Überbucht, sobald die geplante Zeit das Kunden-Ziel überschreitet.`,
+  ].join("\n");
 
   return (
     <article
-      className={`capacity-row ${totals.isOverloaded ? "is-overbooked" : ""}`}
+      className={`capacity-row ${totals.isOverbooked ? "is-overbooked" : ""}`}
     >
       <div className="capacity-row-config">
         <div className="capacity-user">
           <div className="capacity-user-name">
             <UserAvatar user={row.user} size={30} />
             <strong>{formatUserName(row.user)}</strong>
-            {totals.customerTargetPercent > 100 && (
-              <span className="overbooked-label">Überplant</span>
-            )}
+            {totals.isOverCapacity ? (
+              <span className="overbooked-label overbooked-label--capacity">
+                Über Kapazität
+              </span>
+            ) : totals.isOverbooked ? (
+              <span className="overbooked-label">Überbucht</span>
+            ) : null}
             {totals.absentDays > 0 && (
               <span
                 className="capacity-absent-badge"
@@ -157,7 +165,7 @@ export function CapacityChartRow({
             onMouseLeave={() => setTooltip(undefined)}
           >
             {formatHours(totals.plannedHours)} geplant –{" "}
-            {formatDecimal(totals.customerTargetPercent)}%
+            {formatDecimal(totals.workloadPercent)}%
           </span>
           <span className="capacity-user-capacity">
             {formatHours(totals.effectiveCapacityHours)} verfügbar
