@@ -238,6 +238,38 @@ export class BackendClient {
     return this.request<unknown>("/api/workspace-absences");
   }
 
+  /** Tracked time entries, optionally filtered to one user. */
+  async getTimeEntries(userId?: string): Promise<unknown> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.set("userId", userId);
+    }
+    return this.request<unknown>(
+      `/api/timeentries${params.size ? `?${params.toString()}` : ""}`,
+    );
+  }
+
+  /** All time entries of one task (task modal "Erfasst"). */
+  async getTaskTimeEntries(taskId: string): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/tasks/${encodeURIComponent(taskId)}/timeentries`,
+    );
+  }
+
+  /** All time entries of one project (project modal burn-down). */
+  async getProjectTimeEntries(projectId: string): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/timeentries`,
+    );
+  }
+
+  /** All schedules of one task (task modal "Im Kalender"). */
+  async getSchedulesForTask(taskId: string): Promise<unknown> {
+    return this.request<unknown>(
+      `/api/tasks/${encodeURIComponent(taskId)}/schedules`,
+    );
+  }
+
   async getAbsences(): Promise<unknown> {
     return this.request<unknown>("/api/absences");
   }

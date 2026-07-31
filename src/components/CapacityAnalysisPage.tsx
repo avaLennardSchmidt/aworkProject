@@ -59,6 +59,7 @@ import {
   shiftIsoByDays,
 } from "../services/scheduleTimeCalculator";
 import { buildUpdatePayload } from "../services/scheduleUpdater";
+import { mapTimeEntriesResponse } from "../services/timeEntryMapper";
 import type {
   AworkAbsence,
   AworkTaskSchedule,
@@ -525,6 +526,59 @@ export function CapacityAnalysisPage({
           : 0,
     };
   }, [visibleSelectedRowSummaries]);
+
+  // --- Plan vs. Actual (Phase F): opt-in tracked-time overlay. ---
+  const [showTracked, setShowTracked] = useState(false);
+  const [isLoadingTracked, setIsLoadingTracked] = useState(false);
+  const [trackedMinutesByUserWeek, setTrackedMinutesByUserWeek] = useState<
+    Record<string, Record<string, number>>
+  >({});
+
+  async function toggleTrackedTimes() {
+    if (showTracked) {
+      setShowTracked(false);
+      return;
+    }
+    setIsLoadingTracked(true);
+    setError("");
+    try {
+      const fromDay = from;
+      const toDay = to;
+      const result: Record<string, Record<string, number>> = {};
+      // Sequential per user keeps the awork rate limit comfortable; the
+      // analyzed set is usually small.
+      for (const user of users) {
+        const raw = await backendClient.getTimeEntries(user.id);
+        const entries = mapTimeEntriesResponse(raw).filter(
+          (entry) =>
+            entry.day !== undefined &&
+            entry.day >= fromDay &&
+            entry.day <= toDay,
+        );
+        const byWeek: Record<string, number> = {};
+        for (const entry of entries) {
+          const entryDate = new Date(`${entry.day}T12:00:00`);
+          const week = capacityWeeks.find(
+            (candidate) =>
+              entryDate >= candidate.from && entryDate <= candidate.to,
+          );
+          if (!week) continue;
+          byWeek[week.key] = (byWeek[week.key] ?? 0) + entry.seconds / 60;
+        }
+        result[user.id] = byWeek;
+      }
+      setTrackedMinutesByUserWeek(result);
+      setShowTracked(true);
+    } catch (trackedError) {
+      setError(
+        trackedError instanceof Error
+          ? trackedError.message
+          : "Erfasste Zeiten konnten nicht geladen werden.",
+      );
+    } finally {
+      setIsLoadingTracked(false);
+    }
+  }
 
   // --- Week drill-down (Phase D): click a week → panel with that week's
   // blockers and remediation actions (shift/delete/jump to manage). ---
@@ -1307,6 +1361,19 @@ export function CapacityAnalysisPage({
                           <button
                             type="button"
                             className="ghost-button"
+                            disabled={isLoadingTracked}
+                            title="Erfasste Zeiten (awork Zeiterfassung) neben den geplanten anzeigen"
+                            onClick={() => void toggleTrackedTimes()}
+                          >
+                            {isLoadingTracked
+                              ? "Erfasste Zeiten laden..."
+                              : showTracked
+                                ? "Erfasste Zeiten ausblenden"
+                                : "Erfasste Zeiten anzeigen"}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-button"
                             disabled={visibleSelectedRowSummaries.length === 0}
                             onClick={() => {
                               setExpandedViewByUser((current) =>
@@ -1562,6 +1629,11 @@ export function CapacityAnalysisPage({
                                 weekKey,
                               })
                             }
+                            trackedMinutesByWeek={
+                              showTracked
+                                ? trackedMinutesByUserWeek[entry.row.user.id]
+                                : undefined
+                            }
                           />
                         );
                       })}
@@ -1581,6 +1653,9 @@ export function CapacityAnalysisPage({
                     capacityWeeks={capacityWeeks}
                     onWeekDetail={(userId, weekKey) =>
                       setWeekDetail({ userId, weekKey })
+                    }
+                    trackedMinutesByUserWeek={
+                      showTracked ? trackedMinutesByUserWeek : undefined
                     }
                   />
                 ) : visibleSelectedRowSummaries.length > 0 ? (

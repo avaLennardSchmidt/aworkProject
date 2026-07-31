@@ -8526,3 +8526,40 @@ button.auto-plan-skipped-day:hover {
 .cap-cell-hours--clickable:focus-visible {
   text-decoration: underline;
 }
+
+/* Plan vs. Actual: tracked-time displays + project burn-down. */
+.capacity-week-tracked {
+  color: #1c7d4d;
+  font-weight: 600;
+}
+
+.cap-cell-tracked {
+  font-size: 0.72rem;
+  color: #1c7d4d;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.detail-burndown {
+  display: grid;
+  gap: 6px;
+}
+
+.detail-burndown-track {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: #eef1f4;
+  overflow: hidden;
+}
+
+.detail-burndown-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+.detail-burndown-fill.is-over {
+  background: var(--color-danger);
+}

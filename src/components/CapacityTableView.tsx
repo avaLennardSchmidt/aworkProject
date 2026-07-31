@@ -53,6 +53,8 @@ interface CapacityTableViewProps {
   readonly entries: CapacityTableEntry[];
   readonly capacityWeeks: CapacityWeek[];
   readonly onWeekDetail?: (userId: string, weekKey: string) => void;
+  /** Erfasste Minuten pro Nutzer und Wochen-Key (Plan vs. Actual overlay). */
+  readonly trackedMinutesByUserWeek?: Record<string, Record<string, number>>;
 }
 
 interface CapacityTableTooltip {
@@ -70,6 +72,7 @@ export function CapacityTableView({
   entries,
   capacityWeeks,
   onWeekDetail,
+  trackedMinutesByUserWeek,
 }: CapacityTableViewProps) {
   const { openProjectDetail } = useDetailModal();
   const currentWeekKey = useMemo(() => currentIsoWeekKey(), []);
@@ -260,6 +263,21 @@ export function CapacityTableView({
                               );
                             })()}
                           </div>
+                          {trackedMinutesByUserWeek?.[row.user.id]?.[
+                            week.key
+                          ] !== undefined && (
+                            <div
+                              className="cap-cell-tracked"
+                              title="Erfasste Zeit (awork Zeiterfassung) in dieser Woche"
+                            >
+                              erfasst{" "}
+                              {formatHours(
+                                (trackedMinutesByUserWeek[row.user.id]?.[
+                                  week.key
+                                ] ?? 0) / 60,
+                              )}
+                            </div>
+                          )}
                           {weekRow.absentHours > 0 && weekRow.absentDays > 0 && (
                             <div className="cap-cell-partial-absent">
                               {Math.round(weekRow.absentDays * 2) / 2 === 1
