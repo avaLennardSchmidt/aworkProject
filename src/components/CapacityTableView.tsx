@@ -52,6 +52,7 @@ export interface CapacityTableEntry {
 interface CapacityTableViewProps {
   readonly entries: CapacityTableEntry[];
   readonly capacityWeeks: CapacityWeek[];
+  readonly onWeekDetail?: (userId: string, weekKey: string) => void;
 }
 
 interface CapacityTableTooltip {
@@ -68,6 +69,7 @@ interface CapacityTableTooltip {
 export function CapacityTableView({
   entries,
   capacityWeeks,
+  onWeekDetail,
 }: CapacityTableViewProps) {
   const { openProjectDetail } = useDetailModal();
   const currentWeekKey = useMemo(() => currentIsoWeekKey(), []);
@@ -206,15 +208,36 @@ export function CapacityTableView({
                         <>
                           <div className="cap-cell-header">
                             <span
-                              className={`cap-cell-hours${hoursMod}`}
-                              aria-label={plannedHoursTooltip}
+                              className={`cap-cell-hours${hoursMod}${onWeekDetail && hasData ? " cap-cell-hours--clickable" : ""}`}
+                              aria-label={
+                                plannedHoursTooltip
+                                  ? `${plannedHoursTooltip}\nKlicken für Blocker dieser Woche`
+                                  : undefined
+                              }
+                              role={onWeekDetail && hasData ? "button" : undefined}
+                              tabIndex={onWeekDetail && hasData ? 0 : undefined}
                               onMouseEnter={plannedHoursTooltip
-                                ? (event) => showTooltip(plannedHoursTooltip, event)
+                                ? (event) => showTooltip(`${plannedHoursTooltip}${onWeekDetail ? "\nKlicken für Blocker dieser Woche" : ""}`, event)
                                 : undefined}
                               onMouseMove={plannedHoursTooltip
-                                ? (event) => showTooltip(plannedHoursTooltip, event)
+                                ? (event) => showTooltip(`${plannedHoursTooltip}${onWeekDetail ? "\nKlicken für Blocker dieser Woche" : ""}`, event)
                                 : undefined}
                               onMouseLeave={() => setTooltip(undefined)}
+                              onClick={
+                                onWeekDetail && hasData
+                                  ? () => onWeekDetail(row.user.id, week.key)
+                                  : undefined
+                              }
+                              onKeyDown={
+                                onWeekDetail && hasData
+                                  ? (event) => {
+                                      if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault();
+                                        onWeekDetail(row.user.id, week.key);
+                                      }
+                                    }
+                                  : undefined
+                              }
                             >
                               {hasData ? formatHours(plannedHours) : "—"}
                             </span>

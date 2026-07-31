@@ -8367,3 +8367,162 @@ button.auto-plan-skipped-day:hover {
   background: var(--color-accent-soft);
   box-shadow: inset 0 0 0 1px var(--color-accent);
 }
+
+/* Kapazität week drill-down panel. */
+.week-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, calc(100vw - 24px));
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -18px 0 48px rgb(29 35 41 / 0.12);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 20px;
+  overflow-y: auto;
+}
+
+.week-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.week-detail-head h3 {
+  margin: 2px 0 6px;
+}
+
+.week-detail-meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.week-detail-empty {
+  color: var(--color-text-muted);
+  margin-top: 16px;
+}
+
+.week-detail-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0 4px;
+}
+
+.week-detail-count {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.week-detail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1 1 auto;
+}
+
+.week-detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.week-detail-item input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+.week-detail-item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.week-detail-task {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.week-detail-item-meta {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.week-detail-project {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.week-detail-manage {
+  flex-shrink: 0;
+}
+
+.week-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.week-detail-shift {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.week-detail-shift input {
+  width: 56px;
+  text-align: center;
+}
+
+.week-detail-delete.is-confirming {
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+}
+
+.week-detail-hint {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.capacity-week-detail-trigger {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.cap-cell-hours--clickable {
+  cursor: pointer;
+}
+
+.cap-cell-hours--clickable:hover,
+.cap-cell-hours--clickable:focus-visible {
+  text-decoration: underline;
+}

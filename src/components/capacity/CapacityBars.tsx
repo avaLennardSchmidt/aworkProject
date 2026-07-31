@@ -174,6 +174,7 @@ export function CapacityWeekBar({
   customerPercent,
   onTooltip,
   onTooltipClear,
+  onWeekDetail,
 }: {
   weekRow: UserCapacityWeek;
   dayRows?: UserCapacityDay[];
@@ -181,6 +182,7 @@ export function CapacityWeekBar({
   customerPercent: number;
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
   onTooltipClear: () => void;
+  onWeekDetail?: () => void;
 }) {
   const { openProjectDetail } = useDetailModal();
   const displayPercent = Math.max(100, weekRow.utilizationPercent);
@@ -210,7 +212,18 @@ export function CapacityWeekBar({
         className="capacity-week-label"
         title={`${weekRow.week.label}: ${format(weekRow.week.from, "dd.MM.yyyy")} - ${format(weekRow.week.to, "dd.MM.yyyy")}`}
       >
-        <strong>{weekRow.week.label}</strong>
+        {onWeekDetail ? (
+          <button
+            type="button"
+            className="capacity-week-detail-trigger detail-clickable"
+            title="Blocker dieser Woche anzeigen & bearbeiten"
+            onClick={onWeekDetail}
+          >
+            <strong>{weekRow.week.label}</strong>
+          </button>
+        ) : (
+          <strong>{weekRow.week.label}</strong>
+        )}
         <div className="capacity-week-label-right">
           {isPartialWeek && (
             <span
@@ -357,6 +370,7 @@ export function CapacityDayRow({
   onTooltip: (text: string, event: MouseEvent<HTMLElement>) => void;
   onTooltipClear: () => void;
 }) {
+  const { openTaskDetail } = useDetailModal();
   const displayPercent = Math.max(100, day.utilizationPercent);
   const pct = (h: number) =>
     day.dayCapacityHours > 0
@@ -426,13 +440,15 @@ export function CapacityDayRow({
           >
             {day.segments.length > 0 && day.plannedMinutes > 0 ? (
               day.segments.map((segment) => {
-                const tooltipText = `${segment.projectName}${segment.taskName ? ` · ${segment.taskName}` : ""}\n${segment.startHHmm}–${segment.endHHmm} · ${formatHours(segment.minutes / 60)}${segment.unresolvedHint ? `\nHinweis: ${segment.unresolvedHint}` : ""}`;
+                const tooltipText = `${segment.projectName}${segment.taskName ? ` · ${segment.taskName}` : ""}\n${segment.startHHmm}–${segment.endHHmm} · ${formatHours(segment.minutes / 60)}${segment.unresolvedHint ? `\nHinweis: ${segment.unresolvedHint}` : ""}\nKlicken für Aufgabendetails`;
 
                 return (
                   <span
                     key={segment.scheduleId}
-                    className="capacity-segment"
+                    className="capacity-segment capacity-segment-clickable"
                     aria-label={tooltipText}
+                    role="button"
+                    tabIndex={0}
                     style={{
                       width: `${day.plannedMinutes > 0 ? (segment.minutes / day.plannedMinutes) * 100 : 0}%`,
                       background: projectColorFor(segment.projectKey),
@@ -440,6 +456,13 @@ export function CapacityDayRow({
                     onMouseEnter={(event) => onTooltip(tooltipText, event)}
                     onMouseMove={(event) => onTooltip(tooltipText, event)}
                     onMouseLeave={onTooltipClear}
+                    onClick={() => openTaskDetail(segment.taskId)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openTaskDetail(segment.taskId);
+                      }
+                    }}
                   />
                 );
               })

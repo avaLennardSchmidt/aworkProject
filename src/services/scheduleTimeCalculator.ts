@@ -26,6 +26,17 @@ export function setWeekdayPreservingTime(iso: string, weekday: number): string {
   return toLocalIsoWithOffset(addDays(original, weekday - getDay(original)));
 }
 
+/** Shift a date by whole days, preserving the local wall-clock time (DST-safe). */
+export function shiftIsoByDays(iso: string, days: number): string {
+  const original = parseISO(iso);
+
+  if (!isValid(original) || !Number.isInteger(days)) {
+    throw new Error("Invalid date or day offset.");
+  }
+
+  return toLocalIsoWithOffset(addDays(original, days));
+}
+
 export function setTimeOnSameDate(iso: string, hhmm: string): string {
   const original = parseISO(iso);
   const parsedTime = parse(hhmm, "HH:mm", original);

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { AnimatePresence, motion } from "motion/react";
 import { fuzzyMatches } from "../services/fuzzySearch";
@@ -33,7 +34,12 @@ export function ScheduleGroupsList({
   onMultiEdit,
   isMultiEditAvailable = true,
 }: ScheduleGroupsListProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  // "?q=" prefilter, e.g. from the Kapazität week drill-down ("In Blocker
+  // bearbeiten öffnen"). Initial value only — the user can clear/change it.
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(
+    () => searchParams.get("q") ?? "",
+  );
   const normalizedSearchQuery = searchQuery.trim();
   const filteredGroups = useMemo(
     () => filterGroups(groups, searchQuery),

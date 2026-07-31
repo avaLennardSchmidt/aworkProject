@@ -93,6 +93,7 @@ export type UserExpandMode = "weeks" | "days";
 
 export interface DayScheduleDetail {
   scheduleId: string;
+  taskId: string;
   projectKey: string;
   projectName: string;
   taskName?: string;
@@ -618,6 +619,7 @@ export function buildUserCapacityDays(
       if (minutes > 0) {
         const segment: DayScheduleDetail = {
           scheduleId: schedule.id,
+          taskId: schedule.taskId,
           projectKey: key,
           projectName: schedule.projectName ?? "Projekt nicht aufgelöst",
           taskName: schedule.taskName,

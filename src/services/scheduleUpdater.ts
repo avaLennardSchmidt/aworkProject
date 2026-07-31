@@ -74,7 +74,14 @@ export async function updateScheduleChanges(
   return results;
 }
 
-export function buildUpdatePayload(change: PreviewChange): unknown {
+/** The subset of a PreviewChange the payload builder actually needs. */
+export interface SchedulePayloadChange {
+  schedule: PreviewChange["schedule"];
+  newStartIso: string;
+  newEndIso: string;
+}
+
+export function buildUpdatePayload(change: SchedulePayloadChange): unknown {
   if (!isRecord(change.schedule.raw)) {
     return {
       start: change.newStartIso,
