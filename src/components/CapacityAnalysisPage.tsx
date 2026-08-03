@@ -64,6 +64,7 @@ import {
 } from "../services/scheduleTimeCalculator";
 import { buildUpdatePayload } from "../services/scheduleUpdater";
 import { mapTimeEntriesResponse } from "../services/timeEntryMapper";
+import { trackActivity } from "../services/activityTracking";
 import type {
   AworkAbsence,
   AworkTaskSchedule,
@@ -1703,12 +1704,16 @@ export function CapacityAnalysisPage({
                         disabled={visibleSelectedRowSummaries.length === 0}
                         aria-label="Kapazität aller angezeigten Nutzer als CSV exportieren"
                         title="Kapazität aller angezeigten Nutzer als CSV exportieren"
-                        onClick={() =>
+                        onClick={() => {
+                          trackActivity("csv_exported", {
+                            scope: "all",
+                            userCount: visibleSelectedRowSummaries.length,
+                          });
                           exportCapacityCsv(
                             visibleSelectedRowSummaries,
                             "kapazitaet-alle-nutzer",
-                          )
-                        }
+                          );
+                        }}
                       >
                         <CsvExportIcon />
                       </button>

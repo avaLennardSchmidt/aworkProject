@@ -9,6 +9,7 @@ import {
 import { AnimatePresence } from "motion/react";
 import { ProjectDetailModal } from "../components/ProjectDetailModal";
 import { TaskDetailModal } from "../components/TaskDetailModal";
+import { trackActivity } from "../services/activityTracking";
 
 interface DetailModalApi {
   openProjectDetail: (projectId: string) => void;
@@ -30,6 +31,7 @@ export function DetailModalProvider({ children }: { children: ReactNode }) {
     if (!id) {
       return;
     }
+    trackActivity("project_detail_opened");
     setTaskId(null);
     setProjectId(id);
   }, []);
@@ -38,6 +40,7 @@ export function DetailModalProvider({ children }: { children: ReactNode }) {
     if (!id) {
       return;
     }
+    trackActivity("task_detail_opened");
     setProjectId(null);
     setTaskId(id);
   }, []);

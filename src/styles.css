@@ -6033,7 +6033,77 @@ button.auto-plan-skipped-day:hover {
 }
 
 .monitoring-user-table--4col .monitoring-user-row {
-  grid-template-columns: 1fr 90px 90px 80px;
+  grid-template-columns: 1fr 90px 90px 1.5fr;
+}
+
+/* Expandable user rows with a chronological timeline. */
+.monitoring-user-row--clickable {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  align-items: center;
+}
+
+.monitoring-user-group:last-child .monitoring-user-row--clickable {
+  border-bottom: none;
+}
+
+.monitoring-user-row--clickable:hover,
+.monitoring-user-row--clickable.is-expanded {
+  background: var(--color-accent-soft);
+}
+
+.monitoring-expand-caret {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--color-text-muted);
+  transition: transform 0.15s ease;
+}
+
+.monitoring-expand-caret.is-expanded {
+  transform: rotate(90deg);
+}
+
+.monitoring-user-timeline {
+  padding: 6px 14px 12px 30px;
+  background: #f7f9fa;
+  border-bottom: 1px solid var(--color-border);
+  display: grid;
+  gap: 3px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.monitoring-timeline-hint {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.monitoring-timeline-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 8px;
+  font-size: 0.8rem;
+  padding: 2px 0;
+}
+
+.monitoring-timeline-time {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-timeline-action {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.monitoring-timeline-meta {
+  color: var(--color-text-muted);
+  font-weight: 400;
 }
 
 /* ── Projekt einplanen ─────────────────────────────────────────── */

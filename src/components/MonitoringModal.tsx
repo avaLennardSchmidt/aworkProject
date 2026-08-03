@@ -8,6 +8,7 @@ import {
 } from "date-fns";
 import { de } from "date-fns/locale";
 import type {
+  ActivityEntry,
   BackendClient,
   MonitoringUserStats,
   MonitoringDailyStats,
@@ -260,6 +261,7 @@ export function MonitoringModal({
             users={userSummary}
             from={from}
             to={to}
+            backendClient={backendClient}
           />
         </>
       )}
@@ -541,18 +543,22 @@ interface UserSummaryRow {
   userName: string;
   logins: number;
   visits: number;
+  /** Total actions (sum of counts) — the sortable "Aktivität" value. */
   actions: number;
+  actionCounts: Record<string, number>;
   lastLoginTimestamp: string | null;
   lastVisitTimestamp: string | null;
 }
 
 function toSummaryRow(user: MonitoringUserStats): UserSummaryRow {
+  const actionCounts = user.action_counts ?? {};
   return {
     userId: user.user_id,
     userName: user.user_name,
     logins: user.logins,
     visits: user.visits,
-    actions: user.actions.length,
+    actions: Object.values(actionCounts).reduce((sum, n) => sum + n, 0),
+    actionCounts,
     lastLoginTimestamp: user.last_login,
     lastVisitTimestamp: user.last_visit,
   };
@@ -564,13 +570,46 @@ function UserTableSection({
   users,
   from,
   to,
+  backendClient,
 }: {
   users: UserSummaryRow[];
   from: string;
   to: string;
+  backendClient: BackendClient;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("visits");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [logsByUser, setLogsByUser] = useState<Record<string, ActivityEntry[]>>(
+    {},
+  );
+  const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
+
+  function toggleUser(userId: string) {
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+      return;
+    }
+    setExpandedUserId(userId);
+    if (!logsByUser[userId]) {
+      setLoadingUserId(userId);
+      void backendClient
+        .getMonitoringLogs({ from, to, userId, limit: 200 })
+        .then((logs) =>
+          setLogsByUser((current) => ({ ...current, [userId]: logs })),
+        )
+        .catch(() => {
+          setLogsByUser((current) => ({ ...current, [userId]: [] }));
+        })
+        .finally(() => setLoadingUserId(null));
+    }
+  }
+
+  // Re-fetch on range change: drop cached logs so an expanded row reloads.
+  useEffect(() => {
+    setLogsByUser({});
+    setExpandedUserId(null);
+  }, [from, to]);
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -682,34 +721,97 @@ function UserTableSection({
               Aktivität{arrow("actions")}
             </button>
           </div>
-          {sorted.map((user) => (
-            <div key={user.userId} className="monitoring-user-row">
-              <span>
-                {user.userName}
-                <span className="monitoring-user-id">{user.userId}</span>
-              </span>
-              <span className="monitoring-stat-compact">
-                {user.logins}
-                {user.lastLoginTimestamp && (
-                  <span className="monitoring-stat-time">
-                    {formatRelativeTime(user.lastLoginTimestamp)}
+          {sorted.map((user) => {
+            const isExpanded = expandedUserId === user.userId;
+            return (
+              <div key={user.userId} className="monitoring-user-group">
+                <button
+                  type="button"
+                  className={`monitoring-user-row monitoring-user-row--clickable${isExpanded ? " is-expanded" : ""}`}
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleUser(user.userId)}
+                >
+                  <span>
+                    <span
+                      className={`monitoring-expand-caret${isExpanded ? " is-expanded" : ""}`}
+                      aria-hidden="true"
+                    >
+                      ▸
+                    </span>
+                    {user.userName}
+                    <span className="monitoring-user-id">{user.userId}</span>
                   </span>
-                )}
-              </span>
-              <span className="monitoring-stat-compact">
-                {user.visits}
-                {user.lastVisitTimestamp && (
-                  <span className="monitoring-stat-time">
-                    {formatRelativeTime(user.lastVisitTimestamp)}
+                  <span className="monitoring-stat-compact">
+                    {user.logins}
+                    {user.lastLoginTimestamp && (
+                      <span className="monitoring-stat-time">
+                        {formatRelativeTime(user.lastLoginTimestamp)}
+                      </span>
+                    )}
                   </span>
-                )}
-              </span>
-              <span className="monitoring-stat-compact">{user.actions}</span>
-            </div>
-          ))}
+                  <span className="monitoring-stat-compact">
+                    {user.visits}
+                    {user.lastVisitTimestamp && (
+                      <span className="monitoring-stat-time">
+                        {formatRelativeTime(user.lastVisitTimestamp)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="monitoring-actions-cell">
+                    {formatActionCounts(user.actionCounts)}
+                  </span>
+                </button>
+                {isExpanded ? (
+                  <UserTimeline
+                    entries={logsByUser[user.userId]}
+                    isLoading={loadingUserId === user.userId}
+                  />
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       )}
     </>
+  );
+}
+
+function UserTimeline({
+  entries,
+  isLoading,
+}: {
+  entries: ActivityEntry[] | undefined;
+  isLoading: boolean;
+}) {
+  if (isLoading || entries === undefined) {
+    return <div className="monitoring-user-timeline monitoring-timeline-hint">Lade Verlauf…</div>;
+  }
+  if (entries.length === 0) {
+    return (
+      <div className="monitoring-user-timeline monitoring-timeline-hint">
+        Keine Aktivität im Zeitraum.
+      </div>
+    );
+  }
+  return (
+    <div className="monitoring-user-timeline">
+      {entries.map((entry) => {
+        const meta = formatMetadata(entry.action, entry.metadata);
+        return (
+          <div key={entry.id} className="monitoring-timeline-row">
+            <span className="monitoring-timeline-time">
+              {format(new Date(entry.timestamp), "dd.MM. HH:mm")}
+            </span>
+            <span className="monitoring-timeline-action">
+              {formatAction(entry.action)}
+              {meta ? (
+                <span className="monitoring-timeline-meta"> · {meta}</span>
+              ) : null}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -770,9 +872,7 @@ function DayDetail({
                 )}
               </span>
               <span className="monitoring-actions-cell">
-                {row.actions.length > 0
-                  ? row.actions.map(formatAction).join(", ")
-                  : "–"}
+                {formatActionCounts(row.actionCounts)}
               </span>
             </div>
           ))}
@@ -787,7 +887,7 @@ interface DayUserRow {
   userName: string;
   logins: number;
   visits: number;
-  actions: string[];
+  actionCounts: Record<string, number>;
   lastLoginTimestamp: string | null;
   lastVisitTimestamp: string | null;
 }
@@ -798,7 +898,7 @@ function toDayRow(user: MonitoringUserStats): DayUserRow {
     userName: user.user_name,
     logins: user.logins,
     visits: user.visits,
-    actions: user.actions,
+    actionCounts: user.action_counts ?? {},
     lastLoginTimestamp: user.last_login,
     lastVisitTimestamp: user.last_visit,
   };
@@ -1268,6 +1368,10 @@ function formatRelativeTime(isoString: string): string {
 
 function formatAction(action: string): string {
   switch (action) {
+    case "login":
+      return "Login";
+    case "session_start":
+      return "Besuch";
     case "blocker_created":
       return "Blocker erstellt";
     case "blocker_edited":
@@ -1276,7 +1380,65 @@ function formatAction(action: string): string {
       return "Blocker gelöscht";
     case "analysis_viewed":
       return "Analyse angesehen";
+    case "tasks_marked_done":
+      return "Aufgaben erledigt";
+    case "project_detail_opened":
+      return "Projekt-Details geöffnet";
+    case "task_detail_opened":
+      return "Aufgaben-Details geöffnet";
+    case "csv_exported":
+      return "CSV exportiert";
     default:
       return action;
   }
+}
+
+const WORKFLOW_LABELS: Record<string, string> = {
+  "project-plan": "Projekt einplanen",
+  "auto-plan": "Auto Plan",
+  manual: "manuell",
+};
+
+/** "Analyse angesehen 15×, Blocker erstellt 12" — top actions by count. */
+function formatActionCounts(
+  counts: Record<string, number> | undefined,
+  max = 4,
+): string {
+  const entries = Object.entries(counts ?? {}).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0) {
+    return "–";
+  }
+  const shown = entries
+    .slice(0, max)
+    .map(([action, count]) => `${formatAction(action)} ${count}×`);
+  if (entries.length > max) {
+    shown.push(`+${entries.length - max}`);
+  }
+  return shown.join(", ");
+}
+
+/** Short context line for one event, from its metadata. */
+function formatMetadata(
+  action: string,
+  metadata: Record<string, unknown> | null,
+): string {
+  if (!metadata) return "";
+  const parts: string[] = [];
+  const count = typeof metadata.count === "number" ? metadata.count : undefined;
+  if (count !== undefined && count > 1) {
+    parts.push(`${count}×`);
+  }
+  if (typeof metadata.source === "string" && WORKFLOW_LABELS[metadata.source]) {
+    parts.push(WORKFLOW_LABELS[metadata.source]);
+  }
+  if (typeof metadata.op === "string") {
+    parts.push(metadata.op);
+  }
+  if (typeof metadata.userCount === "number") {
+    parts.push(`${metadata.userCount} Nutzer`);
+  }
+  if (typeof metadata.scope === "string") {
+    parts.push(metadata.scope === "all" ? "alle" : "einzeln");
+  }
+  return parts.join(" · ");
 }
