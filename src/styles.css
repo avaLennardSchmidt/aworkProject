@@ -3872,14 +3872,15 @@ button.auto-plan-skipped-day:hover {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto minmax(300px, 440px);
   gap: 12px;
-  align-items: end;
+  /* Controls (Wochen/Tage, Wochenstunden, Kunden %) sit top-right. */
+  align-items: start;
 }
 
 .capacity-expand-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-self: end;
+  align-self: start;
 }
 
 .capacity-expand-button {
@@ -3887,7 +3888,6 @@ button.auto-plan-skipped-day:hover {
   white-space: nowrap;
   height: 38px;
   min-height: 38px;
-  align-self: end;
 }
 
 .capacity-expand-button:hover:not(:disabled) {
@@ -4107,6 +4107,18 @@ button.auto-plan-skipped-day:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Status badges (Überbucht, Urlaub, Termine) on their own row below the name. */
+.capacity-user-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.capacity-user-badges:empty {
+  display: none;
 }
 
 .capacity-icon-button {
@@ -4578,12 +4590,15 @@ button.auto-plan-skipped-day:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(88px, 1fr));
   gap: 10px;
-  align-items: end;
+  align-items: start;
 }
 
+/* Input first, label text below — so the 38px fields top-align with the
+   equally tall Wochen/Tage buttons next to them. */
 .capacity-inputs label {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 4px;
   color: var(--color-text-secondary);
   font-size: 0.82rem;
   font-weight: 700;
@@ -8929,17 +8944,24 @@ button.auto-plan-skipped-day:hover {
 
 /* Selection lives in the card itself: click toggles, selected stands out. */
 .deadline-select-indicator {
-  flex-shrink: 0;
+  flex: 0 0 18px;
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
+  min-width: 18px;
+  max-width: 18px;
   height: 18px;
+  min-height: 18px;
+  max-height: 18px;
+  aspect-ratio: 1;
   margin-top: 1px;
   border-radius: 50%;
   border: 1.5px solid currentColor;
   font-size: 0.7rem;
   font-weight: 700;
+  line-height: 1;
   opacity: 0.55;
 }
 
@@ -9010,4 +9032,45 @@ button.auto-plan-skipped-day:hover {
   border-color: var(--color-accent);
   color: var(--color-accent-deep);
   opacity: 1;
+}
+
+/* Overlap badge: hover/focus reveals WHICH blockers overlap. */
+.overlap-badge {
+  position: relative;
+  cursor: help;
+}
+
+.overlap-badge-tooltip {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 260px;
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #1d2329;
+  color: #ffffff;
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.45;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.25);
+  white-space: normal;
+}
+
+.overlap-badge:hover .overlap-badge-tooltip,
+.overlap-badge:focus-visible .overlap-badge-tooltip,
+.overlap-badge:focus .overlap-badge-tooltip {
+  display: grid;
+  gap: 4px;
+}
+
+.overlap-badge-tooltip strong {
+  color: #ffd66e;
+}
+
+.overlap-badge-tooltip-row {
+  display: block;
 }

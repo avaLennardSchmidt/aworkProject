@@ -44,6 +44,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { StatusIcon } from "./StatusIcon";
 import { ModalShell } from "./ModalShell";
 import { StatusToast } from "./StatusToast";
+import { OverlapBadge } from "./OverlapBadge";
 import { useDetailModal } from "../context/DetailModalContext";
 
 export interface CreateGroupOptions {
@@ -1592,12 +1593,7 @@ function CreateSubmitPreviewModal({
                 {format(parseISO(payload.startDate), "EEEE, dd.MM.yyyy", {
                   locale: de,
                 })}
-                {overlap ? (
-                  <em className="warning-badge">
-                    Überschneidung mit {overlap.overlaps.length} Blocker
-                    {overlap.overlaps.length === 1 ? "" : "n"}
-                  </em>
-                ) : null}
+                {overlap ? <OverlapBadge overlaps={overlap.overlaps} /> : null}
               </span>
               <strong>{formatPayloadTimeWindow(payload)}</strong>
             </div>
@@ -1683,12 +1679,7 @@ function RegularPreview({
                 {format(parseISO(payload.startDate), "EEEE, dd.MM.yyyy", {
                   locale: de,
                 })}
-                {overlap ? (
-                  <em className="warning-badge">
-                    Überschneidung mit {overlap.overlaps.length} Blocker
-                    {overlap.overlaps.length === 1 ? "" : "n"}
-                  </em>
-                ) : null}
+                {overlap ? <OverlapBadge overlaps={overlap.overlaps} /> : null}
               </span>
               <strong>{formatPayloadTimeWindow(payload)}</strong>
             </div>

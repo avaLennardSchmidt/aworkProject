@@ -308,34 +308,6 @@ export function CapacityAnalysisPage({
     setSearchParams,
   ]);
 
-  // Auto-run: once users and the default selection are ready, start the
-  // analysis without requiring the "Analyse starten" click. The button stays
-  // as the manual re-run.
-  const hasAutoRunRef = useRef(false);
-  useEffect(() => {
-    if (
-      hasAutoRunRef.current ||
-      hasLoaded ||
-      isLoading ||
-      isLoadingUsers ||
-      !currentUser ||
-      availableUsers.length === 0 ||
-      selectedUserIds.size === 0
-    ) {
-      return;
-    }
-    hasAutoRunRef.current = true;
-    void loadAnalysis();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    availableUsers,
-    selectedUserIds,
-    hasLoaded,
-    isLoading,
-    isLoadingUsers,
-    currentUser,
-  ]);
-
   useEffect(() => {
     saveCapacityInputs(capacityInputs);
   }, [capacityInputs]);

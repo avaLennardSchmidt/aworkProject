@@ -39,6 +39,7 @@ import { SegmentedControl } from "./SegmentedControl";
 import { DatePickerInput } from "./DatePickerInput";
 import { TimePickerInput } from "./TimePickerInput";
 import { useDetailModal } from "../context/DetailModalContext";
+import { OverlapBadge } from "./OverlapBadge";
 
 interface ProjectPlanPanelProps {
   currentUser: AworkUser;
@@ -1210,12 +1211,12 @@ export function ProjectPlanPanel({
                 (entry) => entry.taskId === payload.taskId,
               );
               const task = tasks.find((entry) => entry.id === payload.taskId);
-              const overlapCount = getPayloadPreviewOverlapCount(preview, payload, index);
+              const payloadOverlaps = getPayloadPreviewOverlaps(preview, payload, index);
               return (
                 <div
                   key={`${payload.taskId}-${payload.startDate}-${index}`}
                   className={`preview-row project-plan-edit-preview-row${
-                    overlapCount > 0 ? " preview-row-warning" : ""
+                    payloadOverlaps.length > 0 ? " preview-row-warning" : ""
                   }`}
                 >
                   <span className="project-plan-preview-main">
@@ -1223,12 +1224,7 @@ export function ProjectPlanPanel({
                       {format(parseISO(payload.startDate), "EEEE, dd.MM.yyyy", {
                         locale: de,
                       })}
-                      {overlapCount > 0 ? (
-                        <em className="warning-badge">
-                          Überschneidung mit {overlapCount} Blocker
-                          {overlapCount === 1 ? "" : "n"}
-                        </em>
-                      ) : null}
+                      <OverlapBadge overlaps={payloadOverlaps} />
                     </span>
                     <span className="project-plan-preview-task">
                       <StatusIcon
@@ -1858,23 +1854,23 @@ function getPayloadsMinutes(payloads: CreateTaskSchedulePayload[]): number {
 function getPreviewOverlapCount(preview: PlanPreview): number {
   return preview.payloads.reduce(
     (sum, payload, index) =>
-      sum + getPayloadPreviewOverlapCount(preview, payload, index),
+      sum + getPayloadPreviewOverlaps(preview, payload, index).length,
     0,
   );
 }
 
-function getPayloadPreviewOverlapCount(
+function getPayloadPreviewOverlaps(
   preview: PlanPreview,
   payload: CreateTaskSchedulePayload,
   index: number,
-): number {
+): AworkTaskSchedule[] {
   const schedules = [
     ...preview.existingSchedules,
     ...preview.payloads
       .filter((_, payloadIndex) => payloadIndex !== index)
       .map(payloadToSchedule),
   ];
-  return findPayloadOverlaps([payload], schedules)[0]?.overlaps.length ?? 0;
+  return findPayloadOverlaps([payload], schedules)[0]?.overlaps ?? [];
 }
 
 function formatHours(seconds: number): string {

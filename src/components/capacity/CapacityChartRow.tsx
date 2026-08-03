@@ -162,6 +162,26 @@ export function CapacityChartRow({
           <div className="capacity-user-name">
             <UserAvatar user={row.user} size={30} />
             <strong>{formatUserName(row.user)}</strong>
+            <button
+              type="button"
+              className="capacity-icon-button"
+              aria-label="Kapazitätszusammenfassung kopieren"
+              title="Kapazitätszusammenfassung in Zwischenablage kopieren"
+              onClick={copyCapacitySummary}
+            >
+              {copied ? <CheckIcon /> : <CopyIcon />}
+            </button>
+            <button
+              type="button"
+              className="capacity-icon-button"
+              aria-label="Kapazität dieses Nutzers als CSV exportieren"
+              title="Kapazität dieses Nutzers als CSV exportieren"
+              onClick={exportUserCapacity}
+            >
+              <CsvExportIcon />
+            </button>
+          </div>
+          <div className="capacity-user-badges">
             {totals.isOverCapacity ? (
               <button
                 type="button"
@@ -231,24 +251,6 @@ export function CapacityChartRow({
                   : "Termine"}
               </button>
             )}
-            <button
-              type="button"
-              className="capacity-icon-button"
-              aria-label="Kapazitätszusammenfassung kopieren"
-              title="Kapazitätszusammenfassung in Zwischenablage kopieren"
-              onClick={copyCapacitySummary}
-            >
-              {copied ? <CheckIcon /> : <CopyIcon />}
-            </button>
-            <button
-              type="button"
-              className="capacity-icon-button"
-              aria-label="Kapazität dieses Nutzers als CSV exportieren"
-              title="Kapazität dieses Nutzers als CSV exportieren"
-              onClick={exportUserCapacity}
-            >
-              <CsvExportIcon />
-            </button>
           </div>
           <span
             className="capacity-user-workload"
