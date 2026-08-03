@@ -9071,6 +9071,9 @@ button.auto-plan-skipped-day:hover {
   color: #ffd66e;
 }
 
-.overlap-badge-tooltip-row {
+/* Beat generic ".preview-row span" color rules that also match these spans. */
+.overlap-badge-tooltip .overlap-badge-tooltip-row,
+span.overlap-badge-tooltip-row {
   display: block;
+  color: #f4f6f8;
 }
