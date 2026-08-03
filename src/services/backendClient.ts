@@ -256,6 +256,22 @@ export class BackendClient {
     );
   }
 
+  /**
+   * Marks tasks as done. The backend resolves each project's "done" status
+   * and reports per-task failures instead of aborting the batch.
+   */
+  async markTasksDone(
+    tasks: Array<{ taskId: string; projectId?: string }>,
+  ): Promise<{
+    succeeded: string[];
+    failed: Array<{ taskId: string; error: string }>;
+  }> {
+    return this.request("/api/tasks/mark-done", {
+      method: "POST",
+      body: JSON.stringify({ tasks }),
+    });
+  }
+
   /** Milestones of one project (Kapazität deadline overlay). */
   async getProjectMilestones(projectId: string): Promise<unknown> {
     return this.request<unknown>(

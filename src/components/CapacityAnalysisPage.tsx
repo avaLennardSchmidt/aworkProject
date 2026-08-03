@@ -189,7 +189,7 @@ export function CapacityAnalysisPage({
   onLogin,
   onDisconnect,
 }: CapacityAnalysisPageProps) {
-  const { openProjectDetail } = useDetailModal();
+  const { openProjectDetail, openTaskDetail } = useDetailModal();
   const hasInitializedDefaultSelectionRef = useRef(false);
   const appliedCapacityDefaultUserIdsRef = useRef<Set<string>>(new Set());
   // View state initialisation order: URL params win, then the last-used
@@ -632,6 +632,36 @@ export function CapacityAnalysisPage({
     string | null
   >(null);
   const [isWeekActionBusy, setIsWeekActionBusy] = useState(false);
+  const [isDeadlineActionBusy, setIsDeadlineActionBusy] = useState(false);
+
+  // Marks the selected deadline tasks as done in awork, then reloads the
+  // user's data so the risks (and blockers of now-done tasks) update.
+  async function markDeadlineTasksDone(
+    tasks: Array<{ taskId: string; projectId?: string }>,
+  ) {
+    if (!deadlineDetailUserId || tasks.length === 0) return;
+    setIsDeadlineActionBusy(true);
+    setError("");
+    try {
+      const result = await backendClient.markTasksDone(tasks);
+      if (result.failed.length > 0) {
+        setError(
+          `${result.failed.length} Aufgabe(n) konnten nicht auf erledigt gesetzt werden: ${result.failed[0]?.error ?? ""}`,
+        );
+      }
+      if (result.succeeded.length > 0) {
+        await refreshUserSchedules(deadlineDetailUserId);
+      }
+    } catch (markError) {
+      setError(
+        markError instanceof Error
+          ? markError.message
+          : "Aufgaben konnten nicht auf erledigt gesetzt werden.",
+      );
+    } finally {
+      setIsDeadlineActionBusy(false);
+    }
+  }
 
   const weekDetailData = useMemo(() => {
     if (!weekDetail) return null;
@@ -672,7 +702,13 @@ export function CapacityAnalysisPage({
         dueDay >= format(candidate.week.from, "yyyy-MM-dd") &&
         dueDay <= format(candidate.week.to, "yyyy-MM-dd"),
     );
-    if (!weekRow) return;
+    if (!weekRow) {
+      // Überfällige Termine can lie before the analyzed range — there is no
+      // KW to open then, so show the task itself instead of doing nothing.
+      setDeadlineDetailUserId(null);
+      openTaskDetail(deadline.taskId);
+      return;
+    }
 
     setExpandedViewByUser((current) => {
       const next = new Map(current);
@@ -1884,9 +1920,12 @@ export function CapacityAnalysisPage({
         <DeadlineOverviewPanel
           user={deadlineDetailData.entry.row.user}
           deadlines={deadlineDetailData.deadlines}
+          rangeFrom={from}
+          isBusy={isDeadlineActionBusy}
           onSelect={(deadline) =>
             openDeadlineWeek(deadlineDetailData.entry.row.user.id, deadline)
           }
+          onMarkDone={markDeadlineTasksDone}
           onClose={() => setDeadlineDetailUserId(null)}
         />
       ) : null}

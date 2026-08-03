@@ -125,8 +125,9 @@ export function CapacityChartRow({
     `Überbucht, sobald die geplante Zeit das Kunden-Ziel überschreitet.`,
   ].join("\n");
   const visibleDeadlineRisks = deadlineRisks.slice(0, 8);
+  // Überfällige und diese Woche fällige Termine sind gleichermaßen kritisch.
   const hasThisWeekDeadlineRisk = deadlineRisks.some(
-    (risk) => risk.urgency === "this-week",
+    (risk) => risk.urgency === "this-week" || risk.urgency === "overdue",
   );
   const deadlineRiskTooltip = [
     `Fällige Termine (${deadlineRisks.length})`,
@@ -134,7 +135,11 @@ export function CapacityChartRow({
       const scheduledSeconds = risk.scheduledMinutesInRange * 60;
       const openSeconds = Math.max(0, risk.plannedSeconds - scheduledSeconds);
       const horizon =
-        risk.urgency === "this-week" ? "Diese Woche" : "Nächste Woche";
+        risk.urgency === "overdue"
+          ? "Überfällig"
+          : risk.urgency === "this-week"
+            ? "Diese Woche"
+            : "Nächste Woche";
       const scheduleStatus =
         risk.plannedSeconds <= 0
           ? "Kein Zeitbudget hinterlegt"

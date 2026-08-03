@@ -157,8 +157,9 @@ export interface DeadlineRisk {
   plannedSeconds: number;
   /** Minutes already scheduled for this task within the analysis range. */
   scheduledMinutesInRange: number;
-  /** Calendar urgency relative to the current Monday–Sunday week. */
-  urgency: "this-week" | "next-week";
+  /** Calendar urgency: overdue (dueOn before today, task still open),
+   * or relative to the current Monday–Sunday week. */
+  urgency: "overdue" | "this-week" | "next-week";
 }
 
 /**
@@ -174,10 +175,7 @@ export function computeDeadlineRisks(
   to: string,
   today = new Date(),
 ): DeadlineRisk[] {
-  const currentWeekStart = format(
-    startOfWeek(today, { weekStartsOn: 1 }),
-    "yyyy-MM-dd",
-  );
+  const todayDay = format(today, "yyyy-MM-dd");
   const currentWeekEndDate = endOfWeek(today, { weekStartsOn: 1 });
   const currentWeekEnd = format(currentWeekEndDate, "yyyy-MM-dd");
   const nextWeekEnd = format(addDays(currentWeekEndDate, 7), "yyyy-MM-dd");
@@ -201,8 +199,13 @@ export function computeDeadlineRisks(
   for (const task of tasks) {
     if (!task.dueOn) continue;
     const dueDay = task.dueOn.slice(0, 10);
-    if (dueDay < from || dueDay > to) continue;
-    if (dueDay < currentWeekStart || dueDay > nextWeekEnd) continue;
+    // Beyond the analysis horizon or further out than next week: not shown.
+    if (dueDay > to || dueDay > nextWeekEnd) continue;
+    // Overdue = due before today and still open. Overdue tasks are exempt
+    // from the lower range/week bounds — an unfinished past Termin must stay
+    // visible no matter which date range is analyzed.
+    const isOverdue = dueDay < todayDay;
+    if (!isOverdue && dueDay < from) continue;
     // Closed tasks are no longer a risk.
     const statusType = task.statusType?.trim().toLowerCase();
     if (statusType && ["done", "closed", "completed"].includes(statusType)) {
@@ -217,7 +220,11 @@ export function computeDeadlineRisks(
       dueOn: task.dueOn,
       plannedSeconds: task.plannedDurationSeconds ?? 0,
       scheduledMinutesInRange: scheduledMinutes,
-      urgency: dueDay <= currentWeekEnd ? "this-week" : "next-week",
+      urgency: isOverdue
+        ? "overdue"
+        : dueDay <= currentWeekEnd
+          ? "this-week"
+          : "next-week",
     });
   }
 

@@ -160,11 +160,14 @@ export function WeekDetailPanel({
 
       {risks.length > 0 && (
         <div
-          className={`week-detail-risks${risks.some((risk) => risk.urgency === "this-week") ? " week-detail-risks--critical" : ""}`}
+          className={`week-detail-risks${risks.some((risk) => risk.urgency === "this-week" || risk.urgency === "overdue") ? " week-detail-risks--critical" : ""}`}
           role="note"
         >
           <strong>
-            ⚠ Fällige Termine {risks[0]?.urgency === "this-week" ? "diese" : "nächste"} Woche
+            ⚠{" "}
+            {risks.some((risk) => risk.urgency === "overdue")
+              ? "Überfällige & fällige Termine"
+              : `Fällige Termine ${risks[0]?.urgency === "this-week" ? "diese" : "nächste"} Woche`}
           </strong>
           <ul>
             {risks.map((risk) => (
