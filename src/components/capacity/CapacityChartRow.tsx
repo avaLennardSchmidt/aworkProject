@@ -23,6 +23,7 @@ import {
   type UserExpandMode,
 } from "../../services/capacityModel";
 import { UserAvatar } from "../UserAvatar";
+import { trackActivity } from "../../services/activityTracking";
 import { CapacityCombinedBar, CapacityWeekBar } from "./CapacityBars";
 import { CheckIcon, CopyIcon, CsvExportIcon } from "./icons";
 
@@ -103,6 +104,7 @@ export function CapacityChartRow({
   }
 
   function exportUserCapacity() {
+    trackActivity("csv_exported", { scope: "user" });
     exportCapacityCsv(
       [{ row, weekRows }],
       `kapazitaet-${slugifyName(formatUserName(row.user))}`,

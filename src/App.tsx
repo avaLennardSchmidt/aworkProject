@@ -1141,6 +1141,7 @@ function App() {
       try {
         const response = await backendClient.batchTaskSchedules({
           userId: plannerUser.id,
+          source: "project-plan",
           create: payloads.map((payload) => ({
             ...payload,
             userId: plannerUser.id,

@@ -82,8 +82,31 @@ export interface MonitoringUserStats {
   logins: number;
   visits: number;
   actions: string[];
+  /** Per-action counts, e.g. { blocker_created: 12, analysis_viewed: 3 }. */
+  action_counts?: Record<string, number>;
   last_login: string | null;
   last_visit: string | null;
+}
+
+export type ActivityAction =
+  | "login"
+  | "session_start"
+  | "blocker_created"
+  | "blocker_edited"
+  | "blocker_deleted"
+  | "analysis_viewed"
+  | "tasks_marked_done"
+  | "project_detail_opened"
+  | "task_detail_opened"
+  | "csv_exported";
+
+export interface ActivityEntry {
+  id: number;
+  timestamp: string;
+  user_id: string;
+  user_name: string;
+  action: ActivityAction;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface MonitoringTotals {
@@ -405,6 +428,8 @@ export class BackendClient {
    */
   async batchTaskSchedules(request: {
     userId?: string;
+    /** Workflow that triggered creates — for activity metadata only. */
+    source?: string;
     create?: Array<Record<string, unknown>>;
     update?: Array<{ id: string } & Record<string, unknown>>;
     delete?: string[];
@@ -443,11 +468,31 @@ export class BackendClient {
     );
   }
 
-  async trackActivity(action: string, details?: string): Promise<void> {
+  async trackActivity(
+    action: ActivityAction,
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
     await this.request("/api/monitoring/track", {
       method: "POST",
-      body: JSON.stringify({ action, details }),
+      body: JSON.stringify({ action, metadata }),
     });
+  }
+
+  /** Raw chronological activity log for the monitoring timeline. */
+  async getMonitoringLogs(options: {
+    from?: string;
+    to?: string;
+    userId?: string;
+    limit?: number;
+  }): Promise<ActivityEntry[]> {
+    const params = new URLSearchParams();
+    if (options.from) params.set("from", options.from);
+    if (options.to) params.set("to", options.to);
+    if (options.userId) params.set("userId", options.userId);
+    if (options.limit) params.set("limit", String(options.limit));
+    return this.request<ActivityEntry[]>(
+      `/api/monitoring/logs${params.size ? `?${params.toString()}` : ""}`,
+    );
   }
 
   async getSeenFeatureKeys(): Promise<string[]> {
