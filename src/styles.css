@@ -2649,7 +2649,8 @@ button.auto-plan-skipped-day:hover {
      not the full viewport. The scrim still covers everything. */
   padding-left: calc(220px + 20px);
   background: rgb(17 24 31 / 0.58);
-  z-index: 20;
+  /* Above side panels (week/deadline sidebar, z-index 30). */
+  z-index: 50;
   transition: padding-left 0.22s ease;
 }
 
@@ -8780,28 +8781,27 @@ button.auto-plan-skipped-day:hover {
   font-size: 0.82rem;
 }
 
-.deadline-overview-group-title span {
+.deadline-overview-group-title span:not(.deadline-select-indicator) {
   min-width: 22px;
-  padding: 1px 6px;
-  border-radius: 999px;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .deadline-overview-group-title--this-week {
   color: var(--color-danger-hover);
 }
 
-.deadline-overview-group-title--this-week span {
-  background: var(--color-danger-soft);
+.deadline-overview-group-title--this-week span:not(.deadline-select-indicator) {
+  color: var(--color-danger-hover);
 }
 
 .deadline-overview-group-title--next-week {
   color: #8a5a12;
 }
 
-.deadline-overview-group-title--next-week span {
-  background: #fdf4e3;
+.deadline-overview-group-title--next-week span:not(.deadline-select-indicator) {
+  color: #8a5a12;
 }
 
 .deadline-overview-list {
@@ -8879,16 +8879,11 @@ button.auto-plan-skipped-day:hover {
 
 /* Überfällig: strongest deadline-risk tier (open tasks due in the past). */
 .deadline-overview-group-title--overdue {
-  color: #ffffff;
-}
-
-.deadline-overview-group-title--overdue strong {
   color: var(--color-danger);
 }
 
-.deadline-overview-group-title--overdue span {
-  background: var(--color-danger);
-  color: #ffffff;
+.deadline-overview-group-title--overdue span:not(.deadline-select-indicator) {
+  color: var(--color-danger);
 }
 
 .deadline-overview-item--overdue {
@@ -9076,4 +9071,23 @@ button.auto-plan-skipped-day:hover {
 span.overlap-badge-tooltip-row {
   display: block;
   color: #f4f6f8;
+}
+
+/* Back link from the week panel to the Termine sidebar. */
+.week-detail-back {
+  display: block;
+  border: none;
+  background: none;
+  padding: 0 0 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.week-detail-back:hover,
+.week-detail-back:focus-visible {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
 }

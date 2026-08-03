@@ -25,6 +25,7 @@ export function WeekDetailPanel({
   schedules,
   risks = [],
   isBusy,
+  onBack,
   onClose,
   onDelete,
   onShift,
@@ -35,6 +36,9 @@ export function WeekDetailPanel({
   /** Unfertige Aufgaben, deren Fälligkeit in diese Woche fällt. */
   risks?: DeadlineRisk[];
   isBusy: boolean;
+  /** Present when the panel was opened from the Termine sidebar — renders a
+   * back button that returns there. */
+  onBack?: () => void;
   onClose: () => void;
   onDelete: (scheduleIds: string[]) => Promise<boolean>;
   onShift: (scheduleIds: string[], dayOffset: number) => Promise<boolean>;
@@ -133,6 +137,15 @@ export function WeekDetailPanel({
     >
       <div className="week-detail-head">
         <div>
+          {onBack ? (
+            <button
+              type="button"
+              className="week-detail-back"
+              onClick={onBack}
+            >
+              ← Zurück zu den Terminen
+            </button>
+          ) : null}
           <p className="eyebrow">{weekRow.week.label}</p>
           <h3>{formatUserName(user)}</h3>
           <p className="week-detail-meta">

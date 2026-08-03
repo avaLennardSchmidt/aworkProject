@@ -1,6 +1,37 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { motion } from "motion/react";
 
+// Body-scroll lock shared by all open modals: the page behind a modal must
+// not scroll; only the modal's own content does. A counter handles stacked
+// modals (e.g. a confirmation on top of another dialog).
+let openModalCount = 0;
+let savedBodyOverflow = "";
+let savedBodyPaddingRight = "";
+
+function lockBodyScroll() {
+  openModalCount += 1;
+  if (openModalCount > 1) {
+    return;
+  }
+  savedBodyOverflow = document.body.style.overflow;
+  savedBodyPaddingRight = document.body.style.paddingRight;
+  // Compensate the vanishing scrollbar so the layout doesn't jump.
+  const scrollbarWidth =
+    window.innerWidth - document.documentElement.clientWidth;
+  if (scrollbarWidth > 0) {
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+  }
+  document.body.style.overflow = "hidden";
+}
+
+function unlockBodyScroll() {
+  openModalCount = Math.max(0, openModalCount - 1);
+  if (openModalCount === 0) {
+    document.body.style.overflow = savedBodyOverflow;
+    document.body.style.paddingRight = savedBodyPaddingRight;
+  }
+}
+
 interface ModalShellProps {
   labelledBy: string;
   dialogClassName?: string;
@@ -17,6 +48,7 @@ export function ModalShell({ labelledBy, dialogClassName = "modal", onClose, chi
   useEffect(() => {
     const previouslyFocused = document.activeElement;
     dialogRef.current?.focus();
+    lockBodyScroll();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -29,6 +61,7 @@ export function ModalShell({ labelledBy, dialogClassName = "modal", onClose, chi
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      unlockBodyScroll();
       if (previouslyFocused instanceof HTMLElement) {
         previouslyFocused.focus();
       }

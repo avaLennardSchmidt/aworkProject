@@ -603,6 +603,11 @@ export function CapacityAnalysisPage({
   const [deadlineDetailUserId, setDeadlineDetailUserId] = useState<
     string | null
   >(null);
+  // Set when the week panel was opened FROM the Termine sidebar — enables the
+  // "back to Termine" button there.
+  const [weekDetailReturnUserId, setWeekDetailReturnUserId] = useState<
+    string | null
+  >(null);
   const [isWeekActionBusy, setIsWeekActionBusy] = useState(false);
   const [isDeadlineActionBusy, setIsDeadlineActionBusy] = useState(false);
 
@@ -677,7 +682,8 @@ export function CapacityAnalysisPage({
     if (!weekRow) {
       // Überfällige Termine can lie before the analyzed range — there is no
       // KW to open then, so show the task itself instead of doing nothing.
-      setDeadlineDetailUserId(null);
+      // The sidebar stays open; the modal layers above it and closing it
+      // returns to the list.
       openTaskDetail(deadline.taskId);
       return;
     }
@@ -688,6 +694,7 @@ export function CapacityAnalysisPage({
       return next;
     });
     setDeadlineDetailUserId(null);
+    setWeekDetailReturnUserId(userId);
     setWeekDetail({ userId, weekKey: weekRow.week.key });
   }
 
@@ -1766,6 +1773,7 @@ export function CapacityAnalysisPage({
                             onWeekDetail={(weekKey) =>
                               {
                                 setDeadlineDetailUserId(null);
+                                setWeekDetailReturnUserId(null);
                                 setWeekDetail({
                                   userId: entry.row.user.id,
                                   weekKey,
@@ -1804,6 +1812,7 @@ export function CapacityAnalysisPage({
                     onWeekDetail={(userId, weekKey) =>
                       {
                         setDeadlineDetailUserId(null);
+                        setWeekDetailReturnUserId(null);
                         setWeekDetail({ userId, weekKey });
                       }
                     }
@@ -1883,7 +1892,19 @@ export function CapacityAnalysisPage({
             },
           )}
           isBusy={isWeekActionBusy}
-          onClose={() => setWeekDetail(null)}
+          onBack={
+            weekDetailReturnUserId
+              ? () => {
+                  setWeekDetail(null);
+                  setDeadlineDetailUserId(weekDetailReturnUserId);
+                  setWeekDetailReturnUserId(null);
+                }
+              : undefined
+          }
+          onClose={() => {
+            setWeekDetail(null);
+            setWeekDetailReturnUserId(null);
+          }}
           onDelete={deleteWeekSchedules}
           onShift={shiftWeekSchedules}
         />
