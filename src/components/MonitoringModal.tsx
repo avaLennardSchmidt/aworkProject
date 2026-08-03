@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   format,
   startOfMonth,
@@ -61,8 +61,6 @@ export function MonitoringModal({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [dayUsers, setDayUsers] = useState<MonitoringUserStats[]>([]);
-  const [isDayLoading, setIsDayLoading] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<ChartMode>("nutzer");
   const [totals, setTotals] = useState<MonitoringTotals | null>(null);
 
@@ -110,18 +108,9 @@ export function MonitoringModal({
     loadData(from, to);
   }, [from, to, loadData]);
 
+  // Clicking a day in the chart narrows the activity feed to that day.
   function handleDayClick(date: string) {
-    if (selectedDay === date) {
-      setSelectedDay(null);
-      return;
-    }
-    setSelectedDay(date);
-    setIsDayLoading(true);
-    backendClient
-      .getMonitoringUserStats(date, date)
-      .then(setDayUsers)
-      .catch(() => setDayUsers([]))
-      .finally(() => setIsDayLoading(false));
+    setSelectedDay((current) => (current === date ? null : date));
   }
 
   function applyPreset(preset: "week" | "month") {
@@ -246,16 +235,16 @@ export function MonitoringModal({
             onDayClick={handleDayClick}
           />
 
-          {selectedDay ? (
-            <DayDetail
-              date={selectedDay}
-              rows={dayUsers.map((u) => toDayRow(u))}
-              isLoading={isDayLoading}
-              onClose={() => setSelectedDay(null)}
-            />
-          ) : null}
-
           <ActivityBreakdown stats={chartStats} />
+
+          <ActivityFeed
+            backendClient={backendClient}
+            from={from}
+            to={to}
+            users={users}
+            dayFilter={selectedDay}
+            onClearDayFilter={() => setSelectedDay(null)}
+          />
 
           <UserTableSection
             users={userSummary}
@@ -776,6 +765,244 @@ function UserTableSection({
   );
 }
 
+function ActivityFeed({
+  backendClient,
+  from,
+  to,
+  users,
+  dayFilter,
+  onClearDayFilter,
+}: {
+  backendClient: BackendClient;
+  from: string;
+  to: string;
+  users: MonitoringUserStats[];
+  /** When set (yyyy-MM-dd, from a chart-day click), the feed shows only that day. */
+  dayFilter: string | null;
+  onClearDayFilter: () => void;
+}) {
+  const [logs, setLogs] = useState<ActivityEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionFilter, setActionFilter] = useState<Set<string>>(new Set());
+  const [userFilter, setUserFilter] = useState<string>("");
+  const [collapsed, setCollapsed] = useState(false);
+  const sectionRef = useRef<HTMLElement | null>(null);
+
+  // Scroll the feed into view (and expand it) when a day is picked above.
+  useEffect(() => {
+    if (dayFilter) {
+      setCollapsed(false);
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [dayFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setActionFilter(new Set());
+    setUserFilter("");
+    backendClient
+      .getMonitoringLogs({ from, to, limit: 500 })
+      .then((data) => {
+        if (!cancelled) setLogs(data);
+      })
+      .catch(() => {
+        if (!cancelled) setLogs([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [backendClient, from, to]);
+
+  // Counts per action across the loaded window (drives the chip labels).
+  const countsByAction = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const log of logs) {
+      counts[log.action] = (counts[log.action] ?? 0) + 1;
+    }
+    return counts;
+  }, [logs]);
+
+  const filtered = useMemo(
+    () =>
+      logs.filter(
+        (log) =>
+          (actionFilter.size === 0 || actionFilter.has(log.action)) &&
+          (!userFilter || log.user_id === userFilter) &&
+          (!dayFilter || log.timestamp.slice(0, 10) === dayFilter),
+      ),
+    [logs, actionFilter, userFilter, dayFilter],
+  );
+
+  // Group the filtered feed by calendar day for readable day separators.
+  const grouped = useMemo(() => {
+    const map = new Map<string, ActivityEntry[]>();
+    for (const log of filtered) {
+      const day = log.timestamp.slice(0, 10);
+      const bucket = map.get(day);
+      if (bucket) {
+        bucket.push(log);
+      } else {
+        map.set(day, [log]);
+      }
+    }
+    return Array.from(map.entries());
+  }, [filtered]);
+
+  function toggleAction(action: string) {
+    setActionFilter((current) => {
+      const next = new Set(current);
+      if (next.has(action)) {
+        next.delete(action);
+      } else {
+        next.add(action);
+      }
+      return next;
+    });
+  }
+
+  const userOptions = [...users].sort((a, b) =>
+    a.user_name.localeCompare(b.user_name),
+  );
+
+  return (
+    <section className="monitoring-feed" ref={sectionRef}>
+      <div className="monitoring-section-header">
+        <button
+          type="button"
+          className="monitoring-feed-toggle"
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          <span
+            className={`monitoring-expand-caret${collapsed ? "" : " is-expanded"}`}
+            aria-hidden="true"
+          >
+            ▸
+          </span>
+          <h3 className="monitoring-section-title monitoring-section-title--inline">
+            Aktivitäts-Feed
+          </h3>
+        </button>
+        <span className="monitoring-feed-count">
+          {dayFilter ? (
+            <button
+              type="button"
+              className="monitoring-day-pill"
+              onClick={onClearDayFilter}
+              title="Tagesfilter aufheben"
+            >
+              {format(new Date(dayFilter), "EEEE, dd.MM.", { locale: de })} ✕
+            </button>
+          ) : null}
+          {filtered.length}{" "}
+          {filtered.length === 1 ? "Aktivität" : "Aktivitäten"}
+        </span>
+      </div>
+
+      {collapsed ? null : (
+        <>
+          {renderFeedBody()}
+        </>
+      )}
+    </section>
+  );
+
+  function renderFeedBody() {
+    return (
+      <>
+
+      <div className="monitoring-feed-filters">
+        <div className="monitoring-feed-chips">
+          <button
+            type="button"
+            className={`monitoring-chip${actionFilter.size === 0 ? " is-active" : ""}`}
+            onClick={() => setActionFilter(new Set())}
+          >
+            Alle
+          </button>
+          {FILTERABLE_ACTIONS.filter((a) => countsByAction[a]).map((action) => (
+            <button
+              key={action}
+              type="button"
+              className={`monitoring-chip${actionFilter.has(action) ? " is-active" : ""}`}
+              onClick={() => toggleAction(action)}
+            >
+              <span
+                className="monitoring-chip-dot"
+                style={{ background: actionColor(action) }}
+                aria-hidden="true"
+              />
+              {formatAction(action)}
+              <span className="monitoring-chip-count">
+                {countsByAction[action]}
+              </span>
+            </button>
+          ))}
+        </div>
+        <select
+          className="monitoring-feed-user-select"
+          value={userFilter}
+          onChange={(e) => setUserFilter(e.target.value)}
+        >
+          <option value="">Alle Nutzer</option>
+          {userOptions.map((u) => (
+            <option key={u.user_id} value={u.user_id}>
+              {u.user_name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <p className="monitoring-feed-hint">Lade Aktivitäten…</p>
+      ) : filtered.length === 0 ? (
+        <p className="monitoring-feed-hint">
+          Keine Aktivitäten für diese Filter.
+        </p>
+      ) : (
+        <div className="monitoring-feed-list">
+          {grouped.map(([day, entries]) => (
+            <div key={day} className="monitoring-feed-day">
+              <div className="monitoring-feed-day-label">
+                {format(new Date(day), "EEEE, dd. MMMM yyyy", { locale: de })}
+              </div>
+              {entries.map((entry) => {
+                const meta = formatMetadata(entry.action, entry.metadata);
+                return (
+                  <div key={entry.id} className="monitoring-feed-row">
+                    <span className="monitoring-feed-time">
+                      {format(new Date(entry.timestamp), "HH:mm")}
+                    </span>
+                    <span
+                      className="monitoring-feed-dot"
+                      style={{ background: actionColor(entry.action) }}
+                      aria-hidden="true"
+                    />
+                    <span className="monitoring-feed-user">
+                      {entry.user_name}
+                    </span>
+                    <span className="monitoring-feed-action">
+                      {formatAction(entry.action)}
+                      {meta ? (
+                        <span className="monitoring-feed-meta"> · {meta}</span>
+                      ) : null}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+      </>
+    );
+  }
+}
+
 function UserTimeline({
   entries,
   isLoading,
@@ -815,94 +1042,6 @@ function UserTimeline({
   );
 }
 
-function DayDetail({
-  date,
-  rows,
-  isLoading,
-  onClose,
-}: {
-  date: string;
-  rows: DayUserRow[];
-  isLoading: boolean;
-  onClose: () => void;
-}) {
-  const formatted = format(new Date(date), "EEEE, dd. MMMM yyyy", {
-    locale: de,
-  });
-
-  return (
-    <div className="monitoring-day-detail">
-      <div className="monitoring-day-detail-header">
-        <strong>{formatted}</strong>
-        <button className="ghost-button" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      {isLoading ? (
-        <p style={{ color: "#5c6874", fontSize: "0.85rem" }}>Lade...</p>
-      ) : rows.length === 0 ? (
-        <p style={{ color: "#5c6874", fontSize: "0.85rem" }}>
-          Keine Aktivität an diesem Tag.
-        </p>
-      ) : (
-        <div className="monitoring-user-table">
-          <div className="monitoring-user-row monitoring-user-header">
-            <span>Nutzer</span>
-            <span>Logins</span>
-            <span>Besuche</span>
-            <span>Aktionen</span>
-          </div>
-          {rows.map((row) => (
-            <div key={row.userId} className="monitoring-user-row">
-              <span>{row.userName}</span>
-              <span className="monitoring-stat-compact">
-                {row.logins}
-                {row.lastLoginTimestamp && (
-                  <span className="monitoring-stat-time">
-                    {formatRelativeTime(row.lastLoginTimestamp)}
-                  </span>
-                )}
-              </span>
-              <span className="monitoring-stat-compact">
-                {row.visits}
-                {row.lastVisitTimestamp && (
-                  <span className="monitoring-stat-time">
-                    {formatRelativeTime(row.lastVisitTimestamp)}
-                  </span>
-                )}
-              </span>
-              <span className="monitoring-actions-cell">
-                {formatActionCounts(row.actionCounts)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface DayUserRow {
-  userId: string;
-  userName: string;
-  logins: number;
-  visits: number;
-  actionCounts: Record<string, number>;
-  lastLoginTimestamp: string | null;
-  lastVisitTimestamp: string | null;
-}
-
-function toDayRow(user: MonitoringUserStats): DayUserRow {
-  return {
-    userId: user.user_id,
-    userName: user.user_name,
-    logins: user.logins,
-    visits: user.visits,
-    actionCounts: user.action_counts ?? {},
-    lastLoginTimestamp: user.last_login,
-    lastVisitTimestamp: user.last_visit,
-  };
-}
 
 function UsageChart({
   stats,
@@ -1398,6 +1537,38 @@ const WORKFLOW_LABELS: Record<string, string> = {
   "auto-plan": "Auto Plan",
   manual: "manuell",
 };
+
+// One colour per action, consistent with the "Aktivität im Zeitraum" bar.
+const ACTION_COLOR: Record<string, string> = {
+  login: "#64748b",
+  session_start: "#0d9488",
+  blocker_created: "var(--color-accent)",
+  blocker_edited: "#4f7cf7",
+  blocker_deleted: "#b8323a",
+  analysis_viewed: "#0891b2",
+  tasks_marked_done: "#15803d",
+  project_detail_opened: "#7c3aed",
+  task_detail_opened: "#a855f7",
+  csv_exported: "#d97706",
+};
+
+function actionColor(action: string): string {
+  return ACTION_COLOR[action] ?? "#94a3b8";
+}
+
+// Order of the filter chips / feed legend.
+const FILTERABLE_ACTIONS = [
+  "blocker_created",
+  "blocker_edited",
+  "blocker_deleted",
+  "tasks_marked_done",
+  "analysis_viewed",
+  "project_detail_opened",
+  "task_detail_opened",
+  "csv_exported",
+  "login",
+  "session_start",
+] as const;
 
 /** "Analyse angesehen 15×, Blocker erstellt 12" — top actions by count. */
 function formatActionCounts(

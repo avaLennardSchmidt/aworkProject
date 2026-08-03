@@ -9161,3 +9161,178 @@ span.overlap-badge-tooltip-row {
   color: var(--color-accent-hover);
   text-decoration: underline;
 }
+
+/* ── Monitoring: filterable activity feed ──────────────────────── */
+.monitoring-feed {
+  margin: 0 24px 24px;
+}
+
+.monitoring-feed-count {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.monitoring-feed-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.monitoring-feed-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.monitoring-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.monitoring-chip:hover {
+  border-color: var(--color-border-strong);
+}
+
+.monitoring-chip.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.monitoring-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.monitoring-chip-count {
+  color: var(--color-text-muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-chip.is-active .monitoring-chip-count {
+  color: var(--color-accent-deep);
+}
+
+.monitoring-feed-user-select {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-size: 0.82rem;
+  color: var(--color-text);
+}
+
+.monitoring-feed-hint {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+
+.monitoring-feed-list {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.monitoring-feed-day-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 14px;
+  background: #f0f3f6;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.monitoring-feed-row {
+  display: grid;
+  grid-template-columns: 48px 10px minmax(120px, 160px) 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.82rem;
+}
+
+.monitoring-feed-day:last-child .monitoring-feed-row:last-child {
+  border-bottom: none;
+}
+
+.monitoring-feed-time {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-feed-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.monitoring-feed-user {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitoring-feed-action {
+  color: var(--color-text);
+}
+
+.monitoring-feed-meta {
+  color: var(--color-text-muted);
+}
+
+/* Day filter pill in the activity feed header (from a chart-day click). */
+.monitoring-day-pill {
+  border: 1px solid var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-right: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.monitoring-day-pill:hover {
+  border-color: var(--color-accent);
+}
+
+/* Collapsible activity-feed header toggle. */
+.monitoring-feed-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.monitoring-feed-toggle .monitoring-section-title {
+  cursor: pointer;
+}
