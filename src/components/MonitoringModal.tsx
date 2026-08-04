@@ -243,7 +243,7 @@ export function MonitoringModal({
             to={to}
             users={users}
             dayFilter={selectedDay}
-            onClearDayFilter={() => setSelectedDay(null)}
+            onDayFilterChange={setSelectedDay}
           />
 
           <UserTableSection
@@ -771,15 +771,15 @@ function ActivityFeed({
   to,
   users,
   dayFilter,
-  onClearDayFilter,
+  onDayFilterChange,
 }: {
   backendClient: BackendClient;
   from: string;
   to: string;
   users: MonitoringUserStats[];
-  /** When set (yyyy-MM-dd, from a chart-day click), the feed shows only that day. */
+  /** Selected day (yyyy-MM-dd) or null for the whole-range summary. */
   dayFilter: string | null;
-  onClearDayFilter: () => void;
+  onDayFilterChange: (day: string | null) => void;
 }) {
   const [logs, setLogs] = useState<ActivityEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -802,7 +802,7 @@ function ActivityFeed({
     setActionFilter(new Set());
     setUserFilter("");
     backendClient
-      .getMonitoringLogs({ from, to, limit: 500 })
+      .getMonitoringLogs({ from, to, limit: 1000 })
       .then((data) => {
         if (!cancelled) setLogs(data);
       })
@@ -826,6 +826,16 @@ function ActivityFeed({
     return counts;
   }, [logs]);
 
+  // Days present in the data (for the date dropdown), newest first, with counts.
+  const dayOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const log of logs) {
+      const day = log.timestamp.slice(0, 10);
+      counts.set(day, (counts.get(day) ?? 0) + 1);
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [logs]);
+
   const filtered = useMemo(
     () =>
       logs.filter(
@@ -837,19 +847,42 @@ function ActivityFeed({
     [logs, actionFilter, userFilter, dayFilter],
   );
 
-  // Group the filtered feed by calendar day for readable day separators.
-  const grouped = useMemo(() => {
-    const map = new Map<string, ActivityEntry[]>();
-    for (const log of filtered) {
-      const day = log.timestamp.slice(0, 10);
-      const bucket = map.get(day);
-      if (bucket) {
-        bucket.push(log);
-      } else {
-        map.set(day, [log]);
+  // Summary (no day selected): one line per user × action with count + last seen.
+  const summary = useMemo(() => {
+    const byUser = new Map<
+      string,
+      {
+        userName: string;
+        total: number;
+        actions: Map<string, { count: number; last: string }>;
       }
+    >();
+    for (const log of filtered) {
+      const entry = byUser.get(log.user_id) ?? {
+        userName: log.user_name,
+        total: 0,
+        actions: new Map(),
+      };
+      entry.total += 1;
+      const a = entry.actions.get(log.action);
+      if (a) {
+        a.count += 1;
+        if (log.timestamp > a.last) a.last = log.timestamp;
+      } else {
+        entry.actions.set(log.action, { count: 1, last: log.timestamp });
+      }
+      byUser.set(log.user_id, entry);
     }
-    return Array.from(map.entries());
+    return Array.from(byUser.entries())
+      .map(([userId, v]) => ({
+        userId,
+        userName: v.userName,
+        total: v.total,
+        actions: Array.from(v.actions.entries())
+          .map(([action, x]) => ({ action, ...x }))
+          .sort((p, q) => q.count - p.count),
+      }))
+      .sort((p, q) => q.total - p.total);
   }, [filtered]);
 
   function toggleAction(action: string) {
@@ -888,16 +921,6 @@ function ActivityFeed({
           </h3>
         </button>
         <span className="monitoring-feed-count">
-          {dayFilter ? (
-            <button
-              type="button"
-              className="monitoring-day-pill"
-              onClick={onClearDayFilter}
-              title="Tagesfilter aufheben"
-            >
-              {format(new Date(dayFilter), "EEEE, dd.MM.", { locale: de })} ✕
-            </button>
-          ) : null}
           {filtered.length}{" "}
           {filtered.length === 1 ? "Aktivität" : "Aktivitäten"}
         </span>
@@ -905,72 +928,75 @@ function ActivityFeed({
 
       {collapsed ? null : (
         <>
-          {renderFeedBody()}
-        </>
-      )}
-    </section>
-  );
+          <div className="monitoring-feed-filters">
+            <div className="monitoring-feed-chips">
+              <button
+                type="button"
+                className={`monitoring-chip${actionFilter.size === 0 ? " is-active" : ""}`}
+                onClick={() => setActionFilter(new Set())}
+              >
+                Alle
+              </button>
+              {FILTERABLE_ACTIONS.filter((a) => countsByAction[a]).map(
+                (action) => (
+                  <button
+                    key={action}
+                    type="button"
+                    className={`monitoring-chip${actionFilter.has(action) ? " is-active" : ""}`}
+                    onClick={() => toggleAction(action)}
+                  >
+                    <span
+                      className="monitoring-chip-dot"
+                      style={{ background: actionColor(action) }}
+                      aria-hidden="true"
+                    />
+                    {formatAction(action)}
+                    <span className="monitoring-chip-count">
+                      {countsByAction[action]}
+                    </span>
+                  </button>
+                ),
+              )}
+            </div>
+            <div className="monitoring-feed-selects">
+              <select
+                className="monitoring-feed-user-select"
+                value={dayFilter ?? ""}
+                onChange={(e) => onDayFilterChange(e.target.value || null)}
+              >
+                <option value="">Alle Tage (Zusammenfassung)</option>
+                {dayOptions.map(([day, count]) => (
+                  <option key={day} value={day}>
+                    {format(new Date(day), "EEE, dd.MM.yyyy", { locale: de })} (
+                    {count})
+                  </option>
+                ))}
+              </select>
+              <select
+                className="monitoring-feed-user-select"
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+              >
+                <option value="">Alle Nutzer</option>
+                {userOptions.map((u) => (
+                  <option key={u.user_id} value={u.user_id}>
+                    {u.user_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-  function renderFeedBody() {
-    return (
-      <>
-
-      <div className="monitoring-feed-filters">
-        <div className="monitoring-feed-chips">
-          <button
-            type="button"
-            className={`monitoring-chip${actionFilter.size === 0 ? " is-active" : ""}`}
-            onClick={() => setActionFilter(new Set())}
-          >
-            Alle
-          </button>
-          {FILTERABLE_ACTIONS.filter((a) => countsByAction[a]).map((action) => (
-            <button
-              key={action}
-              type="button"
-              className={`monitoring-chip${actionFilter.has(action) ? " is-active" : ""}`}
-              onClick={() => toggleAction(action)}
-            >
-              <span
-                className="monitoring-chip-dot"
-                style={{ background: actionColor(action) }}
-                aria-hidden="true"
-              />
-              {formatAction(action)}
-              <span className="monitoring-chip-count">
-                {countsByAction[action]}
-              </span>
-            </button>
-          ))}
-        </div>
-        <select
-          className="monitoring-feed-user-select"
-          value={userFilter}
-          onChange={(e) => setUserFilter(e.target.value)}
-        >
-          <option value="">Alle Nutzer</option>
-          {userOptions.map((u) => (
-            <option key={u.user_id} value={u.user_id}>
-              {u.user_name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {isLoading ? (
-        <p className="monitoring-feed-hint">Lade Aktivitäten…</p>
-      ) : filtered.length === 0 ? (
-        <p className="monitoring-feed-hint">
-          Keine Aktivitäten für diese Filter.
-        </p>
-      ) : (
-        <div className="monitoring-feed-list">
-          {grouped.map(([day, entries]) => (
-            <div key={day} className="monitoring-feed-day">
-              <div className="monitoring-feed-day-label">
-                {format(new Date(day), "EEEE, dd. MMMM yyyy", { locale: de })}
-              </div>
-              {entries.map((entry) => {
+          {isLoading ? (
+            <p className="monitoring-feed-hint">Lade Aktivitäten…</p>
+          ) : filtered.length === 0 ? (
+            <p className="monitoring-feed-hint">
+              Keine Aktivitäten für diese Filter.
+            </p>
+          ) : dayFilter ? (
+            // A single day is selected → full chronological list for that day.
+            <div className="monitoring-feed-list">
+              {filtered.map((entry) => {
                 const meta = formatMetadata(entry.action, entry.metadata);
                 return (
                   <div key={entry.id} className="monitoring-feed-row">
@@ -995,12 +1021,41 @@ function ActivityFeed({
                 );
               })}
             </div>
-          ))}
-        </div>
+          ) : (
+            // No day selected → compact per-user, per-action summary.
+            <div className="monitoring-feed-list">
+              {summary.map((u) => (
+                <div key={u.userId} className="monitoring-summary-group">
+                  <div className="monitoring-summary-user">
+                    <span>{u.userName}</span>
+                    <span className="monitoring-summary-total">{u.total}</span>
+                  </div>
+                  {u.actions.map((a) => (
+                    <div key={a.action} className="monitoring-summary-row">
+                      <span
+                        className="monitoring-feed-dot"
+                        style={{ background: actionColor(a.action) }}
+                        aria-hidden="true"
+                      />
+                      <span className="monitoring-summary-action">
+                        {formatAction(a.action)}
+                      </span>
+                      <span className="monitoring-summary-count">
+                        {a.count}×
+                      </span>
+                      <span className="monitoring-summary-last">
+                        zuletzt {format(new Date(a.last), "dd.MM. HH:mm")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
-      </>
-    );
-  }
+    </section>
+  );
 }
 
 function UserTimeline({
