@@ -9336,3 +9336,58 @@ span.overlap-badge-tooltip-row {
 .monitoring-feed-toggle .monitoring-section-title {
   cursor: pointer;
 }
+
+/* Activity feed: date + user selects side by side. */
+.monitoring-feed-selects {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Summary mode (no day selected): per-user, per-action rollup. */
+.monitoring-summary-group {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.monitoring-summary-group:last-child {
+  border-bottom: none;
+}
+
+.monitoring-summary-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px 4px;
+  font-weight: 700;
+  font-size: 0.84rem;
+}
+
+.monitoring-summary-total {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-summary-row {
+  display: grid;
+  grid-template-columns: 12px minmax(140px, 1fr) 56px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 14px 3px 24px;
+  font-size: 0.8rem;
+}
+
+.monitoring-summary-action {
+  color: var(--color-text);
+}
+
+.monitoring-summary-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.monitoring-summary-last {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
