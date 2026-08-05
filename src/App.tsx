@@ -273,7 +273,7 @@ function App() {
       }
 
       lastSessionCheckRef.current = now;
-      void restoreBackendSession();
+      void restoreBackendSession(false, true);
     }
 
     function handleVisibilityChange() {
@@ -773,8 +773,15 @@ function App() {
     [groups, selectedGroupIds],
   );
 
-  async function restoreBackendSession(returnedFromLogin = false) {
-    setIsConnecting(true);
+  async function restoreBackendSession(
+    returnedFromLogin = false,
+    isLivenessCheck = false,
+  ) {
+    // A focus/visibility liveness re-check must not disturb the loaded planner
+    // state. Only flip into the connecting UI for a real (re)connect.
+    if (!isLivenessCheck) {
+      setIsConnecting(true);
+    }
     setError("");
     if (returnedFromLogin) {
       setStatusMessage("awork Login abgeschlossen. Session wird geprüft...");
@@ -786,8 +793,18 @@ function App() {
       try {
         const status = await backendClient.getAuthStatus();
         if (status.authenticated && status.user) {
+          const sameUser = currentUser?.id === status.user.id;
+          if (isLivenessCheck && sameUser) {
+            // Session is still alive and unchanged: keep the selected planner
+            // user and already-loaded blockers intact. Nothing to reset.
+            return;
+          }
           setCurrentUser(status.user);
-          setSelectedPlannerUserId("");
+          // Reset the planner selection only when establishing or switching the
+          // user — never on a silent liveness re-check of the same user.
+          if (!sameUser) {
+            setSelectedPlannerUserId("");
+          }
           backendClient
             .getMonitoringAccess()
             .then((r) => setHasMonitoringAccess(r.hasAccess))
