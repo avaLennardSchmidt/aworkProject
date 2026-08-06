@@ -2664,6 +2664,56 @@ button.auto-plan-skipped-day:hover {
   }
 }
 
+/* Login gate: unlike normal modals (which center within the content area and
+   sit below the sidebar at z-index 100), the sign-in gate must cover the
+   entire viewport — including the sidebar and its small login button — so
+   nothing behind it is interactive while signed out. */
+.modal-backdrop:has(.login-gate-modal) {
+  padding-left: 20px;
+  z-index: 10000;
+  background: rgb(17 24 31 / 0.72);
+}
+
+.login-gate-modal {
+  width: min(440px, 100%);
+  max-width: 440px;
+}
+
+.login-gate {
+  display: grid;
+  gap: 14px;
+  text-align: center;
+  justify-items: center;
+}
+
+.login-gate h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.login-gate .eyebrow {
+  margin: 0;
+}
+
+.login-gate-copy {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.login-gate-button {
+  min-width: 200px;
+  margin-top: 6px;
+}
+
+.login-gate-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .success-popup {
   display: grid;
   justify-items: center;
@@ -8964,6 +9014,26 @@ button.auto-plan-skipped-day:hover {
 }
 
 /* Deadline sidebar: prominent full-width mark-as-done CTA + in-card selection. */
+.deadline-action-result {
+  margin: -6px 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.deadline-action-result--success {
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-border);
+}
+
+.deadline-action-result--error {
+  color: #8a1c13;
+  background: #fdecea;
+  border: 1px solid #f5c2bd;
+}
+
 .deadline-mark-done-cta {
   display: flex;
   align-items: center;

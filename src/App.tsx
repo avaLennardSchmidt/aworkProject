@@ -71,6 +71,7 @@ import { SuccessPopup } from "./components/SuccessPopup";
 import type { PlannerWorkflow } from "./components/WorkflowChooser";
 import { Sidebar } from "./components/Sidebar";
 import { BackendStartupBanner } from "./components/BackendStartupBanner";
+import { LoginModal } from "./components/LoginModal";
 import { CapacityAnalysisPage } from "./components/CapacityAnalysisPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MonitoringModal } from "./components/MonitoringModal";
@@ -131,6 +132,7 @@ function App() {
   // Route is the single source of truth for which view is active.
   const workflow = pathToWorkflow(location.pathname);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<"ok" | "starting">("ok");
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(false);
   const [scheduleRefreshNotice, setScheduleRefreshNotice] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -247,6 +249,12 @@ function App() {
     // Wake the backend on load and show the startup banner while it spins up.
     // Runs regardless of auth state so a cold start is visible before login.
     void backendClient.warmUp();
+  }, []);
+
+  useEffect(() => {
+    // Mirror the backend cold-start status so the login gate can hold back
+    // while the startup banner is up — the two overlays must not stack.
+    return backendClient.onStatusChange(setBackendStatus);
   }, []);
 
   useEffect(() => {
@@ -1494,10 +1502,24 @@ function App() {
     setDeleteResults(undefined);
   }
 
+  // Blocking sign-in gate: while no user is authenticated the planner UI is
+  // non-functional, so cover it with a modal that is the only interactive
+  // surface. Held back while the backend is still starting so it never stacks
+  // on top of the startup banner — the banner shows first, then the login
+  // modal once the backend is reachable. Rendered in every route branch below.
+  const loginGate = currentUser || backendStatus === "starting" ? null : (
+    <LoginModal
+      isConnecting={isConnecting}
+      onLogin={handleLogin}
+      error={error}
+    />
+  );
+
   if (isAnalysisRoute) {
     return (
       <div className="app-layout">
         <BackendStartupBanner backendClient={backendClient} />
+        {loginGate}
         <Sidebar
           activeItem={workflow}
           isCapacityActive={isAnalysisRoute}
@@ -1543,6 +1565,7 @@ function App() {
   return (
     <div className="app-layout">
       <BackendStartupBanner backendClient={backendClient} />
+      {loginGate}
       <Sidebar
         activeItem={workflow}
         capacityHref={`#${CAPACITY_PATH}`}

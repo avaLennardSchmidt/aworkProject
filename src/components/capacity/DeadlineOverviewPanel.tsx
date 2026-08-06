@@ -15,6 +15,7 @@ export function DeadlineOverviewPanel({
   isBusy = false,
   onSelect,
   onMarkDone,
+  actionResult,
   onClose,
 }: {
   user: AworkUser;
@@ -26,6 +27,8 @@ export function DeadlineOverviewPanel({
   onSelect: (deadline: DeadlineRisk) => void;
   /** Marks the given tasks as done in awork (project-specific done status). */
   onMarkDone?: (tasks: Array<{ taskId: string; projectId?: string }>) => Promise<void>;
+  /** Outcome of the last mark-done action, shown inside the panel. */
+  actionResult?: { kind: "success" | "error"; message: string } | null;
   onClose: () => void;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -121,8 +124,9 @@ export function DeadlineOverviewPanel({
       </div>
 
       <p className="deadline-overview-hint">
-        Termin anklicken zum Auswählen · „KW öffnen" zeigt die Blocker der
-        Woche.
+        {onMarkDone
+          ? "Termin anklicken zum Auswählen · „KW öffnen\" zeigt die Blocker der Woche."
+          : "Termin anklicken zeigt die Blocker der Woche."}
       </p>
       {onMarkDone && deadlines.length > 0 ? (
         <button
@@ -145,6 +149,15 @@ export function DeadlineOverviewPanel({
             </>
           )}
         </button>
+      ) : null}
+
+      {actionResult ? (
+        <p
+          className={`deadline-action-result deadline-action-result--${actionResult.kind}`}
+          role={actionResult.kind === "error" ? "alert" : "status"}
+        >
+          {actionResult.message}
+        </p>
       ) : null}
 
       {overdue.length > 0 ? (

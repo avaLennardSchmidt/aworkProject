@@ -611,6 +611,10 @@ export function CapacityAnalysisPage({
   >(null);
   const [isWeekActionBusy, setIsWeekActionBusy] = useState(false);
   const [isDeadlineActionBusy, setIsDeadlineActionBusy] = useState(false);
+  const [deadlineActionResult, setDeadlineActionResult] = useState<{
+    kind: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Marks the selected deadline tasks as done in awork, then reloads the
   // user's data so the risks (and blockers of now-done tasks) update.
@@ -620,22 +624,31 @@ export function CapacityAnalysisPage({
     if (!deadlineDetailUserId || tasks.length === 0) return;
     setIsDeadlineActionBusy(true);
     setError("");
+    // Panel-scoped feedback: the global ErrorAlert renders behind this slide-in
+    // overlay, so mark-done failures were invisible here.
+    setDeadlineActionResult(null);
     try {
       const result = await backendClient.markTasksDone(tasks);
       if (result.failed.length > 0) {
-        setError(
-          `${result.failed.length} Aufgabe(n) konnten nicht auf erledigt gesetzt werden: ${result.failed[0]?.error ?? ""}`,
-        );
+        const message = `${result.failed.length} Aufgabe(n) konnten nicht auf erledigt gesetzt werden: ${result.failed[0]?.error ?? ""}`;
+        setError(message);
+        setDeadlineActionResult({ kind: "error", message });
+      } else {
+        setDeadlineActionResult({
+          kind: "success",
+          message: `${result.succeeded.length} Aufgabe(n) als erledigt markiert.`,
+        });
       }
       if (result.succeeded.length > 0) {
         await refreshUserSchedules(deadlineDetailUserId);
       }
     } catch (markError) {
-      setError(
+      const message =
         markError instanceof Error
           ? markError.message
-          : "Aufgaben konnten nicht auf erledigt gesetzt werden.",
-      );
+          : "Aufgaben konnten nicht auf erledigt gesetzt werden.";
+      setError(message);
+      setDeadlineActionResult({ kind: "error", message });
     } finally {
       setIsDeadlineActionBusy(false);
     }
@@ -1923,8 +1936,20 @@ export function CapacityAnalysisPage({
           onSelect={(deadline) =>
             openDeadlineWeek(deadlineDetailData.entry.row.user.id, deadline)
           }
-          onMarkDone={markDeadlineTasksDone}
-          onClose={() => setDeadlineDetailUserId(null)}
+          onMarkDone={
+            deadlineDetailData.entry.row.user.id === currentUser?.id
+              ? markDeadlineTasksDone
+              : undefined
+          }
+          actionResult={
+            deadlineDetailData.entry.row.user.id === currentUser?.id
+              ? deadlineActionResult
+              : null
+          }
+          onClose={() => {
+            setDeadlineActionResult(null);
+            setDeadlineDetailUserId(null);
+          }}
         />
       ) : null}
     </main>
