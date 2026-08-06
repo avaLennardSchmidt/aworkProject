@@ -3,12 +3,25 @@ name: Deploy Frontend to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
+# Official GitHub Actions Pages deployment: build once, upload an artifact, and
+# publish it directly via the Pages deployment API. No gh-pages branch and no
+# legacy "pages build and deployment" job, so the two no longer race and cancel
+# each other (the previous cause of "Error: Deployment cancelled").
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one publish at a time; let a newer run replace an older queued one
+# instead of failing it.
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,9 +39,18 @@ jobs:
         env:
           VITE_BACKEND_BASE_URL: ${{ secrets.VITE_BACKEND_BASE_URL }}
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          cname: false
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
