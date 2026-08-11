@@ -6064,6 +6064,16 @@ button.auto-plan-skipped-day:hover {
   white-space: nowrap;
 }
 
+/* Active day filter on the user table — sits next to the title. */
+.monitoring-day-chip {
+  margin-right: auto;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  white-space: nowrap;
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .monitoring-sort-btn {
   appearance: none;
   background: none;

@@ -63,6 +63,9 @@ export function MonitoringModal({
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<ChartMode>("nutzer");
   const [totals, setTotals] = useState<MonitoringTotals | null>(null);
+  // User stats for the single day picked in the chart (null = whole range).
+  const [dayUsers, setDayUsers] = useState<MonitoringUserStats[] | null>(null);
+  const [isDayUsersLoading, setIsDayUsersLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +111,31 @@ export function MonitoringModal({
     loadData(from, to);
   }, [from, to, loadData]);
 
+  // A day picked in the chart narrows the user table to that day only.
+  useEffect(() => {
+    if (!selectedDay) {
+      setDayUsers(null);
+      setIsDayUsersLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setIsDayUsersLoading(true);
+    backendClient
+      .getMonitoringUserStats(selectedDay, selectedDay)
+      .then((data) => {
+        if (!cancelled) setDayUsers(data);
+      })
+      .catch(() => {
+        if (!cancelled) setDayUsers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsDayUsersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [backendClient, selectedDay]);
+
   // Clicking a day in the chart narrows the activity feed to that day.
   function handleDayClick(date: string) {
     setSelectedDay((current) => (current === date ? null : date));
@@ -130,7 +158,8 @@ export function MonitoringModal({
   const totalLogins = chartStats.reduce((s, d) => s + d.logins, 0);
   const totalVisits = chartStats.reduce((s, d) => s + d.session_starts, 0);
   const totalActions = chartStats.reduce((s, d) => s + dailyActions(d), 0);
-  const userSummary = users.map((u) => toSummaryRow(u));
+  const visibleUsers = selectedDay ? (dayUsers ?? []) : users;
+  const userSummary = visibleUsers.map((u) => toSummaryRow(u));
 
   return (
     <ModalShell
@@ -248,9 +277,12 @@ export function MonitoringModal({
 
           <UserTableSection
             users={userSummary}
-            from={from}
-            to={to}
+            from={selectedDay ?? from}
+            to={selectedDay ?? to}
             backendClient={backendClient}
+            selectedDay={selectedDay}
+            isDayLoading={isDayUsersLoading}
+            onClearDay={() => setSelectedDay(null)}
           />
         </>
       )}
@@ -560,11 +592,18 @@ function UserTableSection({
   from,
   to,
   backendClient,
+  selectedDay,
+  isDayLoading,
+  onClearDay,
 }: {
   users: UserSummaryRow[];
   from: string;
   to: string;
   backendClient: BackendClient;
+  /** Day picked in the chart (yyyy-MM-dd) or null for the whole range. */
+  selectedDay: string | null;
+  isDayLoading: boolean;
+  onClearDay: () => void;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("visits");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -657,6 +696,16 @@ function UserTableSection({
         <h3 className="monitoring-section-title monitoring-section-title--inline">
           Nutzer-Übersicht
         </h3>
+        {selectedDay ? (
+          <button
+            type="button"
+            className="ghost-button monitoring-day-chip"
+            onClick={onClearDay}
+            title="Tagesfilter aufheben"
+          >
+            {format(new Date(selectedDay), "dd. MMM yyyy", { locale: de })} ✕
+          </button>
+        ) : null}
         {users.length > 0 ? (
           <button
             type="button"
@@ -668,7 +717,7 @@ function UserTableSection({
         ) : null}
       </div>
 
-      {users.length === 0 ? (
+      {isDayLoading ? (
         <p
           style={{
             padding: "0 24px 24px",
@@ -676,7 +725,19 @@ function UserTableSection({
             fontSize: "0.85rem",
           }}
         >
-          Keine Nutzer im gewählten Zeitraum.
+          Lade Nutzer für den gewählten Tag...
+        </p>
+      ) : users.length === 0 ? (
+        <p
+          style={{
+            padding: "0 24px 24px",
+            color: "#5c6874",
+            fontSize: "0.85rem",
+          }}
+        >
+          {selectedDay
+            ? "Keine Nutzer an diesem Tag."
+            : "Keine Nutzer im gewählten Zeitraum."}
         </p>
       ) : (
         <div className="monitoring-user-table monitoring-user-table--4col">
@@ -817,14 +878,23 @@ function ActivityFeed({
     };
   }, [backendClient, from, to]);
 
-  // Counts per action across the loaded window (drives the chip labels).
+  // Logs inside the current day scope — the selected day, or the whole range.
+  const dayScopedLogs = useMemo(
+    () =>
+      dayFilter
+        ? logs.filter((log) => log.timestamp.slice(0, 10) === dayFilter)
+        : logs,
+    [logs, dayFilter],
+  );
+
+  // Counts per action within the day scope (drives the chip labels).
   const countsByAction = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const log of logs) {
+    for (const log of dayScopedLogs) {
       counts[log.action] = (counts[log.action] ?? 0) + 1;
     }
     return counts;
-  }, [logs]);
+  }, [dayScopedLogs]);
 
   // Days present in the data (for the date dropdown), newest first, with counts.
   const dayOptions = useMemo(() => {
@@ -897,9 +967,27 @@ function ActivityFeed({
     });
   }
 
-  const userOptions = [...users].sort((a, b) =>
-    a.user_name.localeCompare(b.user_name),
-  );
+  // With a day selected, only offer the users who were actually active that day.
+  const userOptions = useMemo(() => {
+    if (!dayFilter) {
+      return [...users]
+        .map((u) => ({ user_id: u.user_id, user_name: u.user_name }))
+        .sort((a, b) => a.user_name.localeCompare(b.user_name));
+    }
+    const seen = new Map<string, string>();
+    for (const log of dayScopedLogs) {
+      if (!seen.has(log.user_id)) seen.set(log.user_id, log.user_name);
+    }
+    return Array.from(seen, ([user_id, user_name]) => ({ user_id, user_name }))
+      .sort((a, b) => a.user_name.localeCompare(b.user_name));
+  }, [dayFilter, dayScopedLogs, users]);
+
+  // Drop a user filter that no longer exists in the current day scope.
+  useEffect(() => {
+    if (userFilter && !userOptions.some((u) => u.user_id === userFilter)) {
+      setUserFilter("");
+    }
+  }, [userFilter, userOptions]);
 
   return (
     <section className="monitoring-feed" ref={sectionRef}>
