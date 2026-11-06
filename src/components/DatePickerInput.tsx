@@ -29,6 +29,8 @@ interface DatePickerInputProps {
   minDate?: string; // YYYY-MM-DD — days before this are disabled
   maxDate?: string; // YYYY-MM-DD — days after this are disabled
   absenceRanges?: AbsenceRange[];
+  /** Weekday (0 = Sunday … 6 = Saturday) whose days are emphasized in the calendar. */
+  highlightWeekday?: number;
   onChange: (value: string) => void;
 }
 
@@ -69,6 +71,7 @@ export function DatePickerInput({
   minDate,
   maxDate,
   absenceRanges,
+  highlightWeekday,
   onChange,
 }: DatePickerInputProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -335,6 +338,10 @@ export function DatePickerInput({
                               isCurrentDay ? "date-picker-cell--today" : "",
                               isAbsent ? "date-picker-cell--absent" : "",
                               isDisabled ? "date-picker-cell--disabled" : "",
+                              highlightWeekday !== undefined &&
+                              date.getDay() === highlightWeekday
+                                ? "date-picker-cell--highlight"
+                                : "",
                             ]
                               .filter(Boolean)
                               .join(" ")}

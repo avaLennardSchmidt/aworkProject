@@ -52,7 +52,6 @@ import type {
   ScheduleGroup,
   UpdateResult,
 } from "./types/planner";
-import { BulkEditModal } from "./components/BulkEditModal";
 import {
   CreateScheduleGroupPanel,
   type CreateGroupOptions,
@@ -62,8 +61,12 @@ import { DeleteGroupModal } from "./components/DeleteGroupModal";
 import { StatusToast } from "./components/StatusToast";
 import { FilterPanel } from "./components/FilterPanel";
 import { LoadingState } from "./components/LoadingState";
-import { ManualBlockerEditModal } from "./components/ManualBlockerEditModal";
-import { MultiGroupDurationEditModal } from "./components/MultiGroupDurationEditModal";
+import {
+  ManualBlockerEditModal,
+  type ManualEditState,
+} from "./components/ManualBlockerEditModal";
+import { SeriesEditModal } from "./components/SeriesEditModal";
+import type { SeriesEditDraft } from "./services/seriesEdit";
 import { PreviewChangesModal } from "./components/PreviewChangesModal";
 import { BlockerOperationsPreviewModal } from "./components/BlockerOperationsPreviewModal";
 import { ScheduleGroupsList } from "./components/ScheduleGroupsList";
@@ -190,6 +193,8 @@ function App() {
   );
   const [multiEditGroups, setMultiEditGroups] = useState<ScheduleGroup[]>();
   const [manualEditGroup, setManualEditGroup] = useState<ScheduleGroup>();
+  const [seriesDraft, setSeriesDraft] = useState<SeriesEditDraft>();
+  const [manualDraft, setManualDraft] = useState<ManualEditState>();
   const [deleteGroup, setDeleteGroup] = useState<ScheduleGroup>();
   const [previewChanges, setPreviewChanges] = useState<PreviewChange[]>();
   const [blockerOperations, setBlockerOperations] =
@@ -1491,6 +1496,8 @@ function App() {
   }
 
   function closeModals() {
+    setSeriesDraft(undefined);
+    setManualDraft(undefined);
     setSelectedGroup(undefined);
     setMultiEditGroups(undefined);
     setManualEditGroup(undefined);
@@ -2026,43 +2033,41 @@ function App() {
             </ModalShell>
           ) : null}
 
-          {selectedGroup && plannerUser && !previewChanges ? (
-            <BulkEditModal
-              group={selectedGroup}
-              currentUser={plannerUser}
-              onClose={closeModals}
-              onPreview={handlePreview}
-              onManualEditRequest={handleManualEditRequest}
-            />
-          ) : null}
-
-          {multiEditGroups &&
+          {(selectedGroup || multiEditGroups) &&
           plannerUser &&
           !previewChanges &&
-          !blockerOperations &&
-          isMultiEditAvailable ? (
-            <MultiGroupDurationEditModal
-              groups={multiEditGroups}
+          !blockerOperations ? (
+            <SeriesEditModal
+              groups={selectedGroup ? [selectedGroup] : (multiEditGroups ?? [])}
               currentUser={plannerUser}
+              initialDraft={seriesDraft}
               onClose={closeModals}
-              onPreview={handlePreview}
-              onUnplanPreview={(operations) => {
-                setMultiEditGroups(undefined);
+              onPreview={(operations, draft) => {
+                setSeriesDraft(draft);
                 handleBlockerOperationsPreview(operations);
+              }}
+              onEditIndividually={(group) => {
+                setManualDraft(undefined);
+                handleManualEditRequest(group);
               }}
             />
           ) : null}
 
-          {manualEditGroup && plannerUser ? (
+          {manualEditGroup && plannerUser && !blockerOperations ? (
             <ManualBlockerEditModal
               group={manualEditGroup}
               currentUser={plannerUser}
+              initialState={manualDraft}
               onBack={() => {
+                setManualDraft(undefined);
                 setSelectedGroup(manualEditGroup);
                 setManualEditGroup(undefined);
               }}
               onClose={closeModals}
-              onPreview={handleBlockerOperationsPreview}
+              onPreview={(operations, state) => {
+                setManualDraft(state);
+                handleBlockerOperationsPreview(operations);
+              }}
             />
           ) : null}
 
