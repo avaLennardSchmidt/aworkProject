@@ -202,7 +202,7 @@ export function ScheduleGroupsList({
           }
           onClick={onMultiEdit}
         >
-          Gruppen bearbeiten
+          Serien bearbeiten
         </button>
       </div>
 
@@ -376,8 +376,8 @@ function ProjectRows({
                   <button
                     type="button"
                     className="table-icon-button table-edit-button"
-                    title="Zeitfenster ändern"
-                    aria-label="Zeitfenster ändern"
+                    title="Serie bearbeiten"
+                    aria-label="Serie bearbeiten"
                     onClick={() => onChangeTimeWindow(group)}
                   >
                     <span aria-hidden="true">✎</span>
